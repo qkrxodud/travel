@@ -35,8 +35,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li><b>순서 단위(lane) = (aggregateId, 구독자)</b>. 같은 단위 안에서 앞 이벤트가 DELIVERED 가 아니면(재시도 대기·FAILED)
  *       뒤 이벤트를 보내지 않는다(head-of-line). 순서를 깨고 건너뛰지 않는다 — 그래서 취소가 체크인을 앞지르지 않는다.
  *       다른 단위는 계속 진행한다(독성 이벤트가 전체를 막지 않음).</li>
- *   <li>낙관적 락 충돌(동시 사용자 커맨드와 경합)은 재시도 상한에 세지 않고 지수 백오프 + 지터로 계속 재시도한다.
- *       그 밖의 실패는 백오프로 재시도, max-attempts(5)에 닿으면 FAILED — 그 단위는 {@link OutboxRedelivery}로 풀 때까지 멈춘다.</li>
+ *   <li>낙관적 락 충돌(동시 사용자 커맨드와 경합)은 재시도 횟수 상한에 세지 않고 지수 백오프 + 지터로 재시도하되, 첫 충돌부터
+ *       conflict-retry-limit(기본 10분, 결정 5)을 넘기면 FAILED. 그 밖의 실패는 백오프로 재시도, max-attempts(5)에 닿으면
+ *       FAILED — 그 단위는 {@link OutboxRedelivery}로 풀 때까지 멈춘다.</li>
+ *   <li>한 페이지(100행)의 전달 기록은 한 번에 읽는다(R2-2 — 멈춘 행이 쌓여도 행마다 조회하지 않는다). FAILED 로 멈춘 전달 수는
+ *       주기적으로(최대 1분에 한 번) WARN 로그로 알린다.</li>
  *   <li>모든 구독자가 DELIVERED 가 되면 published_at 을 찍고 프로세스 안 리스너(@EventListener)에도 알린다.
  *       FAILED 가 남은 행은 미발행으로 남아 재전달을 기다린다.</li>
  * </ul>
@@ -58,15 +61,20 @@ public class OutboxRelay {
     private final Clock clock;
     /** 재시도 시각(백오프)은 벽시계로 잰다 — 업무 시계(Clock 빈, 테스트에선 멈춘 가변 시계)와 무관한 인프라 타이밍이다. */
     private final Clock retryClock = Clock.systemUTC();
+    private volatile boolean paused;
     private final int maxAttempts;
+    private final Duration conflictRetryLimit;
     private final RetryBackoff backoff;
+    private Instant lastStalledReport = Instant.EPOCH;
 
     public OutboxRelay(OutboxEventRepository events, OutboxDeliveryRepository deliveries, ObjectMapper objectMapper,
                        ApplicationEventPublisher publisher, List<EventSubscriber> subscribers,
                        PlatformTransactionManager txManager, Clock clock,
                        @Value("${territory.outbox.relay.max-attempts:5}") int maxAttempts,
                        @Value("${territory.outbox.relay.backoff.initial-ms:500}") long initialBackoffMs,
-                       @Value("${territory.outbox.relay.backoff.max-ms:30000}") long maxBackoffMs) {
+                       @Value("${territory.outbox.relay.backoff.max-ms:30000}") long maxBackoffMs,
+                       @Value("${territory.outbox.relay.conflict-retry-limit:10m}") Duration conflictRetryLimit) {
+        this.conflictRetryLimit = conflictRetryLimit;
         this.events = events;
         this.deliveries = deliveries;
         this.objectMapper = objectMapper;
@@ -81,29 +89,51 @@ public class OutboxRelay {
         log.info("outbox 구독자 {}개: {}", this.subscribers.size(), this.subscribers);
     }
 
+    /** local 전용(/dev/reset): 릴레이를 멈춘다. relay() 와 같은 모니터라 진행 중인 주기가 끝날 때까지 기다린다(QA R2-1). */
+    public synchronized void pause() {
+        paused = true;
+    }
+
+    public void resume() {
+        paused = false;
+    }
+
     @Scheduled(fixedDelayString = "${territory.outbox.relay.delay-ms:1000}")
     public synchronized void relay() {
+        if (paused) return;
         Set<String> stalledLanes = new HashSet<>(); // 이번 주기에 앞 이벤트가 끝나지 않아 멈춘 (aggregateId|구독자)
         long cursor = 0;
         List<OutboxEventEntity> page;
         do {
             page = events.findByPublishedAtIsNullAndIdGreaterThanOrderByIdAsc(cursor, Limit.of(PAGE));
+            Map<Long, Map<String, OutboxDeliveryEntity>> pageState = deliveries
+                .findByEventIdIn(page.stream().map(OutboxEventEntity::id).toList()).stream()
+                .collect(Collectors.groupingBy(OutboxDeliveryEntity::eventId,
+                    Collectors.toMap(OutboxDeliveryEntity::subscriber, Function.identity())));
             for (OutboxEventEntity row : page) {
                 cursor = row.id();
-                relayRow(row, stalledLanes);
+                relayRow(row, pageState.getOrDefault(row.id(), Map.of()), stalledLanes);
             }
         } while (page.size() == PAGE);
+        reportStalled();
     }
 
-    private void relayRow(OutboxEventEntity row, Set<String> stalledLanes) {
+    /** FAILED 로 멈춘 전달이 있으면 최대 1분에 한 번 WARN 으로 알린다(R2-2 — 멈춘 단위를 드러내는 최소 수단). */
+    private void reportStalled() {
+        Instant now = retryClock.instant();
+        if (now.isBefore(lastStalledReport.plus(Duration.ofMinutes(1)))) return;
+        lastStalledReport = now;
+        long failed = deliveries.countByStatus(OutboxDeliveryEntity.Status.FAILED);
+        if (failed > 0) log.warn("outbox FAILED 전달 {}건 — 그 순서 단위는 재전달(OutboxRedelivery) 전까지 멈춰 있다", failed);
+    }
+
+    private void relayRow(OutboxEventEntity row, Map<String, OutboxDeliveryEntity> state, Set<String> stalledLanes) {
         Optional<DomainEvent> parsed = deserialize(row);
         if (parsed.isEmpty()) {
             markPublished(row.id());
             return;
         }
         DomainEvent event = parsed.get();
-        Map<String, OutboxDeliveryEntity> state = deliveries.findByEventId(row.id()).stream()
-            .collect(Collectors.toMap(OutboxDeliveryEntity::subscriber, Function.identity()));
         Instant now = retryClock.instant();
         boolean allDelivered = true;
         for (EventSubscriber subscriber : subscribersOf(event)) {
@@ -145,9 +175,13 @@ public class OutboxRelay {
             OutboxDeliveryEntity delivery = loadOrNew(row.id(), subscriber.id());
             Instant now = retryClock.instant();
             if (conflict) {
-                delivery.markConflict(exception.toString(), backoff.delay(delivery.conflicts() + 1), now);
-                log.info("outbox {} ({}) → {} 낙관적 락 충돌 {}회째, 백오프 후 재시도", row.id(), row.eventName(),
-                    subscriber.id(), delivery.conflicts());
+                if (delivery.markConflict(exception.toString(), backoff.delay(delivery.conflicts() + 1), conflictRetryLimit, now)) {
+                    log.error("outbox {} ({}) → {} 충돌 재시도가 {} 를 넘겨 FAILED — 이 순서 단위는 재전달 전까지 멈춘다: {}",
+                        row.id(), row.eventName(), subscriber.id(), conflictRetryLimit, exception.toString());
+                } else {
+                    log.info("outbox {} ({}) → {} 낙관적 락 충돌 {}회째, 백오프 후 재시도", row.id(), row.eventName(),
+                        subscriber.id(), delivery.conflicts());
+                }
             } else if (delivery.markFailure(exception.toString(), maxAttempts,
                 backoff.delay(delivery.attempts() + 1), now)) {
                 log.error("outbox {} ({}) → {} 전달 {}회 실패, FAILED — 이 순서 단위는 재전달 전까지 멈춘다: {}", row.id(),

@@ -1,5 +1,6 @@
 package com.kobi.territory.progression.application;
 
+import com.kobi.territory.common.event.EventBacklog;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.ConcurrencyFailureException;
@@ -29,8 +31,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 재계산 배치(일관성 원칙 3) — 정의 변경·버그 복구용. Territory(탐험 Query 의 visitHistory)로부터 진행·도감·퀘스트를
  * 다시 만든다(현재 방문으로 정해지는 값은 다시 만들고, 취소 비대칭으로 남은 보상·완성 기록은 지우지 않는 "덧붙이기" +
  * 잃은 세트·퀘스트 보상 복구). 재생 규칙은 도메인 서비스 ProgressionReplay 가 갖고, 여기는 불러오기·저장 순서만 둔다.
- * 진입점: local 전용 POST /dev/recalculate, 운영은 기동 인자 --territory.progression.recalculate-on-startup=true.
- * 릴레이와 동시에 돌리는 것은 가정하지 않는다(운영 배치는 트래픽이 없을 때).
+ * 진입점: local 전용 POST /dev/recalculate, 운영은 기동 인자 --territory.progression.recalculate-on-startup=true
+ * (릴레이가 outbox 를 비운 뒤 실행).
+ * <p>
+ * 보류(구조 QA S3-3): 탐험가(와 그가 속한 지도)에 아직 릴레이가 전달하지 않은 outbox 이벤트가 남아 있으면 그 탐험가는 건너뛰고
+ * 보고서의 deferred 에 넣는다 — 재계산이 릴레이보다 앞선 영토를 읽으면 "잠깐 있었던 완성"(체크인 → 취소 사이의 테마 완성)을
+ * 놓쳐 이벤트 누적과 달라지기 때문이다. 보류된 탐험가는 릴레이가 비운 뒤 다시 돌리면 된다. 운영은 트래픽 적은 시간에 돌린다
+ * (재계산이 진행 루트를 잠그는 동안 사용자의 칭호 선택은 409 로 실패할 수 있다 — S3-2).
  */
 @Service
 public class RecalculateService {
@@ -44,11 +51,14 @@ public class RecalculateService {
     private final QuestBoardRepository boards;
     private final ProgressionCatalog catalog;
     private final Clock clock;
+    private final EventBacklog backlog;
     private final TransactionTemplate perExplorerTx;
 
     public RecalculateService(TerritoryQuery territories, ExplorerProgressRepository progresses,
                               CollectionBookRepository collectionBooks, QuestBoardRepository boards,
-                              ProgressionCatalog catalog, Clock clock, PlatformTransactionManager transactionManager) {
+                              ProgressionCatalog catalog, Clock clock, EventBacklog backlog,
+                              PlatformTransactionManager transactionManager) {
+        this.backlog = backlog;
         this.territories = territories;
         this.progresses = progresses;
         this.collectionBooks = collectionBooks;
@@ -65,9 +75,22 @@ public class RecalculateService {
      * (트랜잭션 경계·재시도는 application 몫, QA S-1·S2-1·S2-4).
      */
     public ExplorerProgress recalculate(ExplorerId explorerId) {
+        return withRetry(explorerId, false).orElseThrow();
+    }
+
+    /**
+     * 미전달 이벤트가 없을 때만 재계산한다(S3-3). 판정은 진행 루트를 잠근 <b>뒤</b> 같은 트랜잭션 안에서 한다(QA P3-5 — 판정과
+     * 영토 읽기 사이에 끼어드는 체크인을 막는다: 그 체크인의 이벤트도 진행 루트 잠금을 기다린다).
+     * @return 재계산했으면 true, 보류했으면 false
+     */
+    public boolean recalculateIfSettled(ExplorerId explorerId) {
+        return withRetry(explorerId, true).isPresent();
+    }
+
+    private Optional<ExplorerProgress> withRetry(ExplorerId explorerId, boolean onlyIfSettled) {
         for (int attempt = 1; ; attempt++) {
             try {
-                return perExplorerTx.execute(status -> recalculateLocked(explorerId));
+                return perExplorerTx.execute(status -> recalculateLocked(explorerId, onlyIfSettled));
             } catch (ConcurrencyFailureException | DataIntegrityViolationException exception) {
                 if (attempt >= MAX_ATTEMPTS) throw exception;
                 log.info("재계산 {} 동시성 충돌 {}회째 — 다시 시도: {}", explorerId, attempt, exception.toString());
@@ -75,9 +98,10 @@ public class RecalculateService {
         }
     }
 
-    private ExplorerProgress recalculateLocked(ExplorerId explorerId) {
+    private Optional<ExplorerProgress> recalculateLocked(ExplorerId explorerId, boolean onlyIfSettled) {
         ExplorerProgress current = progresses.findLocked(explorerId)
             .orElseGet(() -> ExplorerProgress.start(explorerId, catalog.policy(), clock.instant()));
+        if (onlyIfSettled && !settled(explorerId)) return Optional.empty();
         Map<String, List<ReplayVisit>> histories = new LinkedHashMap<>();
         territories.mapIdsOf(explorerId.value()).forEach(mapId -> histories.put(mapId,
             territories.visitHistory(mapId).stream().map(RecalculateService::replayVisit).toList()));
@@ -94,36 +118,59 @@ public class RecalculateService {
         result.collectionBooks().forEach(collectionBooks::replace);
         boards.replace(result.monthly());
         boards.replace(result.always());
-        return result.progress();
+        return Optional.of(result.progress());
     }
 
     /**
      * 모든 탐험가. 탐험가마다 트랜잭션·재시도를 나누고 실패를 격리한다 — 한 명이 재시도를 다 써도 나머지는 계속한다(QA S2-3).
+     * 미전달 이벤트가 남은 탐험가는 보류(deferred)한다(S3-3).
      */
     public RecalculationReport recalculateAll() {
         List<String> failed = new ArrayList<>();
+        List<String> deferred = new ArrayList<>();
         List<String> explorerIds = territories.explorerIds();
         explorerIds.forEach(explorerId -> {
             try {
-                recalculate(ExplorerId.of(explorerId));
+                if (!recalculateIfSettled(ExplorerId.of(explorerId))) deferred.add(explorerId);
             } catch (RuntimeException exception) {
                 failed.add(explorerId);
                 log.error("진행 재계산 실패(다음 탐험가로 계속): {} — {}", explorerId, exception.toString());
             }
         });
-        RecalculationReport report = new RecalculationReport(explorerIds.size() - failed.size(), failed);
-        log.info("진행 재계산 완료: 성공 {}명, 실패 {}명 {}", report.recalculated(), failed.size(), failed);
+        RecalculationReport report = new RecalculationReport(explorerIds.size() - failed.size() - deferred.size(), failed,
+            deferred);
+        log.info("진행 재계산 완료: 성공 {}명, 실패 {}명 {}, 보류 {}명 {}", report.recalculated(), failed.size(), failed,
+            deferred.size(), deferred);
         return report;
     }
 
-    /** @param failedExplorerIds 재시도를 다 쓰고도 실패한 탐험가(다시 돌리면 된다) */
-    public record RecalculationReport(int recalculated, List<String> failedExplorerIds) {
+    /**
+     * 탐험가와 그가 속한 지도의 outbox 이벤트 중 진행 구독자(progression.*)에게 아직 전달되지 않은 것이 없는지 — 진행과 무관한
+     * 구독자(꾸미기·탐험)가 멈춰 있어도 재계산을 막지 않는다(QA P3-6).
+     */
+    private boolean settled(ExplorerId explorerId) {
+        List<String> aggregateIds = new ArrayList<>(territories.mapIdsOf(explorerId.value()));
+        aggregateIds.add(explorerId.value());
+        return !backlog.hasUndelivered(aggregateIds, SUBSCRIBER_PREFIX);
+    }
+
+    /** 진행 컨텍스트 구독자 id 접두사(ProgressionSubscriptions). */
+    static final String SUBSCRIBER_PREFIX = "progression.";
+
+    /**
+     * @param failedExplorerIds   재시도를 다 쓰고도 실패한 탐험가(다시 돌리면 된다)
+     * @param deferredExplorerIds 미전달 이벤트가 남아 건너뛴 탐험가(릴레이가 비운 뒤 다시 돌리면 된다 — S3-3)
+     */
+    public record RecalculationReport(int recalculated, List<String> failedExplorerIds, List<String> deferredExplorerIds) {
         public RecalculationReport {
             failedExplorerIds = List.copyOf(failedExplorerIds);
+            deferredExplorerIds = List.copyOf(deferredExplorerIds);
         }
+
     }
 
     private static ReplayVisit replayVisit(RegionVisited event) {
-        return new ReplayVisit(ExplorerId.of(event.explorerId()), ProgressService.visitOf(event));
+        List<ExplorerId> members = event.memberIds() == null ? List.of() : event.memberIds().stream().map(ExplorerId::of).toList();
+        return new ReplayVisit(ExplorerId.of(event.explorerId()), ProgressService.visitOf(event), members);
     }
 }

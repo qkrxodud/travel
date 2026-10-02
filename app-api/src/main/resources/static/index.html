@@ -75,6 +75,21 @@ h2,h3{text-wrap:balance}
 .region.legend{stroke:var(--legend);stroke-width:1.1}
 .region.focus{stroke:var(--fg);stroke-width:1.4}
 .region.hl{stroke:var(--gold);stroke-width:1.6}
+/* 3단계 공유 지도: 지역 색 = 선점자 색(인라인 fill), 내 영토는 테두리 강조 */
+.region.claimed{opacity:.92}
+.region.claimed.on{stroke:var(--fg);stroke-width:.9}
+#map-card select{flex:1;min-width:0;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+.members{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:12px}
+.members li{display:flex;align-items:center;gap:6px}
+.members .dot,.vlist .dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.members .role{font-size:10px;padding:1px 6px;border-radius:99px;background:var(--line)}
+.members .cnt{margin-left:auto;color:var(--muted)}
+.vlist{list-style:none;margin:8px 0 0;padding:0;font-size:12px;display:flex;flex-direction:column;gap:4px}
+.vlist li{display:flex;align-items:center;gap:6px}
+.tag-disputed{font-size:10px;padding:1px 6px;border-radius:99px;background:#f8d7da;color:#8a1c24}
+.tag-claim{font-size:10px;padding:1px 6px;border-radius:99px;background:#fff1c2;color:#7a5a00}
+.rules{margin:0;padding-left:18px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+#map-modal input[type=text]{flex:1;min-width:0;padding:6px 8px;border-radius:8px;border:1px solid var(--line)}
 .ping{fill:none;stroke:var(--accent);stroke-width:2;pointer-events:none;animation:ping .7s ease-out forwards}
 @keyframes ping{from{r:2;opacity:1}to{r:28;opacity:0}}
 .maptools{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap}
@@ -262,6 +277,8 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
 .item.on{outline:2px solid var(--fg);outline-offset:-1px}
 .item.on::after{content:"E";position:absolute;right:-2px;top:-2px;font-size:9px;font-weight:700;padding:2px 5px;background:var(--fg);color:var(--bg);border-radius:0 6px 0 6px}
 .item.locked{opacity:.5}
+.item .fav{position:absolute;left:3px;bottom:2px;font-size:12px;line-height:1;color:var(--muted);cursor:pointer}
+.item .fav.on{color:#e6a700}
 .item.locked img{filter:grayscale(1)}
 .px{width:40px;height:40px;display:block;image-rendering:pixelated}
 .px.big{width:64px;height:64px}
@@ -349,6 +366,21 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
       <div class="tip" id="tip"></div>
     </div>
     <aside class="side">
+      <div class="card" id="map-card">
+        <h2>지도 <span id="map-kind">개인 지도</span></h2>
+        <div class="row" style="margin-top:0"><select id="map-select" aria-label="지도 선택"></select></div>
+        <div class="row"><button class="btn sm" id="t-map-new">지도 만들기</button><button class="btn sm" id="t-map-join">초대코드로 합류</button></div>
+        <div id="map-shared" hidden>
+          <ul class="members" id="map-members"></ul>
+          <div class="row"><span class="sub">초대코드</span><b id="map-invite"></b><button class="btn sm" id="t-invite-regen" hidden>재발급</button></div>
+          <div class="row" id="map-settings" hidden>
+            <label><input type="checkbox" id="set-photo"> 사진 필수</label>
+            <label>하루 상한 <input type="number" id="set-cap" min="1" max="50" style="width:52px"></label>
+            <button class="btn sm" id="t-settings-save">설정 저장</button>
+          </div>
+          <div class="row"><button class="btn sm danger" id="t-map-leave">지도에서 탈퇴</button></div>
+        </div>
+      </div>
       <div class="card detail" id="detail">
         <h2>선택한 지역 <span>기록 남기기</span></h2>
         <div id="d-body"><p class="empty">지도에서 지역을 선택하면 방문 날짜와 한 줄 메모를 남길 수 있어요.</p></div>
@@ -479,6 +511,10 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
     <p>실제 서비스에서는 이 이미지가 공개 프로필 링크의 미리보기(OG 이미지)로 쓰입니다. 카톡·인스타에 링크만 던지면 카드가 뜨는 구조예요.</p>
     <div class="row"><button class="btn primary" id="t-close">닫기</button></div>
   </div>
+</div>
+
+<div class="modal" id="map-modal" hidden>
+  <div class="box" id="map-modal-body"></div>
 </div>
 
 <div class="modal" id="checkin" hidden>
@@ -642,41 +678,47 @@ const today = new Date();
 const localISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
 /* ---------- server API (1단계: 방문 기록의 진실 원천은 서버) ----------
-   서버 호출은 전부 이 객체 하나로 모은다. 탐험가는 익명 발급(POST /explorers) 후 X-Explorer-Id 헤더로 식별하고,
+   서버 호출은 전부 이 객체 하나로 모은다. 탐험가는 익명 발급(POST /explorers) 후 받은 비밀 접근 토큰을 X-Explorer-Token
+   헤더로 보내 인증한다(3단계 결정 2 — explorerId 는 공개 식별자). 지금 보는 지도(mapId, 없으면 개인 지도)도 여기서 들고 있다.
    지역 코드는 서버 KR-11010 ↔ 화면 11010 을 여기서만 바꾼다. 오류는 {code, message} → ApiError. */
 const api = (() => {
-  const ID_KEY = 'territory-explorer-id';
+  const ID_KEY = 'territory-explorer-id', TOKEN_KEY = 'territory-explorer-token', MAP_KEY = 'territory-map-id';
   const toServer = c => 'KR-' + c, toClient = c => String(c).replace(/^KR-/, '');
-  let explorerId = null;
-  try { explorerId = localStorage.getItem(ID_KEY); } catch(e){}
+  let explorerId = null, token = null, mapId = null;
+  try { explorerId = localStorage.getItem(ID_KEY); token = localStorage.getItem(TOKEN_KEY); mapId = localStorage.getItem(MAP_KEY); } catch(e){}
+  const withMap = path => mapId ? path + (path.includes('?') ? '&' : '?') + 'mapId=' + encodeURIComponent(mapId) : path;
   class ApiError extends Error { constructor(status, code, message){ super(message); this.status = status; this.code = code; } }
   async function issue(){
     const r = await fetch('/explorers', { method:'POST' });
     if (!r.ok) throw new ApiError(r.status, 'ISSUE_FAILED', '탐험가 발급에 실패했어요');
-    const b = await r.json(); explorerId = b.explorerId;
-    try { localStorage.setItem(ID_KEY, explorerId); } catch(e){}
+    const b = await r.json(); explorerId = b.explorerId; token = b.accessToken; mapId = null;
+    try { localStorage.setItem(ID_KEY, explorerId); localStorage.setItem(TOKEN_KEY, token); localStorage.removeItem(MAP_KEY); } catch(e){}
     return b;
   }
   async function call(method, path, body, retried){
-    if (!explorerId) await issue();
-    const headers = { 'X-Explorer-Id': explorerId };
+    if (!token) await issue();
+    const headers = { 'X-Explorer-Token': token };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     const r = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     if (r.ok) return r.status === 204 ? null : r.json();
     let err = {}; try { err = await r.json(); } catch(e){}
     // 서버 데이터가 초기화돼 저장된 탐험가가 없어졌으면 새로 발급받아 한 번만 재시도
-    if (!retried && (err.code === 'EXPLORER_NOT_FOUND' || err.code === 'EXPLORER_ID_REQUIRED')) { explorerId = null; await issue(); return call(method, path, body, true); }
+    if (!retried && ['EXPLORER_NOT_FOUND', 'EXPLORER_TOKEN_REQUIRED', 'EXPLORER_TOKEN_INVALID'].includes(err.code)) { token = null; await issue(); return call(method, path, body, true); }
     throw new ApiError(r.status, err.code || 'HTTP_' + r.status, err.message || `서버 오류 (${r.status})`);
   }
   return {
     get explorerId(){ return explorerId; },
+    get token(){ return token; },
+    get mapId(){ return mapId; },
+    /** 지금 보는 지도(null = 개인 지도). 체크인·영토 조회가 이 지도로 간다. */
+    setMap(id){ mapId = id || null; try { if (mapId) localStorage.setItem(MAP_KEY, mapId); else localStorage.removeItem(MAP_KEY); } catch(e){} },
     toServer, toClient,
     visitOf: v => ({ code: toClient(v.regionCode), date: v.visitDate, memo: v.memo || '', at: Date.parse(v.visitedAt) }),
-    territory: () => call('GET', '/territory'),
-    preview: code => call('GET', '/visits/preview?region=' + encodeURIComponent(toServer(code))),
-    checkIn: (code, date, memo) => call('POST', '/visits', { regionCode: toServer(code), visitDate: date, memo }),
-    edit: (code, date, memo) => call('PATCH', '/visits/' + toServer(code), { visitDate: date, memo }),
-    cancel: code => call('DELETE', '/visits/' + toServer(code)),
+    territory: () => call('GET', withMap('/territory')),
+    preview: code => call('GET', withMap('/visits/preview?region=' + encodeURIComponent(toServer(code)))),
+    checkIn: (code, date, memo, photoUrl) => call('POST', '/visits', { regionCode: toServer(code), visitDate: date, memo, photoUrl: photoUrl || undefined, mapId: mapId || undefined }),
+    edit: (code, date, memo) => call('PATCH', withMap('/visits/' + toServer(code)), { visitDate: date, memo }),
+    cancel: code => call('DELETE', withMap('/visits/' + toServer(code))),
     seed: () => call('POST', '/dev/seed'),      // local 전용: 현재 탐험가에 프로토타입 SAMPLE 시드
     clear: () => call('DELETE', '/dev/visits'), // local 전용: 현재 탐험가 방문 전부 취소
     // 2단계(진행): XP·레벨·칭호·스트릭·뱃지·도감·퀘스트의 진실 원천도 서버. 체크인 후 이벤트로 비동기 반영된다.
@@ -685,17 +727,78 @@ const api = (() => {
     quests: () => call('GET', '/quests'),
     claim: questId => call('POST', '/quests/' + encodeURIComponent(questId) + '/claim'),
     selectTitle: titleId => call('PUT', '/progress/title', { titleId }),
+    // 3단계(공유 지도): 만들기·합류·탈퇴(7일 유예)·초대코드·설정(지도장)·방문 이의(지도장)
+    maps: () => call('GET', '/maps'),
+    mapDetail: id => call('GET', '/maps/' + encodeURIComponent(id)),
+    createMap: name => call('POST', '/maps', { name }),
+    joinMap: inviteCode => call('POST', '/maps/join', { inviteCode }),
+    leaveMap: id => call('POST', '/maps/' + encodeURIComponent(id) + '/leave'),
+    regenInvite: id => call('POST', '/maps/' + encodeURIComponent(id) + '/invite-code'),
+    saveSettings: (id, settings) => call('PUT', '/maps/' + encodeURIComponent(id) + '/settings', settings),
+    dispute: (id, code, member, disputed) => call('PUT', '/maps/' + encodeURIComponent(id) + '/visits/' + toServer(code) + '/' + member + '/dispute', { disputed }),
+    // 3단계(꾸미기): 가방·장면의 진실 원천도 서버. 체크인 → 지급·자동 착용은 이벤트로 비동기 반영된다.
+    inventory: () => call('GET', '/inventory'),
+    scene: () => call('GET', '/scene'),
+    editScene: body => call('PUT', '/scene', body),
+    favorite: (itemId, favorite) => call('PUT', '/inventory/' + encodeURIComponent(itemId) + '/favorite', { favorite }),
   };
 })();
 let server = null; // 마지막 GET /territory 응답(정복률·시도별·일지의 기준)
 function applyTerritory(t){
   server = t;
   state.visits = {};
-  t.visits.forEach(v => { const x = api.visitOf(v); state.visits[x.code] = { date:x.date, memo:x.memo, at:x.at }; });
+  // 내 영토 = 이 지도에서 내가 칠한 곳(공유 지도에는 다른 멤버 방문도 함께 온다)
+  t.visits.filter(v => !api.explorerId || v.checkedInBy === api.explorerId)
+    .forEach(v => { const x = api.visitOf(v); state.visits[x.code] = { date:x.date, memo:x.memo, at:x.at }; });
   save();
   document.documentElement.dataset.territory = 'ready';
 }
-async function refresh(){ applyTerritory(await api.territory()); }
+/* ---------- 공유 지도(3단계) ---------- */
+let mapInfo = null; // 공유 지도일 때 GET /maps/{id} — 멤버·색·선점·설정·이의
+let myMaps = [];    // GET /maps — 지도 선택 목록
+async function refresh(){
+  let t;
+  try { t = await api.territory(); }
+  catch (e) { if (!api.mapId || !['NOT_A_MEMBER', 'MAP_NOT_FOUND'].includes(e.code)) throw e; api.setMap(null); t = await api.territory(); }
+  mapInfo = t.mapKind === 'SHARED' ? await api.mapDetail(t.mapId).catch(() => null) : null;
+  applyTerritory(t);
+  document.documentElement.dataset.mapId = t.mapId;
+}
+async function refreshMaps(){ myMaps = await api.maps(); renderMapCard(); }
+const isOwner = () => !!(mapInfo && mapInfo.ownerId === api.explorerId);
+function memberOf(id){ return mapInfo ? mapInfo.members.find(m => m.explorerId === id) : null; }
+function claimerOf(code){ if (!mapInfo || !server || !server.claims) return null; const c = server.claims.find(x => x.regionCode === api.toServer(code)); return c ? c.explorerId : null; }
+function claimFill(code){ const m = memberOf(claimerOf(code)); return m ? m.color : null; }
+function myRegionCount(){ const m = memberOf(api.explorerId); return m ? m.regionCount : 0; }
+function renderMapCard(){
+  const sel = $('#map-select'); if (!sel) return;
+  const current = server ? server.mapId : null;
+  sel.innerHTML = myMaps.map(m => `<option value="${m.mapId}" data-kind="${m.kind}" ${m.mapId === current ? 'selected' : ''}>${esc(m.kind === 'PERSONAL' ? m.name + ' (개인)' : m.name + ' · ' + m.memberCount + '명')}</option>`).join('');
+  $('#map-kind').textContent = mapInfo ? '공유 지도' : '개인 지도';
+  $('#map-shared').hidden = !mapInfo;
+  if (!mapInfo) return;
+  $('#map-members').innerHTML = mapInfo.members.map(m => `<li data-member="${m.explorerId}" data-color="${m.color}"><span class="dot" style="background:${m.color}"></span><b>${m.me ? '나' : '멤버 ' + m.explorerId.slice(0, 4)}</b><span class="role">${m.role === 'OWNER' ? '지도장' : '멤버'}</span><span class="cnt">영토 ${m.regionCount} · 선점 ${m.claimCount}</span></li>`).join('')
+    + (mapInfo.departing ? `<li class="sub">탈퇴 유예 중 ${mapInfo.departing}명(7일 안에 돌아오면 복구)</li>` : '');
+  $('#map-invite').textContent = mapInfo.inviteCode;
+  $('#t-invite-regen').hidden = !isOwner();
+  $('#map-settings').hidden = !isOwner();
+  if (isOwner() && document.activeElement !== $('#set-cap')) { $('#set-photo').checked = mapInfo.settings.photoRequired; $('#set-cap').value = mapInfo.settings.dailyCheckInCap; }
+}
+function sharedVisitsHtml(code){
+  if (!mapInfo || !server) return '';
+  const rows = server.visits.filter(v => api.toClient(v.regionCode) === code);
+  if (!rows.length) return '';
+  return `<ul class="vlist" id="d-members">${rows.map(v => { const m = memberOf(v.checkedInBy) || { color:'#999', me:false };
+    return `<li data-visitor="${v.checkedInBy}"><span class="dot" style="background:${m.color}"></span>${m.me ? '나' : '멤버 ' + v.checkedInBy.slice(0, 4)} · ${v.visitDate}${v.claim ? ' <span class="tag-claim">선점</span>' : ''}${v.disputed ? ' <span class="tag-disputed">이의</span>' : ''}${isOwner() && !m.me ? ` <button class="btn sm" data-dispute="${v.checkedInBy}" data-flag="${!v.disputed}">${v.disputed ? '이의 해제' : '이의 표시'}</button>` : ''}</li>`; }).join('')}</ul>`;
+}
+function openMapModal(html){ $('#map-modal-body').innerHTML = html; $('#map-modal').hidden = false; }
+function closeMapModal(){ $('#map-modal').hidden = true; }
+async function switchMap(id){
+  const personal = myMaps.find(m => m.kind === 'PERSONAL');
+  api.setMap(personal && id === personal.mapId ? null : id);
+  selected = null; highlight = null;
+  await refresh(); render(); renderMapCard();
+}
 
 /* ---------- 진행(2단계): 서버 값 + 짧은 재조회 ----------
    체크인·취소는 outbox 릴레이로 비동기 반영되므로(로컬 300ms 주기) 변경 직후 몇 번 다시 조회해 화면을 맞춘다. */
@@ -715,10 +818,15 @@ async function refreshProgress(announce){
 }
 function pollProgress(){
   pollTimers.forEach(clearTimeout);
-  pollTimers = [300, 800, 1500, 2500, 4000].map(ms => setTimeout(() => refreshProgress(!sampleMode).catch(() => {}), ms));
+  pollTimers = [300, 800, 1500, 2500, 4000].map(ms => setTimeout(() => {
+    refreshProgress(!sampleMode).catch(() => {});
+    refreshWardrobe(!sampleMode).catch(() => {}); // 3단계: 가방·장면도 같은 주기로
+  }, ms));
 }
 const ERR_TITLE = { DAILY_CAP_EXCEEDED:'오늘은 여기까지', FUTURE_VISIT_DATE:'날짜를 확인해 주세요', MEMO_TOO_LONG:'메모가 길어요', DUPLICATE_VISIT:'이미 칠한 곳',
-  QUEST_ALREADY_CLAIMED:'이미 받은 보상', QUEST_NOT_COMPLETED:'아직 달성 전', TITLE_NOT_EARNED:'아직 못 얻은 칭호' };
+  QUEST_ALREADY_CLAIMED:'이미 받은 보상', QUEST_NOT_COMPLETED:'아직 달성 전', TITLE_NOT_EARNED:'아직 못 얻은 칭호',
+  PHOTO_REQUIRED:'사진이 필요해요', NOT_A_MEMBER:'멤버가 아니에요', OWNER_ONLY:'지도장만 할 수 있어요', OWNER_CANNOT_LEAVE:'지도장은 탈퇴 전 양도',
+  INVITE_CODE_NOT_FOUND:'초대코드 확인', MAP_FULL:'지도가 가득 찼어요', ALREADY_MEMBER:'이미 멤버예요' };
 function toastError(e){ toast('!', ERR_TITLE[e.code] || '요청 실패', e.message || String(e)); }
 const ym = d => d.slice(0,7);
 const CUR_YM = today.toISOString().slice(0,7);
@@ -736,25 +844,44 @@ function fillSample(){
     const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     state.visits[c] = { date:ds, memo:m, at:d.getTime() + i };
   });
-  // 예시 장비: 얻은 것 중 슬롯별로 가장 좋은 것
-  state.equip = {};
-  inventory().forEach(it => autoEquip(it));
-  setItems().forEach(it => autoEquip(it));
   sampleMode = true;
 }
 
 /* ---------- 아이템 / 캐릭터 ---------- */
-function setItem(sid){ const st = SETS.find(x => x.id === sid), b = SET_BG[sid]; if (!st || !b) return null; const done = st.codes.every(cd => state.visits[cd]); if (!done) return null; return { code:'set:' + sid, e:b[0], n:`${b[1]} 배경`, slot:'bg', tier:'legend', from:`${st.name} 세트 완성 보상`, theme:b[2] }; }
-function setItems(){ return SETS.map(st => setItem(st.id)).filter(Boolean); }
-function inventory(){ return Object.keys(state.visits).map(cd => BY_CODE.get(cd)).filter(Boolean).map(itemOf); }
-function autoEquip(it){
-  if (it.slot === 'bag') return false;
-  if (it.slot === 'prop') { const ps = state.equip.props || (state.equip.props = []); if (ps.includes(it.code)) return false; if (ps.length < 3) { ps.push(it.code); return true; } return false; }
-  const cur = state.equip[it.slot] && itemOfCode(state.equip[it.slot]); if (!cur || TIER[it.tier].pts > TIER[cur.tier].pts || (it.slot === 'bg' && TIER[it.tier].pts >= TIER[cur.tier].pts)) { state.equip[it.slot] = it.code; return true; } return false; }
-function itemOfCode(cd){ if (!cd) return null; if (cd.startsWith('set:')) return setItem(cd.slice(4)); const f = BY_CODE.get(cd); return f && state.visits[cd] ? itemOf(f) : null; }
-function equipped(){ const out = {}; ['back','hat','hand','badge','pet','bg'].forEach(s => { const it = state.equip[s] && itemOfCode(state.equip[s]); if (it && it.slot === s) out[s] = it; else delete state.equip[s]; });
-  state.equip.props = (state.equip.props || []).filter(cd => { const it = itemOfCode(cd); return it && it.slot === 'prop'; }); out.props = state.equip.props.map(itemOfCode); return out; }
-function stylePts(){ const eq = equipped(); return ['back','hat','hand','badge','pet','bg'].reduce((a, s) => a + (eq[s] ? TIER[eq[s].tier].pts : 0), 0) + eq.props.reduce((a, it) => a + TIER[it.tier].pts, 0); }
+/* ---------- 가방·장면(3단계): 서버 값(GET /inventory·/scene) ----------
+   보유·착용·자동 착용(빈 슬롯이거나 더 희귀하면)·회수 시 벗김·꾸미기 점수는 서버가 계산한다. 화면은 생김새만 그린다
+   (지역·세트 아이템은 프로토타입 엔진의 룩, 운영이 추가한 이벤트 아이템은 서버 정의의 이모지·룩). */
+let bag = null, sceneSrv = null, wardrobeRev = 0; // GET /inventory, GET /scene 마지막 응답
+const SLOT_TO_CLIENT = { HAT:'hat', HAND:'hand', BADGE:'badge', BAG:'back', PET:'pet', BG:'bg', PROP:'prop' };
+const SLOT_TO_SERVER = { hat:'HAT', hand:'HAND', badge:'BADGE', back:'BAG', pet:'PET', bg:'BG' };
+function setItemDef(sid){ const st = SETS.find(x => x.id === sid), b = SET_BG[sid]; if (!st || !b) return null; return { code:'set:' + sid, e:b[0], n:`${b[1]} 배경`, slot:'bg', tier:'legend', from:`${st.name} 세트 완성 보상`, theme:b[2] }; }
+/* 서버 아이템(region:KR-11010 · set:jiri · event:…) → 화면 아이템. sid = 서버 itemId */
+function clientItem(served){
+  if (!served) return null;
+  const id = served.itemId; let item = null;
+  if (id.startsWith('region:')) { const feature = BY_CODE.get(api.toClient(id.slice(7))); item = feature ? itemOf(feature) : null; }
+  else if (id.startsWith('set:')) item = setItemDef(id.slice(4));
+  if (!item) item = { code:id, e:served.emoji || '🎁', n:served.name || id, slot:SLOT_TO_CLIENT[served.slot] || 'hand', tier:String(served.tier || 'COMMON').toLowerCase(), from:'이벤트 보상', theme:served.theme || undefined, look:served.look || null };
+  return Object.assign({}, item, { sid:id, fav:!!served.favorite, on:!!served.equipped, source:served.source || null });
+}
+function inventory(){ return bag ? bag.items.map(clientItem).filter(Boolean) : []; }
+function equipped(){ const out = { props:[] }; if (!sceneSrv) return out;
+  Object.entries(sceneSrv.slots).forEach(([slot, worn]) => { const item = clientItem(worn); if (item) out[SLOT_TO_CLIENT[slot]] = item; });
+  out.props = sceneSrv.props.map(clientItem).filter(Boolean); return out; }
+function stylePts(){ return sceneSrv ? sceneSrv.stylePoints : 0; }
+async function refreshWardrobe(announce){
+  const [inventoryRes, sceneRes] = await Promise.all([api.inventory(), api.scene()]);
+  const had = bag ? new Set(bag.items.map(owned => owned.itemId)) : null;
+  bag = inventoryRes; sceneSrv = sceneRes;
+  if (announce && had) inventoryRes.items.filter(owned => !had.has(owned.itemId) && owned.source === 'SET_REWARD')
+    .forEach(owned => toast('✦', `세트 배경 해금 · ${clientItem(owned).n}`, '가방에서 배경으로 쓸 수 있어요'));
+  document.documentElement.dataset.wardrobe = String(++wardrobeRev);
+  render();
+}
+async function editScene(body){
+  try { sceneSrv = await api.editScene(body); await refreshWardrobe(false); }
+  catch (error) { toastError(error); }
+}
 function styleRank(p){ return p >= 30 ? '전설급 꾸미기' : p >= 18 ? '화려함' : p >= 8 ? '제법 꾸밈' : p > 0 ? '소박함' : '맨몸'; }
 /* ================= 픽셀 페인터 =================
    도형(타원/다각형/굵은 선)을 격자에 찍고, 도형마다 자동으로
@@ -824,7 +951,7 @@ const DEFAULT_LOOK = { hand:['map','#e9c46a','#2e7d32'], badge:['keyring','#9aa7
 function lookOf(it){
   if (it.slot === 'aura') return { type:'aura', a:AURA_COLOR[it.e] || '#b48af0', b:'#ffd166' };
   if (it.slot === 'bg') { const th = BG_THEME[it.theme || BG_EMOJI[it.e]] || BG_THEME.plain; return { type:'bg', a:th.sky[0], b:th.ground[0], c:th.sky[th.sky.length-1] }; }
-  let l = LOOK[it.e];
+  let l = it.look ? [it.look.type, it.look.primary, it.look.secondary] : LOOK[it.e]; // 운영 추가 아이템은 서버 정의의 룩
   if (it.slot === 'hat' && l && !HATS[l[0]]) l = ['beanie', l[1], l[2]];
   if (it.slot === 'back' && l && l[0] !== 'bag') l = ['bag', mix(l[1], .25, [255,255,255]), darken(l[1], .2)];
   if (it.slot === 'hand' && l && !HAND[l[0]]) l = ['map', l[1], l[2]];
@@ -846,7 +973,7 @@ const SPRITES = {
 const CU_W = 58, CU_H = 56, CPW = CU_W * PX, CPH = CU_H * PX; // 캐릭터 캔버스 232x224px
 const IMG = {};
 function img(name){ if (!IMG[name]) { const im = new Image(); im.onload = () => { _cache.clear(); if (typeof render === 'function') render(); }; im.src = ASSETS[name].src; IMG[name] = im; } return IMG[name]; }
-function gender(){ return (typeof state !== 'undefined' && state.gender === 'f') ? 'f' : 'm'; }
+function gender(){ try { return sceneSrv && sceneSrv.gender === 'F' ? 'f' : 'm'; } catch (notReady) { return 'm'; } } // 3단계: 서버 장면의 성별
 const OL = '#3b2a22';
 /* 룩 타입 → 시트 아이콘 (없으면 Painter로 그림) */
 const HAT_ICON = { straw:['hat0'], cap:['hat1'], bucket:['hat2'], beanie:['hat3'], bandana:['hat6'], flower:['hat7','hat9','hat10'], crown:['hat16'], circlet:['hat12'], bow:['hat8','hat11','hat13','hat15','hat17'], ears:['hat4'], headphones:['hat5'], hornband:['hat14'] };
@@ -1255,20 +1382,19 @@ async function openCheckin(f){
     </div>
     ${setLines.length ? `<div class="setchips">${setLines.map(x => `<span class="setchip">${esc(x.s.name)} <b>${x.have}/${x.s.codes.length}</b>${x.done ? ' 완성!' : ''}</span>`).join('')}</div>` : ''}
     <div class="loot ${it.tier}"><div class="e">${itemSVG(it, "px big")}</div><div><div class="t">받을 특산물 · <span class="rar ${it.tier}">${TIER[it.tier].n}</span></div><div class="n" id="ci-item">${esc(it.n)}</div><div class="s">${SLOT_NAME[it.slot]} 슬롯${it.tier==='legend' ? ' · 전설 풍경이 열려요' : ''}</div></div></div>
-    <div class="row"><input type="date" id="ci-date" value="${localISO(new Date())}" aria-label="방문 날짜"><input type="text" id="ci-memo" maxlength="40" placeholder="한 줄 메모 (예: 물회 먹음)" aria-label="메모"></div>
+    <div class="row"><input type="date" id="ci-date" value="${localISO(new Date())}" aria-label="방문 날짜"><input type="text" id="ci-memo" maxlength="40" placeholder="한 줄 메모 (예: 물회 먹음)" aria-label="메모">${mapInfo && mapInfo.settings.photoRequired ? '<input type="url" id="ci-photo" placeholder="사진 주소(이 지도는 사진 필수)" aria-label="사진 주소">' : ''}</div>
     <div class="row"><button class="btn" id="ci-cancel">취소</button><button class="btn" id="ci-card">기록하고 카드</button><button class="btn primary" id="ci-save">기록하고 닫기</button></div>`;
   $('#checkin').hidden = false;
   const saveIt = async () => {
     const btn = $('#ci-save'); btn.disabled = true;
     try {
-      const res = await api.checkIn(code, $('#ci-date').value, $('#ci-memo').value.trim());
+      const res = await api.checkIn(code, $('#ci-date').value, $('#ci-memo').value.trim(), $('#ci-photo') ? $('#ci-photo').value.trim() : '');
       sampleMode = false; ping(f);
       await refresh();
-      const eq = autoEquip(it);
-      (SET_OF.get(code) || []).forEach(s => { if (s.codes.every(cd => state.visits[cd])) { const bg = setItem(s.id); if (bg) { autoEquip(bg); toast('✦', `세트 배경 해금 · ${bg.n}`, '가방에서 배경으로 쓸 수 있어요'); } } });
+      // 3단계: 지급·자동 착용·세트 배경은 서버가 이벤트로 처리한다 — pollProgress 가 가방·장면을 다시 읽는다
       commit(); render(); pollProgress();
       $('#checkin').hidden = true;
-      toast('✓', `${f.properties.name} · ${res.nth}번째 영토`, `예상 XP +${res.xp.total} · ${it.n}${eq ? ' 착용' : ''}`);
+      toast('✓', `${f.properties.name} · ${res.nth}번째 영토`, `예상 XP +${res.xp.total} · ${it.n}`);
       return true;
     } catch (e) { toastError(e); return false; }
     finally { btn.disabled = false; }
@@ -1294,7 +1420,9 @@ function showOnMap(code){
 /* ---------- render ---------- */
 function render(){
   const c = ctx();
-  regions.classed('on', f => !!state.visits[f.properties.code]).classed('focus', f => f.properties.code === selected).classed('hl', f => f.properties.code === highlight);
+  regions.classed('on', f => !!state.visits[f.properties.code]).classed('focus', f => f.properties.code === selected).classed('hl', f => f.properties.code === highlight)
+    .classed('claimed', f => !!claimFill(f.properties.code)).style('fill', f => claimFill(f.properties.code))
+    .attr('data-claim', f => claimerOf(f.properties.code));
 
   const cq = server ? server.conquest : { visited:c.n, total:FEATURES.length, percent:Math.round(100 * c.n / FEATURES.length) };
   const pct = cq.percent;
@@ -1318,9 +1446,10 @@ function renderMapSide(c){
   const rows = (server ? server.provinces.map(x => ({ p:x.name, n:x.visited, t:x.total, r:x.visited/x.total }))
                        : PROVS.map(p => ({ p, n:c.p(p), t:PROV_TOTAL[p], r:c.p(p)/PROV_TOTAL[p] }))).sort((a,b) => b.r - a.r || b.n - a.n);
   $('#prov').innerHTML = rows.map(r => `<button data-prov="${r.p}"><span class="n">${r.p}</span><span class="b"><i class="${r.r===1?'full':''}" style="width:${Math.round(r.r*100)}%"></i></span><span class="c ${r.r===1?'full':''}">${r.r===1 ? '정복' : `${r.n}/${r.t}`}</span></button>`).join('');
-  const entries = (server ? server.visits.map(v => { const x = api.visitOf(v); return { ...x, f:BY_CODE.get(x.code) }; }).filter(e => e.f)
+  const entries = (server ? server.visits.map(v => { const x = api.visitOf(v); return { ...x, disputed:v.disputed, f:BY_CODE.get(x.code) }; }).filter(e => e.f)
                           : c.list.slice().sort((a,b) => (b.date||'').localeCompare(a.date||'') || b.at - a.at)).slice(0,40);
-  $('#log').innerHTML = entries.length ? entries.map(e => `<li><time>${e.date||'날짜 미정'}</time><b>${esc(label(e.f))}</b><span class="m">${esc(e.memo||'')}</span></li>`).join('') : '<li class="m">아직 기록이 없어요.</li>';
+  $('#log').innerHTML = entries.length ? entries.map(e => `<li><time>${e.date||'날짜 미정'}</time><b>${esc(label(e.f))}</b><span class="m">${esc(e.memo||'')}</span>${e.disputed ? '<span class="tag-disputed">이의</span>' : ''}</li>`).join('') : '<li class="m">아직 기록이 없어요.</li>';
+  renderMapCard();
   const box = $('#d-body');
   if (!selected) { box.innerHTML = '<p class="empty">지도에서 지역을 선택하면 방문 날짜와 한 줄 메모를 남길 수 있어요.</p>'; return; }
   const f = BY_CODE.get(selected), r = rarity(f), v = state.visits[selected];
@@ -1332,7 +1461,8 @@ function renderMapSide(c){
     ${v ? `
       <div class="row"><input type="date" id="d-date" value="${v.date||''}" aria-label="방문 날짜"><input type="text" id="d-memo" maxlength="40" placeholder="한 줄 메모" value="${esc(v.memo||'')}" aria-label="메모"></div>
       <div class="row"><button class="btn primary" id="d-save">기록 저장</button><button class="btn" id="d-card">여행 카드</button><button class="btn danger" id="d-remove">영토에서 제거</button></div>`
-    : `<div class="row"><button class="btn primary" id="d-visit">방문 체크 (+${XP[r]} XP)</button></div>`}`;
+    : `<div class="row"><button class="btn primary" id="d-visit">방문 체크 (+${XP[r]} XP)</button></div>`}
+    ${sharedVisitsHtml(selected)}`;
   const sv = $('#d-save'), rm = $('#d-remove'), vs = $('#d-visit'), cd = $('#d-card');
   if (sv) sv.onclick = async () => {
     try { await api.edit(selected, $('#d-date').value, $('#d-memo').value.trim()); sampleMode = false; await refresh(); commit(); render(); toast('✓', '기록 저장됨', f.properties.name); }
@@ -1347,19 +1477,18 @@ function renderBag(c){
   const eq = equipped(), pts = stylePts();
   $('#bag-char').innerHTML = sceneSVG(eq);
   $('#bag-style').textContent = `꾸미기 ${pts}점 · ${styleRank(pts)}`;
-  document.querySelectorAll('[data-gender]').forEach(b => b.setAttribute('aria-pressed', b.dataset.gender === (state.gender || 'm')));
+  document.querySelectorAll('[data-gender]').forEach(b => b.setAttribute('aria-pressed', b.dataset.gender === gender()));
   const slotTile = (s, it, un) => `<button class="stile ${it ? it.tier : 'empty'}" data-unequip="${it ? un : ''}" title="${it ? esc(it.n) + ' · 누르면 벗기' : SLOT_NAME[s] + ' 비어 있음'}">${it ? itemSVG(it) : '<span class="ph"></span>'}<span class="sl">${SLOT_NAME[s]}</span>${it ? `<span class="tr">${TIER[it.tier].n}</span>` : ''}</button>`;
   $('#slots-left').innerHTML = ['hat','hand','back'].map(s => slotTile(s, eq[s], s)).join('');
   $('#slots-right').innerHTML = ['badge','pet','bg'].map(s => slotTile(s, eq[s], s)).join('');
-  $('#bag-scene').innerHTML = [0,1,2].map(i => slotTile('prop', eq.props[i], eq.props[i] ? 'prop:' + eq.props[i].code : '')).join('');
-  const inv = inventory(), sets = setItems(), all = [...sets, ...inv];
-  const worn = ['hat','hand','badge','back','pet','bg'].filter(s => eq[s]).length + eq.props.length;
+  $('#bag-scene').innerHTML = [0,1,2].map(i => slotTile('prop', eq.props[i], eq.props[i] ? 'prop:' + eq.props[i].sid : '')).join('');
+  const all = inventory(), inv = all.filter(item => !item.code.startsWith('set:')), sets = all.filter(item => item.code.startsWith('set:'));
+  const worn = sceneSrv ? sceneSrv.wornCount : 0;
   $('#bag-stats').innerHTML = `<span><b>${worn}</b> 착용</span><span><b>${all.length}</b> 보유</span><span><b>${inv.filter(i => i.tier==='legend').length}</b> 전설 풍경</span><span><b>${sets.length}</b> 세트 배경</span>`;
-  const isOn = i => i.slot === 'prop' ? (state.equip.props || []).includes(i.code) : state.equip[i.slot] === i.code;
   const order = { legend:0, rare:1, common:2 };
-  const tile = i => `<button class="item ${i.tier} ${isOn(i)?'on':''} ${i.code.startsWith('set:')?'set':''}" data-equip="${i.code}" title="${esc(i.n)} · ${esc(i.from)}">${itemSVG(i)}<span class="sb">${SLOT_NAME[i.slot]}</span><span class="n">${esc(i.n)}</span></button>`;
+  const tile = item => `<button class="item ${item.tier} ${item.on?'on':''} ${item.code.startsWith('set:')?'set':''}" data-equip="${esc(item.sid)}" title="${esc(item.n)} · ${esc(item.from)}">${itemSVG(item)}<span class="sb">${SLOT_NAME[item.slot]}</span><span class="n">${esc(item.n)}</span><span class="fav ${item.fav?'on':''}" data-fav="${esc(item.sid)}" role="button" aria-pressed="${item.fav}" title="즐겨찾기" aria-label="즐겨찾기">${item.fav ? '★' : '☆'}</span></button>`;
   const filter = state.bagFilter || 'all';
-  const list = all.filter(i => filter === 'all' || i.slot === filter).sort((a, b) => order[a.tier] - order[b.tier]);
+  const list = all.filter(item => filter === 'all' || item.slot === filter).sort((left, right) => (right.fav - left.fav) || (order[left.tier] - order[right.tier]));
   $('#bag-filters').innerHTML = [['all','전체'],['hat','모자'],['hand','손'],['badge','키링'],['back','배낭'],['pet','동행'],['bg','배경·풍경'],['prop','장식']].map(([k, n]) => `<button data-filter="${k}" aria-pressed="${filter === k}">${n}</button>`).join('');
   $('#bag-inv').innerHTML = list.length ? `<div class="inv">${list.map(tile).join('')}</div>` : '<p class="empty">아직 이 종류의 장비가 없어요. 지도를 더 칠해보세요.</p>';
   const want = FEATURES.filter(f => !state.visits[f.properties.code] && rarity(f)==='legend').slice(0, 4).map(itemOf);
@@ -1547,18 +1676,29 @@ $('#t-copy').onclick = () => {
   const fallback = () => { const r = document.createRange(); r.selectNodeContents($('#share-url')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('!', '복사가 막혀 있어요', '선택된 링크를 직접 복사하세요'); };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done).catch(fallback); else fallback();
 };
-document.querySelectorAll('[data-gender]').forEach(b => b.onclick = () => { state.gender = b.dataset.gender; save(); render(); });
+document.querySelectorAll('[data-gender]').forEach(button => button.onclick = () => editScene({ gender: button.dataset.gender.toUpperCase() }));
 $('#t-char').onclick = () => { if (charAt) zoomTo([BY_CODE.get(charAt)], 0.25); };
-$('#bag-inv').addEventListener('click', ev => { const b = ev.target.closest('[data-equip]'); if (!b) return; const it = itemOfCode(b.dataset.equip); if (!it || it.slot==='bag') return;
-  if (it.slot === 'prop') { const ps = state.equip.props || (state.equip.props = []); const i = ps.indexOf(it.code); if (i >= 0) ps.splice(i, 1); else if (ps.length < 3) ps.push(it.code); else { toast('!', '장식은 3개까지', '하나를 벗고 다시 눌러주세요'); return; } }
-  else if (state.equip[it.slot] === it.code) delete state.equip[it.slot]; else state.equip[it.slot] = it.code; save(); render(); });
-$('#tab-bag').addEventListener('click', ev => { const b = ev.target.closest('[data-unequip]'); if (!b) return; const k = b.dataset.unequip; if (!k) { setBagHint(); return; } if (k.startsWith('prop:')) state.equip.props = (state.equip.props || []).filter(cd => cd !== k.slice(5)); else delete state.equip[k]; save(); render(); });
+/* 3단계: 착용·해제·장식·즐겨찾기는 서버(PUT /scene · PUT /inventory/{id}/favorite) — 검증(보유·슬롯·장식 ≤3)도 서버가 한다 */
+$('#bag-inv').addEventListener('click', ev => {
+  const star = ev.target.closest('[data-fav]');
+  if (star) { const item = inventory().find(owned => owned.sid === star.dataset.fav); if (item) api.favorite(item.sid, !item.fav).then(() => refreshWardrobe(false)).catch(toastError); return; }
+  const tile = ev.target.closest('[data-equip]'); if (!tile) return; const item = inventory().find(owned => owned.sid === tile.dataset.equip); if (!item) return;
+  if (item.slot === 'prop') {
+    const props = sceneSrv ? sceneSrv.props.map(prop => prop.itemId) : []; const at = props.indexOf(item.sid);
+    if (at >= 0) props.splice(at, 1); else if (props.length < 3) props.push(item.sid); else { toast('!', '장식은 3개까지', '하나를 벗고 다시 눌러주세요'); return; }
+    editScene({ props });
+  }
+  else if (item.on) editScene({ unequip: [SLOT_TO_SERVER[item.slot]] });
+  else editScene({ equip: { [SLOT_TO_SERVER[item.slot]]: item.sid } });
+});
+$('#tab-bag').addEventListener('click', ev => { const slotTile = ev.target.closest('[data-unequip]'); if (!slotTile) return; const key = slotTile.dataset.unequip; if (!key) { setBagHint(); return; }
+  if (key.startsWith('prop:')) editScene({ props: (sceneSrv ? sceneSrv.props.map(prop => prop.itemId) : []).filter(id => id !== key.slice(5)) });
+  else editScene({ unequip: [SLOT_TO_SERVER[key]] }); });
 $('#bag-filters').addEventListener('click', ev => { const b = ev.target.closest('[data-filter]'); if (b) { state.bagFilter = b.dataset.filter; save(); render(); } });
 function setBagHint(){ toast('!', '빈 슬롯', '아래 가방에서 장비를 눌러 장착하세요'); }
 $('#t-sample').onclick = async () => {
   try {
     await api.seed(); await refresh();
-    state.equip = {}; inventory().forEach(it => autoEquip(it)); setItems().forEach(it => autoEquip(it));
     sampleMode = true; selected = null; highlight = null; commit(); render(); resetView(); pollProgress();
   } catch (e) { toastError(e); }
 };
@@ -1566,6 +1706,59 @@ $('#t-clear').onclick = async () => {
   try { await api.clear(); state = BLANK(); await refresh(); sampleMode = false; selected = null; highlight = null; save(); render(); pollProgress(); }
   catch (e) { toastError(e); }
 };
+
+/* ---------- 공유 지도 wiring(3단계) ---------- */
+$('#map-select').onchange = ev => switchMap(ev.target.value).catch(toastError);
+$('#map-modal').addEventListener('click', ev => { if (ev.target === $('#map-modal')) closeMapModal(); });
+$('#t-map-new').onclick = () => {
+  openMapModal(`<h3 style="margin:0">공유 지도 만들기</h3><div class="row"><input type="text" id="mm-name" maxlength="40" placeholder="지도 이름 (예: 부산 원정대)" aria-label="지도 이름"></div>
+    <div class="row"><button class="btn" id="mm-cancel">취소</button><button class="btn primary" id="mm-create">만들기</button></div>`);
+  $('#mm-cancel').onclick = closeMapModal;
+  $('#mm-create').onclick = async () => {
+    try {
+      const created = await api.createMap($('#mm-name').value.trim());
+      openMapModal(`<h3 style="margin:0">「${esc(created.name)}」를 만들었어요</h3><p>초대코드 <b id="mm-invite">${created.inviteCode}</b> 를 친구에게 알려 주세요(최대 4명).</p>
+        <ol class="rules" id="mm-rules">${created.rules.map(line => `<li>${esc(line)}</li>`).join('')}</ol><div class="row"><button class="btn primary" id="mm-done">확인</button></div>`);
+      $('#mm-done').onclick = closeMapModal;
+      await refreshMaps(); await switchMap(created.mapId);
+    } catch (e) { toastError(e); }
+  };
+};
+$('#t-map-join').onclick = () => {
+  openMapModal(`<h3 style="margin:0">초대코드로 합류</h3><div class="row"><input type="text" id="mm-code" maxlength="8" placeholder="8자 초대코드" aria-label="초대코드"></div>
+    <div class="row"><button class="btn" id="mm-cancel">취소</button><button class="btn primary" id="mm-join">합류</button></div>`);
+  $('#mm-cancel').onclick = closeMapModal;
+  $('#mm-join').onclick = async () => {
+    try {
+      const joined = await api.joinMap($('#mm-code').value.trim());
+      closeMapModal();
+      toast('✓', joined.rejoined ? `「${joined.name}」에 돌아왔어요` : `「${joined.name}」에 합류`, joined.rejoined ? '숨겨졌던 내 영토가 복구돼요(선점은 돌아오지 않아요)' : joined.rules[0]);
+      await refreshMaps(); await switchMap(joined.mapId);
+      if (joined.rejoined) setTimeout(() => refresh().then(render).catch(() => {}), 800); // 복구는 이벤트로 비동기
+    } catch (e) { toastError(e); }
+  };
+};
+$('#t-map-leave').onclick = () => {
+  if (!mapInfo) return;
+  const n = myRegionCount();
+  openMapModal(`<h3 style="margin:0">「${esc(mapInfo.name)}」에서 탈퇴</h3><p id="leave-text">내 영토 ${n}곳이 지도에서 사라집니다. 내가 선점한 지역은 다음에 칠한 멤버에게 넘어가요. 7일 안에 초대코드로 돌아오면 복구돼요(선점은 돌아오지 않아요). 그사이 자리가 차면(최대 4명) 다시 합류할 수 없어요.</p>
+    <div class="row"><button class="btn" id="mm-cancel">취소</button><button class="btn danger" id="leave-ok">탈퇴</button></div>`);
+  $('#mm-cancel').onclick = closeMapModal;
+  $('#leave-ok').onclick = async () => {
+    try { const left = await api.leaveMap(mapInfo.mapId); closeMapModal(); toast('✓', '지도에서 탈퇴', left.message); await switchMap(null); await refreshMaps(); }
+    catch (e) { toastError(e); }
+  };
+};
+$('#t-invite-regen').onclick = async () => { try { const r = await api.regenInvite(mapInfo.mapId); mapInfo.inviteCode = r.inviteCode; renderMapCard(); toast('✓', '초대코드 재발급', r.inviteCode); } catch (e) { toastError(e); } };
+$('#t-settings-save').onclick = async () => {
+  try { mapInfo = await api.saveSettings(mapInfo.mapId, { photoRequired: $('#set-photo').checked, dailyCheckInCap: Number($('#set-cap').value), visibility: mapInfo.settings.visibility }); renderMapCard(); toast('✓', '지도 설정 저장', `사진 필수 ${mapInfo.settings.photoRequired ? '켬' : '끔'} · 하루 ${mapInfo.settings.dailyCheckInCap}곳`); }
+  catch (e) { toastError(e); }
+};
+$('#d-body').addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-dispute]'); if (!b || !mapInfo || !selected) return;
+  try { await api.dispute(mapInfo.mapId, selected, b.dataset.dispute, b.dataset.flag === 'true'); await refresh(); render(); toast('✓', b.dataset.flag === 'true' ? '이의 표시' : '이의 해제', '지도 내 랭킹 집계에서만 빠져요'); }
+  catch (e) { toastError(e); }
+});
 
 /* ---------- boot ---------- */
 function start(hot){
@@ -1575,7 +1768,7 @@ function start(hot){
   const h = (location.hash || '').slice(1);
   if (['map','bag','sets','quests','rank','profile'].includes(h)) setTab(h);
   render();
-  refresh().then(() => refreshProgress(false)).catch(e => toastError(e));
+  refresh().then(() => refreshMaps()).then(() => refreshProgress(false)).then(() => refreshWardrobe(false)).catch(e => toastError(e));
 }
 if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => ({ state, sampleMode }));
 (window.claude && window.claude.hot && window.claude.hot.ready) ? window.claude.hot.ready(start) : start((window.claude && window.claude.hot && window.claude.hot.data) || {});

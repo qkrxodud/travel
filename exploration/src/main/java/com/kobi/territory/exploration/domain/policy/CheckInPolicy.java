@@ -1,4 +1,4 @@
-package com.kobi.territory.exploration.domain.map;
+package com.kobi.territory.exploration.domain.policy;
 
 import java.time.Duration;
 import java.util.Objects;

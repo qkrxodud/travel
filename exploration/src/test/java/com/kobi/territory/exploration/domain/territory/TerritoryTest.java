@@ -1,6 +1,6 @@
 package com.kobi.territory.exploration.domain.territory;
 
-import com.kobi.territory.exploration.domain.map.CheckInPolicy;
+import com.kobi.territory.exploration.domain.policy.CheckInPolicy;
 import com.kobi.territory.exploration.domain.ExplorationError;
 import com.kobi.territory.exploration.domain.ExplorationException;
 import static com.kobi.territory.exploration.domain.Fixtures.FRIEND;

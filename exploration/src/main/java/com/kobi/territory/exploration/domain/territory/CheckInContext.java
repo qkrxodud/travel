@@ -1,6 +1,6 @@
 package com.kobi.territory.exploration.domain.territory;
 
-import com.kobi.territory.exploration.domain.map.CheckInPolicy;
+import com.kobi.territory.exploration.domain.policy.CheckInPolicy;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;

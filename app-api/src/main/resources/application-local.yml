@@ -17,6 +17,9 @@ spring:
       path: /h2-console
 
 territory:
+  admin:
+    # 로컬 전용 관리자 토큰(X-Admin-Token). http/stage3-wardrobe.http·E2E 가 쓴다.
+    token: local-admin-token
   outbox:
     relay:
       # 로컬은 체크인 → 진행 반영(비동기)이 화면에서 바로 보이도록 짧게.

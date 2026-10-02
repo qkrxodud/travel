@@ -8,3 +8,8 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+
+territory:
+  admin:
+    # 운영 관리자 토큰 — 환경변수 필수(없으면 기동 실패).
+    token: ${TERRITORY_ADMIN_TOKEN}

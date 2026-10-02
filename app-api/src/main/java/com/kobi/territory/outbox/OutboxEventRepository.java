@@ -1,5 +1,6 @@
 package com.kobi.territory.outbox;
 
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,4 +13,8 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEventEntity, 
     List<OutboxEventEntity> findByPublishedAtIsNullAndIdGreaterThanOrderByIdAsc(Long afterId, Limit limit);
 
     List<OutboxEventEntity> findByAggregateIdOrderByIdAsc(String aggregateId);
+
+    List<OutboxEventEntity> findByAggregateIdInAndPublishedAtIsNull(Collection<String> aggregateIds);
+
+    boolean existsByPublishedAtIsNull();
 }

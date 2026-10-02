@@ -3,6 +3,7 @@ package com.kobi.territory.progression.infra.repository;
 import com.kobi.territory.progression.infra.entity.BadgeEarnedJpaEntity;
 import com.kobi.territory.progression.infra.entity.ExplorerProgressJpaEntity;
 import com.kobi.territory.progression.infra.entity.ExplorerRegionJpaEntity;
+import com.kobi.territory.progression.infra.entity.ExplorerRegionMarkJpaEntity;
 import com.kobi.territory.progression.infra.entity.TitleEarnedJpaEntity;
 import com.kobi.territory.progression.infra.entity.XpLedgerJpaEntity;
 import com.kobi.territory.common.model.ExplorerId;
@@ -32,11 +33,14 @@ class JpaExplorerProgressRepository implements ExplorerProgressRepository {
     private final BadgeEarnedJpaRepository badgeRows;
     private final TitleEarnedJpaRepository titleRows;
     private final ExplorerRegionJpaRepository regionRows;
+    private final ExplorerRegionMarkJpaRepository markRows;
     private final EntityManager entityManager;
 
     JpaExplorerProgressRepository(ExplorerProgressJpaRepository progressRows, XpLedgerJpaRepository ledgerRows,
                                   BadgeEarnedJpaRepository badgeRows, TitleEarnedJpaRepository titleRows,
-                                  ExplorerRegionJpaRepository regionRows, EntityManager entityManager) {
+                                  ExplorerRegionJpaRepository regionRows, ExplorerRegionMarkJpaRepository markRows,
+                                  EntityManager entityManager) {
+        this.markRows = markRows;
         this.progressRows = progressRows;
         this.ledgerRows = ledgerRows;
         this.badgeRows = badgeRows;
@@ -58,12 +62,13 @@ class JpaExplorerProgressRepository implements ExplorerProgressRepository {
     private ExplorerProgress withChildren(ExplorerProgressJpaEntity root) {
         String id = root.explorerId();
         return root.toDomain(ledgerRows.findByExplorerIdOrderByIdAsc(id), regionRows.findByExplorerId(id),
-            badgeRows.findByExplorerId(id), titleRows.findByExplorerId(id));
+            markRows.findByExplorerId(id), badgeRows.findByExplorerId(id), titleRows.findByExplorerId(id));
     }
 
     @Override
     public ExploredRegions exploredRegions(ExplorerId explorerId) {
-        return ExplorerRegionJpaEntity.toDomain(regionRows.findByExplorerId(explorerId.value()));
+        return ExplorerRegionJpaEntity.toDomain(regionRows.findByExplorerId(explorerId.value()),
+            markRows.findByExplorerId(explorerId.value()));
     }
 
     @Override
@@ -89,11 +94,15 @@ class JpaExplorerProgressRepository implements ExplorerProgressRepository {
         String id = explorer.value();
         ledgerRows.deleteAll(ledgerRows.findByExplorerIdOrderByIdAsc(id));
         regionRows.deleteAll(regionRows.findByExplorerId(id));
+        markRows.deleteAll(markRows.findByExplorerId(id));
         badgeRows.deleteAll(badgeRows.findByExplorerId(id));
         titleRows.deleteAll(titleRows.findByExplorerId(id));
         entityManager.flush();
         progress.ledger().chronological().forEach(entry -> ledgerRows.save(XpLedgerJpaEntity.from(explorer, entry)));
-        progress.regions().all().forEach(region -> regionRows.save(ExplorerRegionJpaEntity.from(explorer, region)));
+        progress.regions().all().forEach(region -> {
+            regionRows.save(ExplorerRegionJpaEntity.from(explorer, region));
+            markRows.saveAll(ExplorerRegionMarkJpaEntity.from(explorer, region));
+        });
         progress.badges().forEach((badge, earnedAt) -> badgeRows.save(BadgeEarnedJpaEntity.from(explorer, badge, earnedAt)));
         progress.titles().forEach((title, earnedAt) -> titleRows.save(TitleEarnedJpaEntity.from(explorer, title, earnedAt)));
         saveRoot(progress);
@@ -121,5 +130,7 @@ class JpaExplorerProgressRepository implements ExplorerProgressRepository {
         regionRows.findById(ExplorerRegionJpaEntity.keyOf(explorer, region)).ifPresentOrElse(
             regionRow -> regionRow.apply(region),
             () -> regionRows.save(ExplorerRegionJpaEntity.from(explorer, region)));
+        ExplorerRegionMarkJpaEntity.from(explorer, region).forEach(markRow -> markRows.findById(markRow.key())
+            .ifPresentOrElse(saved -> saved.apply(markRow.mark()), () -> markRows.save(markRow)));
     }
 }

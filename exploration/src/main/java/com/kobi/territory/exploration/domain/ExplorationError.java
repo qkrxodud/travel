@@ -19,7 +19,12 @@ public enum ExplorationError {
     INVALID_PHOTO_REF(ErrorKind.INVALID, "사진 주소가 올바르지 않습니다."),
     INVALID_MAP(ErrorKind.INVALID, "지도 정보가 올바르지 않습니다: %s"),
     MAP_FULL(ErrorKind.CONFLICT, "지도 멤버는 %d명까지입니다."),
-    ALREADY_MEMBER(ErrorKind.CONFLICT, "이미 이 지도의 멤버입니다.");
+    ALREADY_MEMBER(ErrorKind.CONFLICT, "이미 이 지도의 멤버입니다."),
+    OWNER_ONLY(ErrorKind.FORBIDDEN, "지도장만 할 수 있어요."),
+    OWNER_CANNOT_LEAVE(ErrorKind.RULE_VIOLATION, "지도장은 다른 멤버에게 지도장을 넘긴 뒤 탈퇴할 수 있어요."),
+    PERSONAL_MAP_ONLY_ME(ErrorKind.RULE_VIOLATION, "개인 지도에서는 할 수 없어요: %s"),
+    INVITE_CODE_NOT_FOUND(ErrorKind.NOT_FOUND, "초대코드를 찾을 수 없어요: %s"),
+    INVALID_SETTINGS(ErrorKind.INVALID, "지도 설정이 올바르지 않습니다: %s");
 
     private final ErrorKind kind;
     private final String template;

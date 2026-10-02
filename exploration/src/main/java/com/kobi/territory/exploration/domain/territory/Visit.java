@@ -8,6 +8,13 @@ import java.util.Objects;
 /**
  * Territory 내부 엔티티. (지도, 지역, 멤버) 단위로 한 건. 식별은 (region.code, checkedInBy).
  * visitedAt 은 처리 시각(서버 시계), visitDate 는 사용자가 적은 기록용 날짜다.
+ * <ul>
+ *   <li>generation — 같은 (지도, 지역, 멤버)의 체크인 회차(1부터, 결정 6). 취소 후 다시 칠하면 +1</li>
+ *   <li>claimRankAt — 선점(지도 내 최초 체크인) 순서 기준. 평소 visitedAt 과 같고, 재가입으로 복구된 방문은 복구 시각이다
+ *       (탈퇴 때 넘어간 선점이 돌아오지 않게 — §2-9)</li>
+ *   <li>hiddenAt — 탈퇴 유예 중 숨김(지도·집계에서 빠진다). 재가입이면 복구, 유예가 끝나면 하드 삭제</li>
+ *   <li>disputed — 지도장 이의(지도 내 랭킹 집계 제외용, 5단계)</li>
+ * </ul>
  */
 public final class Visit {
 
@@ -15,12 +22,23 @@ public final class Visit {
     private final ExplorerId checkedInBy;
     private final Verification verification;
     private final Instant visitedAt;
+    private final int generation;
     private VisitDate visitDate;
     private Memo memo;
     private PhotoRef photo;
+    private Instant claimRankAt;
+    private Instant hiddenAt;
+    private boolean disputed;
 
+    /** 새 방문(1회차, 숨김·이의 없음). */
     public Visit(RegionSnapshot region, ExplorerId checkedInBy, VisitDate visitDate, Memo memo, PhotoRef photo,
                  Verification verification, Instant visitedAt) {
+        this(region, checkedInBy, visitDate, memo, photo, verification, visitedAt, 1, visitedAt, null, false);
+    }
+
+    private Visit(RegionSnapshot region, ExplorerId checkedInBy, VisitDate visitDate, Memo memo, PhotoRef photo,
+                  Verification verification, Instant visitedAt, int generation, Instant claimRankAt, Instant hiddenAt,
+                  boolean disputed) {
         this.region = Objects.requireNonNull(region, "region");
         this.checkedInBy = Objects.requireNonNull(checkedInBy, "checkedInBy");
         this.visitDate = Objects.requireNonNull(visitDate, "visitDate");
@@ -28,6 +46,25 @@ public final class Visit {
         this.photo = photo;
         this.verification = Objects.requireNonNull(verification, "verification");
         this.visitedAt = Objects.requireNonNull(visitedAt, "visitedAt");
+        if (generation < 1) throw new IllegalArgumentException("generation >= 1: " + generation);
+        this.generation = generation;
+        this.claimRankAt = Objects.requireNonNull(claimRankAt, "claimRankAt");
+        this.hiddenAt = hiddenAt;
+        this.disputed = disputed;
+    }
+
+    /** 저장소 복원. */
+    public static Visit restore(RegionSnapshot region, ExplorerId checkedInBy, VisitDate visitDate, Memo memo, PhotoRef photo,
+                                Verification verification, Instant visitedAt, int generation, Instant claimRankAt,
+                                Instant hiddenAt, boolean disputed) {
+        return new Visit(region, checkedInBy, visitDate, memo, photo, verification, visitedAt, generation, claimRankAt,
+            hiddenAt, disputed);
+    }
+
+    /** generation 회차의 새 방문. */
+    static Visit checkedIn(RegionSnapshot region, ExplorerId member, VisitDate date, Memo memo, PhotoRef photo, Instant at,
+                           int generation) {
+        return new Visit(region, member, date, memo, photo, Verification.NONE, at, generation, at, null, false);
     }
 
     void edit(VisitDate visitDate, Memo memo, PhotoRef photo) {
@@ -36,8 +73,26 @@ public final class Visit {
         this.photo = photo;
     }
 
+    void hide(Instant at) {
+        this.hiddenAt = Objects.requireNonNull(at, "at");
+    }
+
+    /** 숨김을 푼다. 선점 순서는 복구 시각으로 — 넘어간 선점이 돌아오지 않는다. */
+    void restoreAt(Instant at) {
+        this.hiddenAt = null;
+        this.claimRankAt = Objects.requireNonNull(at, "at");
+    }
+
+    void dispute(boolean flag) {
+        this.disputed = flag;
+    }
+
     boolean is(RegionCode code, ExplorerId member) {
         return region.code().equals(code) && checkedInBy.equals(member);
+    }
+
+    public boolean hidden() {
+        return hiddenAt != null;
     }
 
     public RegionSnapshot region() { return region; }
@@ -48,4 +103,8 @@ public final class Visit {
     public PhotoRef photo() { return photo; }
     public Verification verification() { return verification; }
     public Instant visitedAt() { return visitedAt; }
+    public int generation() { return generation; }
+    public Instant claimRankAt() { return claimRankAt; }
+    public Instant hiddenAt() { return hiddenAt; }
+    public boolean disputed() { return disputed; }
 }

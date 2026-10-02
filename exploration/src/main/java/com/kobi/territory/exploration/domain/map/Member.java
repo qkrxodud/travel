@@ -11,4 +11,12 @@ public record Member(ExplorerId explorerId, MemberRole role, Instant joinedAt) {
         Objects.requireNonNull(role, "role");
         Objects.requireNonNull(joinedAt, "joinedAt");
     }
+
+    public boolean owner() {
+        return role == MemberRole.OWNER;
+    }
+
+    Member withRole(MemberRole next) {
+        return new Member(explorerId, next, joinedAt);
+    }
 }

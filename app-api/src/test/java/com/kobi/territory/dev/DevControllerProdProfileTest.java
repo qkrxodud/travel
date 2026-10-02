@@ -15,7 +15,8 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest(properties = {
     "DB_URL=jdbc:h2:mem:prodprofiletest;MODE=MySQL;DB_CLOSE_DELAY=-1",
     "DB_USERNAME=sa",
-    "DB_PASSWORD="
+    "DB_PASSWORD=",
+    "TERRITORY_ADMIN_TOKEN=prod-profile-test-token"
 })
 @ActiveProfiles("prod")
 class DevControllerProdProfileTest {

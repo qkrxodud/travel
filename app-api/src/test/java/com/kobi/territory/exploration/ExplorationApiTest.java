@@ -28,13 +28,14 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @IntegrationTest
 class ExplorationApiTest {
 
-    private static final String H = "X-Explorer-Id";
+    private static final String H = "X-Explorer-Token";
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper om;
     @Autowired MutableClock clock;
 
     private String me;
+    private String token;
     private String myMap;
     private LocalDate today;
 
@@ -45,6 +46,7 @@ class ExplorationApiTest {
             .andExpect(jsonPath("$.anonymous").value(true))
             .andExpect(jsonPath("$.createdAt").exists()));
         me = body.get("explorerId").asText();
+        token = body.get("accessToken").asText();
         myMap = body.get("personalMapId").asText();
         today = LocalDate.now(clock);
     }
@@ -54,7 +56,7 @@ class ExplorationApiTest {
     }
 
     private MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder builder) {
-        return builder.header(H, me);
+        return builder.header(H, token);
     }
 
     private ResultActions checkIn(String code, LocalDate date, String memo) throws Exception {
@@ -71,10 +73,12 @@ class ExplorationApiTest {
     // ---- 탐험가 식별 ----
 
     @Test
-    void 헤더가_없거나_형식이_틀리면_401_모르는_탐험가는_404() throws Exception {
-        error(mvc.perform(get("/territory")), 401, "EXPLORER_ID_REQUIRED");
-        error(mvc.perform(get("/territory").header(H, "not-a-uuid")), 401, "EXPLORER_ID_REQUIRED");
-        error(mvc.perform(get("/territory").header(H, "00000000-0000-0000-0000-000000000000")), 404, "EXPLORER_NOT_FOUND");
+    void 토큰_헤더가_없으면_401_REQUIRED_모르는_토큰이면_401_INVALID() throws Exception {
+        error(mvc.perform(get("/territory")), 401, "EXPLORER_TOKEN_REQUIRED");
+        error(mvc.perform(get("/territory").header(H, "not-a-token")), 401, "EXPLORER_TOKEN_INVALID");
+        // explorerId 는 공개 식별자라 인증 수단이 아니다(결정 2)
+        error(mvc.perform(get("/territory").header(H, me)), 401, "EXPLORER_TOKEN_INVALID");
+        error(mvc.perform(get("/territory").header("X-Explorer-Id", me)), 401, "EXPLORER_TOKEN_REQUIRED");
         mvc.perform(as(get("/explorers/me"))).andExpect(status().isOk())
             .andExpect(jsonPath("$.explorerId").value(me)).andExpect(jsonPath("$.personalMapId").value(myMap));
     }
@@ -203,7 +207,10 @@ class ExplorationApiTest {
             .andExpect(jsonPath("$[0].countryCode").value("KR"))
             .andExpect(jsonPath("$[0].version").value(1));
         mvc.perform(get("/catalog/provinces")).andExpect(jsonPath("$", hasSize(17)));
-        mvc.perform(get("/catalog/items")).andExpect(jsonPath("$", hasSize(250)));
+        // 3단계: 아이템 정의는 DB(지역 특산물 250 + 세트 배경 9 + 운영 추가 — 같은 DB 의 다른 테스트가 추가할 수 있다)
+        mvc.perform(get("/catalog/items"))
+            .andExpect(jsonPath("$[?(@.grantRule == 'REGION_VISIT')]", hasSize(250)))
+            .andExpect(jsonPath("$[?(@.grantRule == 'THEME_COMPLETE' && @.itemId =~ /set:.*/)]", hasSize(9)));
         mvc.perform(get("/catalog/reward-rules")).andExpect(jsonPath("$.provinceFirstBonus").value(15));
         mvc.perform(get("/catalog/regions.geojson")).andExpect(status().isOk())
             .andExpect(content().contentTypeCompatibleWith("application/geo+json"))
@@ -221,7 +228,7 @@ class ExplorationApiTest {
             .andExpect(jsonPath("$.visits[0].visitDate").value(today.withDayOfMonth(1).toString()));
         mvc.perform(as(delete("/dev/visits"))).andExpect(status().isOk()).andExpect(jsonPath("$.cleared").value(45));
         mvc.perform(as(get("/territory"))).andExpect(jsonPath("$.conquest.visited").value(0));
-        error(mvc.perform(post("/dev/seed")), 401, "EXPLORER_ID_REQUIRED");
+        error(mvc.perform(post("/dev/seed")), 401, "EXPLORER_TOKEN_REQUIRED");
     }
 
     @Test

@@ -74,14 +74,15 @@ public class ExplorerProgressJpaEntity {
 
     /** 루트 + 자식 행으로 애그리거트를 복원한다. */
     public ExplorerProgress toDomain(List<XpLedgerJpaEntity> ledgerRows, List<ExplorerRegionJpaEntity> regionRows,
-                              List<BadgeEarnedJpaEntity> badgeRows, List<TitleEarnedJpaEntity> titleRows) {
+                                     List<ExplorerRegionMarkJpaEntity> markRows, List<BadgeEarnedJpaEntity> badgeRows,
+                                     List<TitleEarnedJpaEntity> titleRows) {
         Map<String, Instant> badges = new LinkedHashMap<>();
         badgeRows.forEach(badgeRow -> badges.putIfAbsent(badgeRow.badgeId(), badgeRow.earnedAt()));
         Map<String, Instant> titles = new LinkedHashMap<>();
         titleRows.forEach(titleRow -> titles.putIfAbsent(titleRow.titleId(), titleRow.earnedAt()));
         return ExplorerProgress.restore(ExplorerId.of(explorerId),
             XpLedger.of(ledgerRows.stream().map(XpLedgerJpaEntity::toDomain).toList()),
-            ExplorerRegionJpaEntity.toDomain(regionRows),
+            ExplorerRegionJpaEntity.toDomain(regionRows, markRows),
             streakMonths == 0 ? Streak.NONE : Streak.of(streakMonths, YearMonth.parse(streakLastMonth)),
             badges, titles, titleId, level, updatedAt);
     }

@@ -35,12 +35,12 @@
 | catalog | common | 다른 컨텍스트 |
 | exploration | common, catalog | progression·wardrobe·social·sharing |
 | progression | common, catalog:api.query, exploration:api.event·api.query | exploration의 domain/application/infra/api.web |
-| wardrobe | common, catalog, exploration:api, progression:api | — |
+| wardrobe | common, catalog(api.query: RegionCatalog·ItemCatalog), exploration(api.event·api.query), progression(api.event·api.query: CollectionBookQuery) | social·sharing, 다른 컨텍스트 내부(ArchUnit `wardrobe_*` 규칙, 3단계) |
 | social | common, exploration:api, progression:api | 다른 컨텍스트의 domain |
 | sharing | common, catalog, 모든 컨텍스트의 api(Query) | 다른 컨텍스트의 domain |
 | app-api | 전부 | 도메인 로직 작성 금지 |
 
-**공개 범위(2단계 D7)**: 각 컨텍스트 api 는 `api.event`(공개 이벤트) · `api.query`(공개 Query 인터페이스·그 DTO) · `api.web`(컨트롤러·웹 DTO)로 나눈다. 다른 컨텍스트는 `api.event`·`api.query`만 참조할 수 있고(`api.web`·domain·application·infra 금지), `api.event`·`api.query`는 자기 domain·application·infra·api.web 을 참조하지 않는다(ArchUnit). 여러 컨텍스트 컨트롤러가 쓰는 `@CurrentExplorer`(X-Explorer-Id) 애노테이션은 common(`common.identity`), 그 resolver 는 app-api 에 둔다.
+**공개 범위(2단계 D7)**: 각 컨텍스트 api 는 `api.event`(공개 이벤트) · `api.query`(공개 Query 인터페이스·그 DTO) · `api.web`(컨트롤러·웹 DTO)로 나눈다. 다른 컨텍스트는 `api.event`·`api.query`만 참조할 수 있고(`api.web`·domain·application·infra 금지), `api.event`·`api.query`는 자기 domain·application·infra·api.web 을 참조하지 않는다(ArchUnit). 여러 컨텍스트 컨트롤러가 쓰는 `@CurrentExplorer` 애노테이션은 common(`common.identity`), 그 resolver 는 app-api 에 둔다. 3단계(결정 2)부터 인증은 비밀 접근 토큰 헤더 `X-Explorer-Token`(발급 시 `POST /explorers` 응답에 한 번만, DB 엔 SHA-256 해시) — explorerId 는 공개 식별자라 인증에 쓰지 않는다. resolver 는 exploration `api.query.ExplorerCredentials`(토큰 → explorerId)를 쓴다. 4단계 구글 로그인 때 세션으로 대체.
 
 common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventOutbox·EventSubscriber), CurrentExplorer, Clock. Spring 의존 없음(이벤트 퍼블리셔 인터페이스용 spring-context만 예외). Rarity는 공개 이벤트(RegionVisited 등)에 실리는 Published Language 값이고 exploration.domain이 catalog를 참조할 수 없어 공유 커널에 둔다.
 
@@ -59,6 +59,8 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 - 커맨드: `checkIn(region, date, memo)`, `editVisit(...)`, `cancelVisit(region)`
 - 이벤트: `RegionVisited{explorerId, mapId, regionCode, rarity, provinceCode, visitedAt, isFirstInProvince, nth, isFirstClaim}`, `VisitEdited`, `VisitCancelled{explorerId, mapId, regionCode, rarity, provinceCode, wasClaim, remaining, regionStillOnMap, cancelledAt}`
   - `regionStillOnMap`(2단계 D2): 취소 후에도 그 지역이 지도에 다른 멤버의 방문으로 남는가 — Collection(지도 단위) 회수 판단용.
+  - 3단계 확장(끝에 추가, 하위 호환): `RegionVisited.visitGeneration`·`VisitCancelled.visitGeneration` = 같은 (지도, 지역, 멤버)의 체크인 회차(결정 6, 1부터, 방문 행을 지워도 `visit_generation` 테이블로 단조 증가, 0 = 예전 이벤트), `RegionVisited.memberIds` = 체크인 시점 지도 멤버(테마 완성 수령자, 결정 1). 진행(ExplorerProgress)은 `explorer_region_mark`(지도별 마지막 회차, 음수 = 취소)로 오래된 회차 이벤트를 무시한다. 회차 0(예전 이벤트)은 그 지도에 표시가 있으면 무시(Q3).
+  - 3단계 이벤트: `ClaimTransferred{mapId, regionCode, rarity, provinceCode, fromExplorerId, explorerId(새 선점자), reason CANCELLED|LEFT, transferredAt}`(선점자 취소·탈퇴 → 다음 체크인 멤버, 진행 +10), `VisitsHidden`·`VisitsRestored`(탈퇴 숨김·재가입 복구 — 도감이 구독), `VisitDisputeChanged`(지도장 이의). 확정 시그니처는 `_workspace/03_contracts.md`.
   - `isFirstInProvince`·`nth`·`isFirstClaim`은 Territory가 자기 상태로 계산해 실어 보낸다(하류가 영토를 다시 읽지 않게).
   - `visitedAt`은 처리 시각(서버 시계). `visitDate`는 기록용 표시 값일 뿐 진행에 영향 없음. `VisitEdited`는 진행이 구독하지 않는다.
 - `CheckInPreview` 도메인 서비스: 순수 함수(현재 영토 + 지역 → 보상 목록). 체크인 모달의 "획득 XP +90"을 계산한다.
@@ -85,7 +87,7 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 - 루트 `Collection(mapId)` — **지도 단위**. 세트별 진행·완성 여부.
 - VO: `SetProgress{setId, collected:Set<RegionCode>, completedAt?}`
 - 불변식: 완성은 정의된 지역 전부 모였을 때 단 한 번. 완성 후 지역 취소해도 완성 기록 유지(보상 회수 없음).
-- 커맨드: `applyVisit`, `revokeVisit(regionStillOnMap)` — 지도에 그 지역이 다른 멤버 방문으로 남아 있으면 진행에서도 빼지 않는다(D2) / 이벤트: `SetCompleted{mapId, setId, explorerId(완성시킨 체크인의 탐험가), completedAt}` → 진행(보너스 XP `set:{explorerId}:{setId}`·칭호)·꾸미기(세트 배경 전원 지급, 3단계)가 구독. `SetProgressed`는 2단계에선 구독자가 없어 발행하지 않는다.
+- 커맨드: `applyVisit(…, members)`, `revokeVisit(regionStillOnMap)` — 지도에 그 지역이 다른 멤버 방문으로 남아 있으면 진행에서도 빼지 않는다(D2), `revokeRegions`(탈퇴로 지도에서 사라진 지역)·`restoreRegions`(재가입 복구) / 이벤트: `SetCompleted{mapId, setId, explorerId(수령자), completedAt, completedBy, recipientIds}` — 3단계 결정 1: 완성 시점 지도 멤버 **전원**이 수령자이고 **수령자마다 한 건**씩 발행 → 진행(보너스 XP `set:{explorerId}:{setId}`·칭호)·꾸미기(세트 배경)가 explorerId 한 명만 처리. 수령자 목록은 set_progress `completed_member_ids` 에 남기고, 재계산 복구 규칙은 이 목록 기준으로만 지급(R2-1). 나중 합류 멤버는 세트 배경만(꾸미기가 MemberJoined + `progression.api.query.CollectionBookQuery`), XP·칭호 없음. `SetProgressed`는 구독자가 없어 발행하지 않는다.
 - ExplorerProgress와 분리한 이유: 세트 정의 추가 시 진행 루트가 커지는 것을 막고 재계산 배치를 독립 실행.
 
 ### 2-4. QuestBoard (월간 퀘스트 · 상시 도전)
@@ -100,19 +102,24 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 ### 2-5. Inventory (보유 아이템)
 
 - 루트 `Inventory(explorerId)`.
-- VO: `OwnedItem{itemId, source(REGION|SET_REWARD|EVENT), acquiredAt, favorite}` — itemId는 지역 아이템 `region:{code}`, 세트 보상 `set:{setId}`
-- 불변식: 같은 itemId 한 번만. 지역 아이템은 해당 지역 방문 취소 시 회수. 세트 보상은 회수 없음.
-- 커맨드: `grant(itemId, source)`, `revoke(itemId)` / 이벤트: `ItemGranted`, `ItemRevoked` → Scene이 구독(착용 중 회수되면 벗김).
-- 지역 아이템은 체크인한 본인에게, 세트 보상은 지도 멤버 전원에게. `MemberJoined` 시 이미 완성된 세트 보상을 새 멤버에게 지급.
-- 아이템 생김새(슬롯·룩·색·이름)는 카탈로그의 ItemDefinition 참조 — 여기 없음.
+- VO: `OwnedItem{itemId, grantKind, source(REGION|SET_REWARD|EVENT — grantKind 에서 정해짐), acquiredAt, favorite, basis}` — itemId는 지역 아이템 `region:{code}`, 세트 보상 `set:{setId}`, 운영 추가 `event:…` 등. `basis` = 그 아이템을 지금 뒷받침하는 활성 방문 `VisitKey(region, mapId)` 집합(체크인 아이템만, 보상은 빈 집합). 일급 컬렉션 `OwnedItems`.
+- 방문 흔적 `VisitTrace{region, mapId, generation, active}`(일급 컬렉션 `VisitTraces`): (지역, 지도)마다 마지막 반영 세대 — 옛 세대 이벤트 무시(체크인 k 는 k > 기록이거나 같은 세대가 아직 활성일 때만, 취소 k 는 k ≥ 기록일 때만, 세대 0 = 예전 이벤트는 그 (지도, 지역)에 회차 기록(세대 ≥ 1)이 있으면 무시, 없으면 반영 — 리더 결정 Q3). progression `explorer_region` 과 같은 원리를 꾸미기가 자기 데이터로 둔다(공개 Query 대신 — 구독 순서가 서로 독립이라).
+- 불변식: 같은 itemId 한 번만. **체크인으로 받은 아이템(지역 특산물 REGION + 기간·시·도 이슈 EVENT)은 근거 방문이 모두 취소되면 회수**(같은 조건을 만족한 다른 활성 방문 — 다른 지도 포함 — 이 남으면 유지, 3단계 리더 결정 Q2: "체크인 → 즉시 취소"로 이슈 아이템을 얻는 경로 차단). 세트 보상·수동 지급은 회수 없음. **탈퇴는 회수 사유가 아니다**(방문 "취소"만 — explorer_region 이 탈퇴로 줄지 않는 것과 같다).
+- 커맨드: `applyCheckIn(CheckInGrant)`, `applyCancel(mapId, region, generation)`, `grantRewards(items)`, `markFavorite` / 결과 `InventoryChange` → 이벤트: `ItemGranted{explorerId, itemId, source, acquiredAt}`, `ItemRevoked{explorerId, itemId, revokedAt}`(공개, aggregate Inventory/explorerId) → Scene이 구독.
+- 지역·이슈 아이템은 체크인한 본인에게(지급 판정 = 카탈로그 `ItemCatalog.grantedByCheckIn`, 날짜는 **처리 시각** 기준 — 소급 방지). 세트 보상은 `SetCompleted`(수령자별 1건) 때 **그 수령자 Inventory 하나만**(기간 판정은 완성 시각), 완성 직후 합류해 수령자 목록에 없는 지금 멤버에게는 완성자 몫의 SetCompleted 처리에서 `ThemeRewardOwed{mapId, setId, explorerId, completedAt}`(공개, aggregate Inventory/explorerId)를 내 각자 트랜잭션에서 지급(QA P3-1·P3-R2-5, 판단 `ThemeRewardRecipients`), `MemberJoined` 시 `CollectionBookQuery.completedSets`(완성 시각 포함)로 이미 완성된 세트 보상. **소급 지급 없음**(리더 결정 Q-R2-1): 이슈 아이템은 체크인 처리 시각이 유효 기간 안이고 정의 생성 시각(item_definition.created_at) 이후일 때만, 테마 보상 기간은 완성 시각 기준 — 재계산도 같은 기준.
+- 재계산(일관성 원칙 3, QA P2-1): `InventoryReplay` — 지금 멤버인 지도의 활성 흔적·근거만 비우고(탈퇴한 지도의 근거·취소된 흔적·보상은 유지, 근거가 하나도 없는 방문형 아이템은 정리 — P3-R2-2) 그 지도들의 본인 방문을 처리 시각 순으로 재생 + 그 지도들의 완성 테마 보상, 예전 아이템의 acquiredAt·favorite 유지. 서비스 `InventoryRecalculateService`(루트 선잠금, replace, 루트 잠금 뒤 같은 트랜잭션에서 `wardrobe.*` 구독자 미전달 이벤트가 있으면 보류 — P3-R2-3, 탐험가별 실패 격리). 장면은 가방에 없게 된 착용만 벗긴다(`Scene.keepOnly`). 진입점: `POST /dev/recalculate`(진행 다음, 응답 `wardrobe` 필드), 운영 `recalculate-on-startup`(진행 다음).
+- 아이템 생김새(슬롯·룩·색·이름)는 카탈로그의 ItemDefinition 참조 — 여기 없음. 꾸미기 쪽 사양은 `item/ItemSpec{itemId, slot, tier, grantKind}`.
+- 구독자: `wardrobe.inventory`(RegionVisited·VisitCancelled·SetCompleted·MemberJoined·MapCreated(루트 행 선생성)·ThemeRewardOwed). dev 시드·지우기는 루트 행(inventory·scene)을 지우지 않는다(Q-R2-2).
 
 ### 2-6. Scene (장면 · 꾸미기)
 
 - 루트 `Scene(explorerId)`. 성별, 슬롯별 착용, 장식 3칸.
-- VO: `Gender`, `EquipSlot(HAT|HAND|BADGE|BAG|PET|BG)`, `PropSlots(≤3)`
-- 불변식: 착용 아이템은 모두 Inventory에 존재. 한 슬롯에 하나, 장식 ≤3, 아이템 슬롯과 장착 슬롯 일치.
-- 커맨드: `equip(slot, itemId)`, `unequip(slot)`, `setGender`, `autoEquip(itemId)`(빈 슬롯이거나 더 높은 희귀도일 때)
-- 이벤트: `SceneChanged` → 공유가 구독(카드 스냅샷 무효화).
+- VO: `Gender(M|F)`, `EquipSlot(HAT|HAND|BADGE|BAG|PET|BG)`, `PropSlots(≤3, 순서 = 배치)`, `EquippedSlots`, 착용 검증용 `Holdings`(Inventory 보유 id — 폴더 간 내부 참조 대신 id 만), `StylePolicy`(희귀도별 점수, 설정 `territory.wardrobe.style-points.*`).
+- 불변식: 사용자가 입히는 아이템은 Inventory에 있어야 한다. 한 슬롯에 하나, 장식 ≤3(`PropSlots.MAX`, 설계 불변식), 아이템 슬롯과 장착 슬롯 일치(PROP 은 장식 칸).
+- 커맨드: `edit(SceneEdit{gender, unequip, equip, props})`(PUT /scene), `autoEquip(item)`(빈 슬롯이거나 **더 높은** 희귀도 — 같으면 유지, PROP 은 빈 칸이 있을 때), `takeOff(itemId)`(ItemRevoked), `keepOnly(holdings)`(재계산 정리).
+- 꾸미기 점수 `stylePoints` = 착용(슬롯 + 장식) 희귀도 점수 합(서버 계산, 기본 1·3·8).
+- 이벤트: `SceneChanged{explorerId, changedAt}` → 공유가 구독(카드 스냅샷 무효화, 4단계 — 3단계는 발행만). 바뀐 경우에만.
+- 구독자: `wardrobe.scene`(ItemGranted·ItemRevoked — aggregate Inventory/explorerId 한 줄이라 획득·회수 순서 유지). 사용자 편집과 자동 착용 경합은 scene.version 낙관적 락(사용자 409, 릴레이는 재시도).
 - Inventory와 분리한 이유: 보유는 탐험 파생, 착용은 사용자 선택 — 변경 빈도·주체가 다름.
 
 ### 2-7. Friendship (소셜)
@@ -131,13 +138,14 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 
 - **소속: exploration 컨텍스트** (Territory와 생명주기가 묶여 있고 별도 모듈이 없다. 단, 같은 트랜잭션에서 둘을 수정하지는 않는다 — 체크인은 멤버 여부만 읽기 참조).
 - 루트 `ExpeditionMap(mapId)`. 이름, 초대코드, 생성자, 멤버 목록, 국가 코드. 가입 시 개인 지도 자동 생성(멤버 1명). 지도는 여러 개 가질 수 있고 합류 시 개인 지도는 병합하지 않는다.
-- VO: `InviteCode(8자, 재발급 가능)`, `Member{explorerId, role(OWNER|MEMBER), joinedAt}`, `CountryCode`, `MapSettings{photoRequired, dailyCheckInCap(기본 5), visibility}`
+- VO: `InviteCode(8자, 재발급 가능)`, `Member{explorerId, role(OWNER|MEMBER), joinedAt}`, `CountryCode`, `MapSettings{photoRequired, dailyCheckInCap(기본 = territory.check-in.daily-cap, 지도장은 1..기본값으로 낮추기만 — Q1), visibility}`(개인 지도는 설정 변경 불가). 사진 필수는 새 체크인에만 적용(기존 방문의 메모·날짜 수정 허용, 있던 사진 삭제만 거부 — Q5). 탈퇴 유예 중인 사람은 자리를 차지하지 않아 그사이 4명이 차면 재가입은 MAP_FULL(의도 — 탈퇴 경고에 안내)
 - 불변식: 멤버 ≤4. 초대코드는 지도당 하나·전체 유일. OWNER 한 명, 탈퇴 불가(양도 후 가능). 중복 가입 불가.
 - 커맨드: `create(owner, name, country)`, `join(inviteCode, explorerId)`, `leave`, `transferOwner`, `regenerateInviteCode`
 - 이벤트: `MapCreated` → 탐험이 빈 Territory·Collection 생성. `MemberJoined` → 인벤토리가 완성된 세트 보상을 새 멤버에게 지급. `MemberLeft` → 탈퇴 유예 처리.
 - 탈퇴는 7일 소프트 삭제: 즉시 해당 멤버 방문에 `hidden_at`, 선점은 다음 체크인 멤버에게 이전(`ClaimTransferred`). 7일 내 재가입 시 방문 복구(선점은 안 돌아옴), 7일 후 배치가 하드 삭제.
 - Territory와 분리한 이유: 멤버 가입·탈퇴가 방문 250건과 같은 락을 잡을 이유가 없다. 체크인은 멤버 여부만 읽기 참조로 확인.
-- 생성 시 예외: Explorer와 개인 ExpeditionMap(+territory 행)은 한 트랜잭션에서 함께 생성한다(모두 신규 행이라 잠금 경합이 없고, 개인 지도 없는 탐험가를 막기 위한 원자성이 필요). "커맨드 하나가 애그리거트 둘을 수정" 금지 규칙의 유일한 예외.
+- 생성 시 예외: Explorer와 개인 ExpeditionMap(+territory 행)은 한 트랜잭션에서 함께 생성한다(모두 신규 행이라 잠금 경합이 없고, 개인 지도 없는 탐험가를 막기 위한 원자성이 필요). 공유 지도 생성(ExpeditionMap + 빈 territory 행)도 같은 이유로 함께. "커맨드 하나가 애그리거트 둘을 수정" 금지 규칙의 유일한 예외.
+- 3단계 구현: 탈퇴 유예 중인 멤버는 `Departure`(map_member.left_at, 일급 컬렉션 `Departures`). 지도 커맨드(join·leave·purge)는 Territory 를 같은 트랜잭션에서 고치지 않고 `MemberLeft`·`MemberJoined(rejoined)`·`MemberPurged` 를 내며, 탐험 자신의 구독자 `exploration.territory` 가 territory 를 잠그고 숨김(hidden_at)·선점 이전·복구·하드 삭제를 한다. 재가입은 원래 가입 시각으로 복귀(온보딩 예외 재사용 방지), 복구된 방문의 선점 순서(`claim_rank_at`)는 복구 시각이라 넘어간 선점은 돌아오지 않는다. 유예 종료 배치 `MapPurgeJob`(territory.map.purge-interval-ms). 지도장만: 설정·초대코드 재발급·지도장 넘기기·방문 이의. 개인 지도는 합류·탈퇴·양도 불가. mapId 지정 요청은 멤버 확인을 잠금보다 먼저(N2, READ_COMMITTED 라 안전).
 
 ## 3. 체크인 이벤트 흐름
 
@@ -159,27 +167,31 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 
 | 테이블 | 애그리거트 | 키 | 비고 |
 |--------|-----------|-----|------|
-| expedition_map | ExpeditionMap | id PK | name, country, invite_code UNIQUE, owner_id FK |
-| map_member | ExpeditionMap | PK(map_id, explorer_id) | role, joined_at, ≤4 |
-| explorer | (계정 루트) | id PK | handle UNIQUE, created_at. 가입 시 개인 지도 자동 생성 |
-| visit | Territory | UQ(map_id, region_code, checked_in_by) | map_id FK, checked_in_by FK, verification, visit_date, memo, photo_url, hidden_at. 취소는 물리 삭제 + 이벤트 |
+| expedition_map | ExpeditionMap | id PK | name, country, invite_code UNIQUE, owner_id FK, version(V3 — 지도 커맨드는 행을 FOR UPDATE + 강제 증가로 잠근다, QA P1-1) |
+| map_member | ExpeditionMap | PK(map_id, explorer_id) | role, joined_at, left_at(V3 — 탈퇴 유예 중, 멤버 수에 안 셈), ≤4 |
+| explorer | (계정 루트) | id PK | handle UNIQUE, access_token_hash UNIQUE(V3, SHA-256), created_at. 가입 시 개인 지도 자동 생성 |
+| visit | Territory | UQ(map_id, region_code, checked_in_by) | map_id FK, checked_in_by FK, verification, visit_date, memo, photo_url, generation, claim_rank_at, hidden_at, disputed(V3). 취소는 물리 삭제 + 이벤트 |
+| visit_generation | Territory | PK(map_id, region_code, explorer_id) | last_generation — 방문을 지워도 남는 체크인 회차(결정 6, V3) |
 | territory | Territory | map_id PK/FK | created_at. Territory 루트 행 — 체크인·수정·취소를 지도 단위로 직렬화하는 잠금 대상(SELECT … FOR UPDATE). 지도 생성 시 함께 생성 |
 | explorer_progress | ExplorerProgress | explorer_id PK/FK | xp, level, title_id, streak_months, streak_last_month, version(낙관적 락) |
 | xp_ledger | ExplorerProgress | id | source, amount, ref_id UNIQUE(멱등), created_at |
 | badge_earned | ExplorerProgress | PK(explorer_id, badge_id) | earned_at |
 | title_earned | ExplorerProgress | PK(explorer_id, title_id) | earned_at — 칭호도 추가만(2단계 추가) |
-| set_progress | Collection | PK(map_id, set_id) | collected_codes JSON, completed_at NULL — **지도 단위** |
+| set_progress | Collection | PK(map_id, set_id) | collected_codes JSON, completed_at NULL, completed_member_ids(V3 — 완성 시점 멤버 = 수령자), version — **지도 단위** |
 | quest_progress | QuestBoard | PK(explorer_id, quest_period, quest_id) | current_count, tally(센 지역 키 집합), claimed_at, version. 상시 도전은 quest_period='ALL'(year_month 는 MySQL 예약어라 이름 변경) |
-| owned_item | Inventory | PK(explorer_id, item_id) | source(REGION\|SET_REWARD\|EVENT), acquired_at, map_id NULL, favorite |
-| scene | Scene | explorer_id PK/FK | gender, slots JSON, props JSON(≤3), version |
+| inventory | Inventory | explorer_id PK/FK | version, updated_at — 루트 행(자식만 바뀌어도 version 강제 증가, 재계산·이벤트 처리의 잠금 대상). 3단계 V3_1 추가 |
+| owned_item | Inventory | PK(explorer_id, item_id) | source(REGION\|SET_REWARD\|EVENT), grant_kind(방문형 여부 — 재계산 정리), acquired_at, favorite. §4 초안의 map_id 는 두지 않음(회수 판단은 근거 행) |
+| owned_item_basis | Inventory | PK(explorer_id, item_id, region_code, map_id) | 체크인 아이템의 근거 활성 방문 — 모두 사라지면 회수(Q2). 3단계 V3_1 추가 |
+| inventory_visit | Inventory | PK(explorer_id, region_code, map_id) | generation, active — 방문 흔적(세대 무시 규칙). 행은 지우지 않고 active=false. 3단계 V3_1 추가 |
+| scene | Scene | explorer_id PK/FK | gender, slot_hat·slot_hand·slot_badge·slot_bag·slot_pet·slot_bg(초안의 slots JSON 대신 슬롯별 컬럼), props(쉼표 구분 ≤3, 순서 유지), version, updated_at |
 | friendship | Friendship | PK(from_id, to_id) | created_at |
 | feed_entry | 읽기 모델 | id PK | actor_id, map_id, kind, payload JSON, IDX(actor_id, created_at) |
 | share_card | ShareCard | PK(explorer_id, map_id, kind) | image_url, scene_ver, visit_ver |
-| explorer_region | ExplorerProgress(읽기 모델 겸용) | (explorer_id, region_code) | province_code, rarity, first_visited_at, active_map_count, active_map_ids — 전체 랭킹·상위%·도감 뱃지 + 기본 XP 회수 판단(D2) |
+| explorer_region | ExplorerProgress(읽기 모델 겸용) | (explorer_id, region_code) | province_code, rarity, first_visited_at, active_map_count, active_map_ids + 자식 explorer_region_mark(explorer_id, region_code, map_id, mark — V3, 지도별 마지막 회차) — 전체 랭킹·상위%·도감 뱃지 + 기본 XP 회수 판단(D2) |
 | region_stats / rank_percentile | 집계 | — | 일 1회 배치 → Redis |
 | outbox | 공통 | id PK | aggregate, event_type, payload JSON, published_at. FK 없음 |
-| outbox_delivery | 공통 | PK(event_id, subscriber) | status(PENDING·DELIVERED·FAILED), attempts, last_error, delivered_at — 구독자별 전달 기록(2단계 D5) |
-| item_definition | 참조(운영 추가) | item_id PK | slot, tier, look, grant_rule JSON, valid_from/to — 3단계에서 DB로 |
+| outbox_delivery | 공통 | PK(event_id, subscriber) | status(PENDING·DELIVERED·FAILED), attempts, conflicts, first_conflict_at(V3), last_error, delivered_at — 구독자별 전달 기록(2단계 D5) |
+| item_definition | 참조(운영 추가) | item_id PK | name, emoji, slot, tier, theme, look·color_primary·color_secondary(룩), grant_rule·grant_ref(초안의 JSON 대신 두 컬럼), valid_from/to(DATE, 양 끝 포함), created_at(이슈 아이템 소급 판정 — Q-R2-1) — 3단계 V3_1 로 DB화(지역 250 + 세트 배경 9 이관, `tools/catalog/gen-item-sql.js`). 소유 = catalog(`ItemCatalog` Query, 30초 캐시 — 무효화는 커밋 뒤 세대 증가, 읽는 동안 세대가 바뀐 결과는 캐시하지 않음, 다른 인스턴스 추가분은 최대 30초 지연 허용 — P3-R2-6). `region:`·`set:` id 는 이관 전용(운영 추가 금지 — dev reset 이 운영 추가분만 지운다) |
 
 - 애그리거트 경계를 넘는 FK는 두지 않는다(예: scene.slots → owned_item 금지).
 - gender는 Scene이 바꾸는 값이므로 scene 테이블에 둔다(explorer 아님).
@@ -191,8 +203,19 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 - 공유 지도는 협력이 아니라 **경쟁**. 같은 지역을 멤버가 각자 체크인할 수 있고, 지역 색은 선점자(최초 체크인 멤버) 색.
 - **랭킹 두 층, 다른 집계**: 지도 안 랭킹은 visit을 (map_id, checked_in_by)로 센다. 전체·친구 랭킹은 탐험가별 **중복 제거한 지역 수**(explorer_region) — 여러 지도에서 같은 지역을 찍어도 1. 탈퇴로 지도 visit이 삭제돼도 explorer_region은 남아 전체 랭킹은 줄지 않는다.
 - XP: 기본 XP는 탐험가당 지역당 활성 한 번(`ref_id = region:{explorerId}:{code}#{k}`, 회수 `…#{k}:revoke` — D4 세대 규칙), 시·도 첫 발 +15는 탐험가당 시·도당 한 번(`province:{explorerId}:{provinceCode}`, 회수 없음 — D3), 선점 보너스 +10은 지도마다·수령자마다(`claim:{mapId}:{code}:{explorerId}` — 수령자를 포함해야 선점 이전 시 새 선점자의 ref_id가 달라진다), 세트 완성 +100은 탐험가당 세트당(`set:{explorerId}:{setId}`), 퀘스트는 `quest:{explorerId}:{period}:{questId}`. 선점 이전 시 새 선점자에게도 +10(`ClaimTransferred`). 떠난 사람 보너스는 회수 안 함.
-- outbox 릴레이(D5, QA P1-1·P1-2 수정): 구독자 = 소비 애그리거트 하나(`progression.progress`·`progression.collection-book`·`progression.quest-board`). 구독자별로 전달·트랜잭션 분리(REQUIRES_NEW), `outbox_delivery`에 기록. 순서 단위 (aggregateId, 구독자) 안에서 앞 이벤트가 DELIVERED 가 아니면 뒤 이벤트를 보내지 않는다(head-of-line, 건너뛰지 않음). 낙관적 락 충돌은 상한에 세지 않고 지수 백오프+지터(`territory.outbox.relay.backoff.*`)로 재시도, 그 밖의 실패는 백오프 재시도 후 5회에 FAILED — 그 단위는 재전달(`OutboxRedelivery.redeliverFailed`, local `POST /dev/outbox/redeliver`)까지 멈추고 다른 단위는 계속 진행. 다중 인스턴스(SKIP LOCKED)는 하지 않음.
-- 재계산 복구 규칙(Q2 승인): 도감에 완성 기록이 있는데 장부에 그 세트 보너스(`set:{e}:{setId}`)가 없으면 지급, 보상 받은(claimed) 퀘스트인데 장부에 퀘스트 XP(`quest:…`)가 없으면 지급(지난 달 보드 포함). 칭호·뱃지는 함께 보정. refId 가 같아 멱등.
+- outbox 릴레이(D5, QA P1-1·P1-2 수정): 구독자 = 소비 애그리거트 하나(목록은 아래 "구독자 목록"). 구독자별로 전달·트랜잭션 분리(REQUIRES_NEW), `outbox_delivery`에 기록. 순서 단위 (aggregateId, 구독자) 안에서 앞 이벤트가 DELIVERED 가 아니면 뒤 이벤트를 보내지 않는다(head-of-line, 건너뛰지 않음). 낙관적 락 충돌은 상한에 세지 않고 지수 백오프+지터(`territory.outbox.relay.backoff.*`)로 재시도, 그 밖의 실패는 백오프 재시도 후 5회에 FAILED — 그 단위는 재전달(`OutboxRedelivery.redeliverFailed`, local `POST /dev/outbox/redeliver`)까지 멈추고 다른 단위는 계속 진행. 다중 인스턴스(SKIP LOCKED)는 하지 않음.
+- 구독자 목록(3단계 기준, id 는 outbox_delivery.subscriber 키 — 바꾸지 않는다):
+  - `progression.progress`(ExplorerProgress): RegionVisited · VisitCancelled · SetCompleted(수령자별) · QuestCompleted · ClaimTransferred(새 선점자 +10) · MapCreated(개인 지도 → 진행 루트 선생성, S3-1)
+  - `progression.collection-book`(CollectionBook): RegionVisited · VisitCancelled · VisitsHidden · VisitsRestored
+  - `progression.quest-board`(QuestBoard): RegionVisited
+  - `exploration.territory`(Territory): MemberLeft(숨김·선점 이전) · MemberJoined(rejoined → 복구) · MemberPurged(하드 삭제)
+  - `wardrobe.inventory`(Inventory): RegionVisited · VisitCancelled · SetCompleted · MemberJoined · MapCreated(루트 행 선생성)
+  - `wardrobe.scene`(Scene): ItemGranted · ItemRevoked
+- 재계산 보류 기준(S3-3, QA P3-5·P3-6): 진행 재계산은 그 탐험가·지도의 이벤트 중 **`progression.*` 구독자에게 아직 DELIVERED 가 아닌 것**이 있으면 보류하고, 판정은 진행 루트를 잠근 뒤 같은 트랜잭션에서 한다. 꾸미기(인벤토리) 재계산은 자기 기준(모든 구독자의 미전달 — `EventBacklog.hasPending`)으로 보류한다. 재계산은 취소된 지역의 회차 표시(진행 explorer_region_mark·꾸미기 흔적)를 다시 만들지 못하고 손상된 표시를 고치지 못한다 — 보류 규칙으로 늦게 올 예전 이벤트가 없다는 전제에서 수용(QA P3-R2-4).
+- 체크인 잠금 순서(3단계 QA P1-2): 체크인·수정·취소·이의는 지도 행 공유 잠금(FOR SHARE) → territory 배타 잠금. 지도 커맨드(합류·탈퇴·양도·설정·초대코드·유예 종료)는 지도 행 배타 잠금만 잡는다(territory 는 구독자가 별도 트랜잭션). 그래서 탈퇴와 동시 체크인이 직렬화되고(탈퇴 커밋 뒤 체크인은 403, 그 전 체크인은 탈퇴 시각보다 앞섬) 순환 잠금이 없다.
+- 재계산 복구 규칙(Q2 승인, 3단계 R2-1 수정): 도감에 완성 기록이 있고 **그 탐험가가 완성 시점 멤버(completed_member_ids)인데** 장부에 그 세트 보너스(`set:{e}:{setId}`)가 없으면 지급, 보상 받은(claimed) 퀘스트인데 장부에 퀘스트 XP(`quest:…`)가 없으면 지급(지난 달 보드 포함). 칭호·뱃지는 함께 보정. refId 가 같아 멱등. 재계산은 지금 멤버인 지도만 다시 만들고, 탈퇴한 지도로 남은 explorer_region 활성과 그 기본 XP 는 그대로 둔다(탈퇴는 줄이지 않음).
+- 재계산 운영(3단계 S3-2·S3-3): 탐험가(와 그가 속한 지도)에 아직 전달되지 않은 outbox 이벤트(FAILED 포함)가 있으면 그 탐험가는 건너뛰고 보고서의 `deferred` 에 넣는다(릴레이보다 앞선 영토를 읽어 "잠깐 있었던 완성"을 놓치지 않게). `recalculate-on-startup` 은 릴레이가 outbox 를 비울 때까지(territory.progression.recalculate-wait, 기본 5분) 기다린 뒤 돈다. **재계산은 트래픽이 적은 시간에 돌린다 — 실행 중(진행 루트를 잠그는 동안) 사용자의 칭호 선택(PUT /progress/title)은 409 로 실패할 수 있다.**
+- outbox 충돌 시간 상한(3단계 결정 5): 낙관적 락 충돌 재시도는 횟수 상한에 세지 않지만 첫 충돌부터 `territory.outbox.relay.conflict-retry-limit`(기본 10분)을 넘기면 FAILED → 재전달 경로. 릴레이는 페이지(100행)의 전달 기록을 한 번에 읽고, FAILED 수를 최대 1분에 한 번 WARN 으로 알린다(R2-2).
 - 친구 랭킹은 요청 시점 조인 계산(친구 수 적음). 시·도별/전국 정복률은 Territory 로드 후 메모리 계산(250건). 지역별 방문자 비율·상위 N%는 일 1회 배치 → Redis.
 
 ## 6. 단계별 진행 순서
@@ -202,9 +225,13 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 | 0 | 뼈대 | 멀티모듈 스캐폴드 (scaffold-multimodule 스킬) | — |
 | 1 | 카탈로그 + 탐험 | Flyway V1(explorer, **expedition_map, map_member**(개인 지도 자동 생성에 필요한 최소), **territory**(Territory 루트·잠금 행), visit, outbox) + app-api에 flyway 의존성 추가·local도 Flyway 전환, `POST /visits`, `DELETE /visits/{code}`, `GET /territory`, CheckInPreview, 지역 250개 JSON·GeoJSON | 2026-10-13 |
 | 2 | 진행 | V2(explorer_progress, xp_ledger, badge_earned, title_earned, explorer_region, set_progress, quest_progress, outbox_delivery), 이벤트 핸들러 3개(진행·도감·퀘스트), 재계산 배치, XP 공식·뱃지 12·세트 9·퀘스트 정의, api 패키지 분리(api.event·api.query·api.web) | 2026-10-27 |
-| 3 | 꾸미기 | V3(owned_item, scene, item_definition), `PUT /scene`, 자동 착용 핸들러, 아이템 정의 DB화 + `POST /admin/items`, 지도 설정·초대·탈퇴 유예 전체 기능(MapSettings, disputed, hidden_at) | 2026-11-10 |
+| 3 | 꾸미기 | V3__shared_map(explorer 토큰 해시, map_member.left_at, visit 회차·숨김·이의, visit_generation, explorer_region_mark, expedition_map.version, set_progress.completed_member_ids, outbox_delivery.first_conflict_at) + V3_1__wardrobe(owned_item, scene, item_definition), `PUT /scene`, 자동 착용 핸들러, 아이템 정의 DB화 + `POST /admin/items`, 지도 설정·초대·탈퇴 유예 전체 기능(MapSettings, disputed, hidden_at) | 2026-11-10 |
 | 4 | 공유 | 공개 프로필 `/u/{handle}`, OG 카드 렌더러(lazy), 스냅샷 저장·무효화 | 2026-11-24 |
 | 5 | 소셜 | V4(friendship, feed_entry), 피드·랭킹 프로젝터, VS 비교 쿼리, 상위 % 배치 | 2026-12-08 |
+
+Flyway 규칙(QA P3-R2-10): 커밋된 마이그레이션은 고치지 않는다 — 커밋 이후의 스키마 변경은 새 버전 번호(V3_2, V4 …)로만 한다(3단계 V3·V3_1 은 커밋 전이라 그 자리에서 수정했다).
+
+3단계 데이터 주의(Q4): 3단계 이전에 만든 탐험가는 접근 토큰 해시가 없어 인증할 수 없고 진행 루트 선생성(S3-1)도 되어 있지 않다. 운영 데이터가 없으므로 backfill 하지 않는다 — 로컬은 `DELETE /dev/reset` 으로 정리하고 다시 발급한다.
 
 1단계 이후: 익명 탐험가 → 계정 연결 병합 커맨드(`claimExplorer`, explorer 레벨). Kafka는 5단계까지 불필요.
 
@@ -217,4 +244,4 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 - 프라이버시: 메모·사진 기본 비공개, 공개 프로필은 색칠·집계만, 날짜는 월 단위 반올림, 공개 범위 설정(전체·친구·비공개).
 - 행정구역 개편: Region에 version·replacedBy·retiredAt. 폐지 코드는 숨김 처리, 세트는 대체 코드로 재평가.
 - 상호·상표 금지: 아이템명은 일반명사화("대전 튀김소보로").
-- 이슈 아이템 지급 규칙은 3종만(기간 내 체크인 / 특정 시·도 / 세트 완성). 규칙 엔진 안 만든다.
+- 이슈 아이템 지급 규칙은 3종만(기간 내 체크인 / 특정 시·도 / 세트 완성). 규칙 엔진 안 만든다. 3단계 구현: grantRule 5종 = `REGION_VISIT`(지역 특산물, 기본) · `PERIOD_CHECK_IN`(기간 필수, 처리 시각 날짜 기준) · `PROVINCE_CHECK_IN` · `THEME_COMPLETE` · `MANUAL`(자동 지급 없음 — 수동 지급 API 는 4단계 역할 기반 인가와 함께 이월). 체크인 이슈 아이템은 근거 방문이 모두 취소되면 회수(Q2), 정의 생성 전 체크인에는 소급 지급 없음(Q-R2-1). `POST /admin/items` 는 `X-Admin-Token`(territory.admin.token, prod 환경변수) — 4단계 로그인 후 역할 기반으로 대체.

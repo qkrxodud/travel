@@ -25,7 +25,7 @@ import org.springframework.stereotype.Service;
 /**
  * {@link RegionCatalog}·{@link RewardCalculator}·{@link ProgressionRules} 구현 — 저장소에서 Catalog를 불러와
  * 도메인에 묻고 view로 매핑만 한다. 필터·정렬·검증·보상 계산은 Regions·Provinces·ItemDefinitions·RewardRules·
- * ProgressionDefinitions(도메인)가 한다.
+ * ProgressionDefinitions(도메인)가 한다. 아이템 정의는 DB(item_definition, ItemDefinitionRepository)에서 읽는다.
  */
 @Service
 public class CatalogService implements RegionCatalog, RewardCalculator, ProgressionRules {
@@ -33,7 +33,7 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
     private final Catalog catalog;
     private final List<RegionView> activeRegions;
     private final List<ProvinceView> provinces;
-    private final List<ItemView> items;
+    private final ItemDefinitionCache itemDefinitions;
     private final RewardRulesView rewardRules;
     private final List<SetView> sets;
     private final List<BadgeView> badges;
@@ -41,11 +41,11 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
     private final List<TitleView> titles;
     private final List<LevelTitleView> levelTitles;
 
-    public CatalogService(CatalogRepository repository) {
+    public CatalogService(CatalogRepository repository, ItemDefinitionCache itemDefinitions) {
         this.catalog = repository.load();
+        this.itemDefinitions = itemDefinitions;
         this.activeRegions = catalog.regions().active().stream().map(this::toView).toList();
         this.provinces = catalog.provinces().inDisplayOrder().stream().map(CatalogService::toView).toList();
-        this.items = catalog.items().all().stream().map(CatalogService::toView).toList();
         RewardRules rules = catalog.rewardRules();
         this.rewardRules = new RewardRulesView(rules.xpByRarity(), rules.provinceFirstBonus(), rules.setCompleteBonus(),
             rules.claimBonus());
@@ -126,19 +126,20 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
         return provinces;
     }
 
+    /** 아이템 정의는 3단계부터 DB(item_definition) — 운영 추가가 바로 보이도록 짧은 캐시(ItemDefinitionCache, 운영 추가 시 비움)로 읽는다. */
     @Override
     public Optional<ItemView> regionItem(RegionCode code) {
-        return catalog.items().regionItem(code).map(CatalogService::toView);
+        return itemDefinitions.current().find(ItemDefinition.regionItemId(code)).map(ItemViews::of);
     }
 
     @Override
     public Optional<ItemView> item(String itemId) {
-        return catalog.items().find(itemId).map(CatalogService::toView);
+        return itemDefinitions.current().find(itemId).map(ItemViews::of);
     }
 
     @Override
     public List<ItemView> items() {
-        return items;
+        return itemDefinitions.current().stream().map(ItemViews::of).toList();
     }
 
     @Override
@@ -159,11 +160,5 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
 
     private static ProvinceView toView(Province province) {
         return new ProvinceView(province.code(), province.name(), province.fullName(), province.displayOrder(), province.regionCount());
-    }
-
-    private static ItemView toView(ItemDefinition item) {
-        return new ItemView(item.itemId(), item.regionCode() == null ? null : item.regionCode().value(), item.name(), item.emoji(),
-            item.slot().name(), item.tier(), item.theme(),
-            item.look() == null ? null : new ItemView.Look(item.look().type(), item.look().primary(), item.look().secondary()));
     }
 }

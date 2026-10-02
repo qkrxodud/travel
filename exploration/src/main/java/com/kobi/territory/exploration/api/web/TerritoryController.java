@@ -4,6 +4,7 @@ import com.kobi.territory.catalog.api.query.ProvinceView;
 import com.kobi.territory.catalog.api.query.RegionCatalog;
 import com.kobi.territory.common.identity.CurrentExplorer;
 import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.exploration.api.web.ExplorationDtos.ClaimResponse;
 import com.kobi.territory.exploration.api.web.ExplorationDtos.ConquestResponse;
 import com.kobi.territory.exploration.api.web.ExplorationDtos.ProvinceConquestResponse;
 import com.kobi.territory.exploration.api.web.ExplorationDtos.TerritoryResponse;
@@ -39,6 +40,7 @@ public class TerritoryController {
             new ConquestResponse(conquest.visited(), conquest.total(), conquest.percent()),
             conquest.provinces().stream().map(provinceRate -> new ProvinceConquestResponse(provinceRate.provinceCode(),
                 provinces.get(provinceRate.provinceCode()).name(), provinceRate.visited(), provinceRate.total(), provinceRate.percent(), provinceRate.conquered())).toList(),
-            overview.visits().stream().map(visit -> VisitResponse.of(visit, catalog)).toList());
+            overview.visits().stream().map(view -> VisitResponse.of(view, catalog)).toList(),
+            overview.claims().stream().map(claim -> new ClaimResponse(claim.regionCode().value(), claim.checkedInBy().value())).toList());
     }
 }

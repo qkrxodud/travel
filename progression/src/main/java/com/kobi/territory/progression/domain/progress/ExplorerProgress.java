@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 진행 애그리거트(explorerId). XP 장부·레벨·스트릭·뱃지·칭호, 그리고 탐험가 단위 지역(explorer_region).
@@ -78,8 +79,11 @@ public final class ExplorerProgress {
     public ProgressChange applyVisit(ProgressVisit visit, ProgressionPolicy policy) {
         long xpBefore = ledger.total();
         int levelBefore = level;
+        if (regions.staleVisit(visit.region(), visit.mapId(), visit.generation())) {
+            return unchanged(xpBefore, levelBefore, visit.visitedAt()); // 늦게 온 예전 회차(결정 6)
+        }
         boolean firstInProvince = !regions.touches(visit.provinceCode());
-        regions.add(visit.region(), visit.provinceCode(), visit.rarity(), visit.mapId(), visit.visitedAt());
+        regions.add(visit.region(), visit.provinceCode(), visit.rarity(), visit.mapId(), visit.generation(), visit.visitedAt());
         for (XpAward award : policy.rewards().checkIn(visit.rarity(), firstInProvince, visit.firstClaim())) {
             grant(award, visit);
         }
@@ -87,13 +91,35 @@ public final class ExplorerProgress {
         return settle(policy, visit.visitedAt(), xpBefore, levelBefore);
     }
 
-    /** 본인 체크인 취소(VisitCancelled): 그 지역이 모든 지도에서 사라졌을 때만 기본 XP 회수. 그 밖은 유지(취소 비대칭). 멱등. */
-    public ProgressChange revokeVisit(String mapId, RegionCode region, Instant at, ProgressionPolicy policy) {
+    /**
+     * 본인 체크인 취소(VisitCancelled): 그 지역이 모든 지도에서 사라졌을 때만 기본 XP 회수. 그 밖은 유지(취소 비대칭). 멱등.
+     * generation: 취소된 방문의 회차 — 더 새 회차를 이미 봤으면 무시(결정 6). 0 = 예전 이벤트.
+     */
+    public ProgressChange revokeVisit(String mapId, RegionCode region, int generation, Instant at, ProgressionPolicy policy) {
         long xpBefore = ledger.total();
         int levelBefore = level;
-        if (regions.remove(region, mapId)) {
+        if (regions.remove(region, mapId, generation)) {
             ledger.revokeRegion(explorerId, region, at);
         }
+        return settle(policy, at, xpBefore, levelBefore);
+    }
+
+    /** 회차를 모르는(예전) 취소. */
+    public ProgressChange revokeVisit(String mapId, RegionCode region, Instant at, ProgressionPolicy policy) {
+        return revokeVisit(mapId, region, 0, at, policy);
+    }
+
+    /**
+     * 선점 이전(ClaimTransferred) — 이 탐험가가 새 선점자가 됐다: 선점 보너스(refId claim:{mapId}:{code}:{e}, 지도마다·수령자마다
+     * 1회 — §5). 액수는 체크인 보상 함수의 선점 줄. 떠난 사람 보너스는 건드리지 않는다.
+     */
+    public ProgressChange applyClaimTransferred(String mapId, RegionCode region, Rarity rarity, Instant at,
+                                                ProgressionPolicy policy) {
+        long xpBefore = ledger.total();
+        int levelBefore = level;
+        policy.rewards().checkIn(rarity, false, true).stream().filter(award -> award.source() == XpSource.FIRST_CLAIM)
+            .forEach(award -> ledger.grantOnce(XpSource.FIRST_CLAIM, RefIds.claim(mapId, region, explorerId),
+                award.amount(), at));
         return settle(policy, at, xpBefore, levelBefore);
     }
 
@@ -114,7 +140,8 @@ public final class ExplorerProgress {
     }
 
     /**
-     * 재계산 복구 규칙(QA P1-2, Q2 승인): 완성 기록은 있는데 장부에 그 테마 보너스가 없으면 지급하고, 보상을 받은(claimed)
+     * 재계산 복구 규칙(QA P1-2, Q2 승인): 완성 기록(이 탐험가가 완성 시점 멤버였던 것만 — 결정 1·R2-1)은 있는데 장부에 그 테마
+     * 보너스가 없으면 지급하고, 보상을 받은(claimed)
      * 퀘스트인데 장부에 그 XP 가 없으면 지급한다. 칭호·뱃지는 settle 이 보정한다. refId 가 같아 멱등하다.
      */
     public ProgressChange recoverRewards(List<String> completedThemeIds, List<QuestXp> claimedRewards, Instant at,
@@ -139,13 +166,17 @@ public final class ExplorerProgress {
     }
 
     /**
-     * 재계산(RecalculateService)용 출발점: 현재 방문으로만 정해지는 것(지역 활성·기본 XP·스트릭)은 비우고, 취소 비대칭·
-     * "추가만" 규칙에 묶인 것(시·도 첫 발·선점·세트·퀘스트 XP, 뱃지·칭호·선택 칭호, 지역의 처음 밟은 시각)은 유지한다.
-     * 재생은 빠진 것만 덧붙이므로 결과가 이벤트 누적과 같다. 저장은 호출자가 replace 로 통째로 바꾼다.
+     * 재계산(RecalculateService)용 출발점: 현재 방문으로만 정해지는 것(지금 멤버인 지도의 지역 활성·기본 XP·스트릭)은 비우고,
+     * 취소 비대칭·"추가만" 규칙에 묶인 것(시·도 첫 발·선점·세트·퀘스트 XP, 뱃지·칭호·선택 칭호, 지역의 처음 밟은 시각)과
+     * 탈퇴한 지도로 남은 활성(§5 — 탈퇴는 줄이지 않음)은 유지한다. 재생은 빠진 것만 덧붙이므로 결과가 이벤트 누적과 같다.
+     * 저장은 호출자가 replace 로 통째로 바꾼다.
+     *
+     * @param currentMaps 탐험가가 지금 멤버인 지도 id
      */
-    public ExplorerProgress rebuildBase() {
-        return new ExplorerProgress(explorerId, ledger.withoutRegionBase(), regions.deactivated(), Streak.NONE, badges,
-            titles, selectedTitle, level, updatedAt);
+    public ExplorerProgress rebuildBase(Set<String> currentMaps) {
+        ExploredRegions base = regions.deactivated(currentMaps);
+        return new ExplorerProgress(explorerId, ledger.withoutRegionBase(explorerId, base.activeCodes()), base, Streak.NONE,
+            badges, titles, selectedTitle, level, updatedAt);
     }
 
     // ---- 판정 ----------------------------------------------------------------------------------------------
@@ -159,6 +190,10 @@ public final class ExplorerProgress {
                 award.amount(), visit.visitedAt());
             default -> throw new IllegalArgumentException("체크인 보상이 아닌 출처: " + award.source());
         }
+    }
+
+    private ProgressChange unchanged(long xpBefore, int levelBefore, Instant at) {
+        return new ProgressChange(xpBefore, ledger.total(), Optional.empty(), List.of(), List.of(), at);
     }
 
     /** 레벨 재계산 → 칭호·뱃지 추가(회수 없음). */

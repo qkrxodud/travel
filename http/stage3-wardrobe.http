@@ -1,0 +1,188 @@
+### 3단계 파트 B(꾸미기) 왕복 확인 — IntelliJ HTTP Client / VS Code REST Client
+### 서버: ./gradlew :app-api:bootRun   (8080이 점유돼 있으면 --args='--server.port=18081' 으로 띄우고 아래 @host 를 바꾼다)
+### 가방·장면은 체크인 후 outbox 릴레이로 비동기 반영된다(RegionVisited → 가방 → ItemGranted → 자동 착용, local 주기 300ms)
+### — 체크인 직후 1초쯤 뒤에 조회한다. 인증: POST /explorers 의 accessToken 을 X-Explorer-Token 으로(3단계 결정 2).
+@host = http://localhost:8080
+@adminToken = local-admin-token
+
+### 0. [local] 전체 초기화 → 204 (아이템 정의는 이관분 250+9 만 남기고 운영 추가분을 지운다 — 다시 돌려도 22번이 201)
+DELETE {{host}}/dev/reset
+
+### 1. 익명 탐험가 발급 → 201 {explorerId, personalMapId, accessToken}
+# @name issue
+POST {{host}}/explorers
+
+> {% client.global.set("token", response.body.accessToken); %}
+
+### 2. 빈 가방 → {count 0, items []}
+GET {{host}}/inventory
+X-Explorer-Token: {{token}}
+
+### 3. 기본 장면 → gender "M", slots {HAT..BG: null}, props [], stylePoints 0
+GET {{host}}/scene
+X-Explorer-Token: {{token}}
+
+### 4. 카탈로그 아이템(DB 기준, 지역 250 + 세트 배경 9 + 운영 추가) → grantRule·grantRef·validFrom·validTo 포함
+GET {{host}}/catalog/items
+
+### 5. 체크인: 종로구(청사초롱 등불 HAND 일반) → 201
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-11010", "visitDate": "2026-10-01"}
+
+### 6. 체크인: 구례군(산수유 비니 HAT 희귀) → 201
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-36330", "visitDate": "2026-10-01"}
+
+### 7. 체크인: 해운대구(파라솔 PROP 일반) → 201
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-21090", "visitDate": "2026-10-01"}
+
+### 8. (1초 뒤) 가방 → count 3, source "REGION", equipped true(자동 착용)
+GET {{host}}/inventory
+X-Explorer-Token: {{token}}
+
+### 9. 장면 → slots.HAND 등불, slots.HAT 비니, props [파라솔], stylePoints 5 (1 + 3 + 1), wornCount 3
+GET {{host}}/scene
+X-Explorer-Token: {{token}}
+
+### 10. 즐겨찾기 → 200 {favorite true}
+PUT {{host}}/inventory/region:KR-11010/favorite
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"favorite": true}
+
+### 11. 직접 편집: 여성 여행자 + 손 벗기 + 장식 비우기 → 200 gender "F", slots.HAND null, props [], stylePoints 3
+PUT {{host}}/scene
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"gender": "F", "unequip": ["HAND"], "props": []}
+
+### 12. 다시 입기 → 200 slots.HAND 등불, props [파라솔], stylePoints 5
+PUT {{host}}/scene
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"equip": {"HAND": "region:KR-11010"}, "props": ["region:KR-21090"]}
+
+### 13. 슬롯 불일치 → 422 SLOT_MISMATCH
+PUT {{host}}/scene
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"equip": {"HAT": "region:KR-11010"}}
+
+### 14. 가방에 없는 아이템 → 422 ITEM_NOT_OWNED
+PUT {{host}}/scene
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"equip": {"HAND": "region:KR-11030"}}
+
+### 15. 체크인 취소(종로구) → 200. (1초 뒤) 가방에서 등불이 빠지고(회수) 장면 HAND 가 비워진다(벗김)
+DELETE {{host}}/visits/KR-11010
+X-Explorer-Token: {{token}}
+
+### 16. 가방 → count 2 (등불 없음)
+GET {{host}}/inventory
+X-Explorer-Token: {{token}}
+
+### 17. 장면 → slots.HAND null, stylePoints 4
+GET {{host}}/scene
+X-Explorer-Token: {{token}}
+
+### 18. 지리산 둘레 세트 완성(남원·구례(이미)·하동·산청·함양) → 각 201. (1초 뒤) 가방에 set:jiri(SET_REWARD), BG 자동 착용
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-35050", "visitDate": "2026-10-01"}
+
+###
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-38360", "visitDate": "2026-10-01"}
+
+###
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-38370", "visitDate": "2026-10-01"}
+
+###
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-38380", "visitDate": "2026-10-01"}
+
+### 19. 가방 → set:jiri (source SET_REWARD) 포함, 장면 slots.BG = set:jiri
+GET {{host}}/inventory
+X-Explorer-Token: {{token}}
+
+### 20. [운영] 관리자 토큰 없이 → 401 ADMIN_TOKEN_REQUIRED
+POST {{host}}/admin/items
+Content-Type: application/json
+
+{"itemId": "event:sejong-pin", "name": "세종 별 핀", "emoji": "📍", "slot": "BADGE", "tier": "RARE",
+ "look": {"type": "star", "primary": "#f4c542", "secondary": "#2b3542"}, "grantRule": "PROVINCE_CHECK_IN", "grantRef": "KR-29"}
+
+### 21. [운영] 틀린 토큰 → 403 ADMIN_TOKEN_INVALID
+POST {{host}}/admin/items
+X-Admin-Token: wrong
+Content-Type: application/json
+
+{"itemId": "event:sejong-pin", "name": "세종 별 핀", "emoji": "📍", "slot": "BADGE", "tier": "RARE",
+ "look": {"type": "star", "primary": "#f4c542", "secondary": "#2b3542"}, "grantRule": "PROVINCE_CHECK_IN", "grantRef": "KR-29"}
+
+### 22. [운영] 시·도 이슈 아이템 추가 → 201 (같은 id 다시 → 409 ITEM_ALREADY_EXISTS)
+POST {{host}}/admin/items
+X-Admin-Token: {{adminToken}}
+Content-Type: application/json
+
+{"itemId": "event:sejong-pin", "name": "세종 별 핀", "emoji": "📍", "slot": "BADGE", "tier": "RARE",
+ "look": {"type": "star", "primary": "#f4c542", "secondary": "#2b3542"}, "grantRule": "PROVINCE_CHECK_IN", "grantRef": "KR-29"}
+
+### 23. [운영] 기간 내 체크인인데 기간 없음 → 400 INVALID_ITEM_DEFINITION
+POST {{host}}/admin/items
+X-Admin-Token: {{adminToken}}
+Content-Type: application/json
+
+{"itemId": "event:no-period", "name": "기간 없는 이슈", "emoji": "🎁", "slot": "PET", "tier": "RARE",
+ "grantRule": "PERIOD_CHECK_IN"}
+
+### 24. 세종 체크인 → 201. (1초 뒤) 가방에 event:sejong-pin(EVENT) — 근거 방문(세종)이 모두 취소되면 회수(결정 Q2)
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-29010", "visitDate": "2026-10-01"}
+
+###
+GET {{host}}/inventory
+X-Explorer-Token: {{token}}
+
+### 25. 세종 취소 → (1초 뒤) 가방에서 event:sejong-pin 도 빠진다(체크인 → 즉시 취소로 이슈 아이템을 얻을 수 없다)
+DELETE {{host}}/visits/KR-29010
+X-Explorer-Token: {{token}}
+
+###
+GET {{host}}/inventory
+X-Explorer-Token: {{token}}
+
+### 26. [local] 재계산(진행 다음 꾸미기) → 200 {recalculated 1, …, wardrobe {recalculated 1, failed [], deferred []}}
+POST {{host}}/dev/recalculate
+X-Explorer-Token: {{token}}

@@ -10,6 +10,9 @@ public interface ExplorerRepository {
 
     Optional<Explorer> findById(ExplorerId id);
 
+    /** 토큰 해시로 탐험가 id 찾기(인증). */
+    Optional<ExplorerId> findIdByTokenHash(AccessTokenHash tokenHash);
+
     /** 모든 탐험가 id(재계산 배치용). */
     List<ExplorerId> allIds();
 }

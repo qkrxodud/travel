@@ -2,7 +2,7 @@ package com.kobi.territory.exploration.domain;
 
 import com.kobi.territory.exploration.domain.map.MapId;
 import com.kobi.territory.exploration.domain.territory.CheckInContext;
-import com.kobi.territory.exploration.domain.map.CheckInPolicy;
+import com.kobi.territory.exploration.domain.policy.CheckInPolicy;
 import com.kobi.territory.exploration.domain.territory.CheckInPreview;
 import com.kobi.territory.exploration.domain.territory.CheckInResult;
 import com.kobi.territory.exploration.domain.territory.CheckInRewards;

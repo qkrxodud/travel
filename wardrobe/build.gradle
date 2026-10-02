@@ -1,6 +1,10 @@
 dependencies {
     api project(':common')
+    // 3단계: 카탈로그(아이템 정의 api.query)·탐험 공개 이벤트(api.event)·Query(api.query)·진행 공개 이벤트(SetCompleted)·
+    // Query(도감 완성 테마)를 구독·조회한다. 다른 패키지(domain·application·infra·api.web) 참조는 ArchUnit 이 막는다.
     implementation project(':catalog')
+    implementation project(':exploration')
+    implementation project(':progression')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

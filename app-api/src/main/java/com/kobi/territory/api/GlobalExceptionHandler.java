@@ -81,6 +81,7 @@ public class GlobalExceptionHandler {
     /** 동시성 충돌 — 낙관적 락 충돌·비관적 잠금 실패(진행·퀘스트 보드 동시 갱신 — 예: 보상 받기 두 번 동시 클릭). */
     @ExceptionHandler(ConcurrencyFailureException.class)
     public ResponseEntity<ErrorResponse> handle(ConcurrencyFailureException exception) {
+        log.debug("동시성 충돌(409): {}", exception.getMostSpecificCause().toString());
         return respond(HttpStatus.CONFLICT, "CONCURRENT_UPDATE", "동시에 같은 요청이 처리되었습니다. 새로고침 후 다시 시도해 주세요.");
     }
 

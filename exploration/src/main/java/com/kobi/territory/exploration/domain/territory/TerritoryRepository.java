@@ -3,6 +3,7 @@ package com.kobi.territory.exploration.domain.territory;
 import com.kobi.territory.exploration.domain.map.MapId;
 import com.kobi.territory.exploration.domain.map.MapSelector;
 import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.common.model.RegionCode;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -32,5 +33,9 @@ public interface TerritoryRepository {
     /** 방문 로드(커맨드는 lock 이후에 호출). 방문이 없으면 빈 Territory. */
     Territory load(MapId mapId);
 
+    /** 방문(숨긴 방문 포함)·회차 변경을 반영한다. 지운 방문은 물리 삭제. */
     void save(Territory territory);
+
+    /** 이 탐험가의 보이는 방문이 어느 지도에든 이 지역에 있는지(읽기 — 지도 경계를 넘는 조회). */
+    boolean hasVisibleVisit(ExplorerId member, RegionCode region);
 }

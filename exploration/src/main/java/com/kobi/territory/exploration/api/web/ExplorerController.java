@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 익명 탐험가 발급(1~3단계). 이후 요청은 X-Explorer-Id 헤더로 식별한다. */
+/** 익명 탐험가 발급(1~3단계). 이후 요청은 발급 응답의 비밀 accessToken 을 X-Explorer-Token 헤더로 보내 인증한다(결정 2). */
 @RestController
 @RequestMapping("/explorers")
 public class ExplorerController {
@@ -30,14 +30,14 @@ public class ExplorerController {
     @ResponseStatus(HttpStatus.CREATED)
     public ExplorerResponse register() {
         var registration = explorers.registerAnonymous();
-        return new ExplorerResponse(registration.explorer().id().value(), registration.personalMap().id().value(), registration.explorer().anonymous(),
-            registration.explorer().createdAt());
+        return new ExplorerResponse(registration.explorer().id().value(), registration.personalMap().id().value(),
+            registration.explorer().anonymous(), registration.explorer().createdAt(), registration.accessToken().value());
     }
 
     @GetMapping("/me")
     public ExplorerResponse me(@CurrentExplorer ExplorerId explorerId) {
         var explorer = mapAccess.requireExplorer(explorerId);
         var map = mapAccess.resolve(explorerId, MapSelector.PERSONAL).map();
-        return new ExplorerResponse(explorer.id().value(), map.id().value(), explorer.anonymous(), explorer.createdAt());
+        return new ExplorerResponse(explorer.id().value(), map.id().value(), explorer.anonymous(), explorer.createdAt(), null);
     }
 }

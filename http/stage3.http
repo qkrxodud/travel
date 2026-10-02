@@ -1,0 +1,164 @@
+### 3단계(공유 지도) 왕복 확인 — IntelliJ HTTP Client / VS Code REST Client
+### 서버: ./gradlew :app-api:bootRun   (8080이 점유돼 있으면 --args='--server.port=18080' 으로 띄우고 아래 @host 를 바꾼다)
+### 인증: POST /explorers 응답의 비밀 accessToken 을 X-Explorer-Token 헤더로 보낸다(explorerId 는 공개 식별자 — 인증 아님).
+### 탈퇴·재가입의 방문 숨김/복구·선점 이전은 outbox 릴레이로 비동기(local 300ms) — 1초쯤 뒤에 조회한다.
+@host = http://localhost:8080
+
+### 0. [local] 전체 초기화 → 204
+DELETE {{host}}/dev/reset
+
+### 1. 지도장 A 발급 → 201 {explorerId, personalMapId, accessToken}
+POST {{host}}/explorers
+
+> {% client.global.set("aId", response.body.explorerId); client.global.set("aToken", response.body.accessToken); %}
+
+### 2. 친구 B 발급 → 201
+POST {{host}}/explorers
+
+> {% client.global.set("bId", response.body.explorerId); client.global.set("bToken", response.body.accessToken); %}
+
+### 3. 토큰 없이 → 401 EXPLORER_TOKEN_REQUIRED, explorerId 를 토큰처럼 → 401 EXPLORER_TOKEN_INVALID
+GET {{host}}/maps
+X-Explorer-Token: {{aId}}
+
+### 4. A 가 공유 지도 만들기 → 201 {mapId, kind:"SHARED", inviteCode, rules[3줄], members[A OWNER]}
+POST {{host}}/maps
+X-Explorer-Token: {{aToken}}
+Content-Type: application/json
+
+{"name": "부산 원정대"}
+
+> {% client.global.set("mapId", response.body.mapId); client.global.set("invite", response.body.inviteCode); %}
+
+### 5. B 가 초대코드로 체크인 시도(아직 멤버 아님) → 403 NOT_A_MEMBER (잠금 없이 거부 — 1단계 N2)
+POST {{host}}/visits
+X-Explorer-Token: {{bToken}}
+Content-Type: application/json
+
+{"regionCode": "KR-26010", "visitDate": "2026-10-01", "mapId": "{{mapId}}"}
+
+### 6. B 합류(소문자도 됨) → 200 {members 2, rejoined:false}
+POST {{host}}/maps/join
+X-Explorer-Token: {{bToken}}
+Content-Type: application/json
+
+{"inviteCode": "{{invite}}"}
+
+### 7. B 의 지도 목록 → [개인 지도, 부산 원정대]
+GET {{host}}/maps
+X-Explorer-Token: {{bToken}}
+
+### 8. 체크인 경쟁: A 가 먼저 KR-26010 → 201 firstClaim:true
+POST {{host}}/visits
+X-Explorer-Token: {{aToken}}
+Content-Type: application/json
+
+{"regionCode": "KR-26010", "visitDate": "2026-10-01", "mapId": "{{mapId}}"}
+
+### 9. B 도 KR-26010 → 201 firstClaim:false (같은 지역을 각자 칠할 수 있다)
+POST {{host}}/visits
+X-Explorer-Token: {{bToken}}
+Content-Type: application/json
+
+{"regionCode": "KR-26010", "visitDate": "2026-10-01", "mapId": "{{mapId}}"}
+
+### 10. B 혼자 KR-26020 → 201
+POST {{host}}/visits
+X-Explorer-Token: {{bToken}}
+Content-Type: application/json
+
+{"regionCode": "KR-26020", "visitDate": "2026-10-01", "mapId": "{{mapId}}"}
+
+### 11. 지도 상세 → claims[KR-26010=A, KR-26020=B], members[색·regionCount·claimCount]
+GET {{host}}/maps/{{mapId}}
+X-Explorer-Token: {{aToken}}
+
+### 12. 지도 영토 → visits 3(B 방문의 메모·사진은 A 에게 비공개), claims 2
+GET {{host}}/territory?mapId={{mapId}}
+X-Explorer-Token: {{aToken}}
+
+### 13. 설정 변경(지도장 아님) → 403 OWNER_ONLY
+PUT {{host}}/maps/{{mapId}}/settings
+X-Explorer-Token: {{bToken}}
+Content-Type: application/json
+
+{"photoRequired": true, "dailyCheckInCap": 3}
+
+### 14. 지도장 설정: 사진 필수 + 하루 3곳 → 200 settings
+PUT {{host}}/maps/{{mapId}}/settings
+X-Explorer-Token: {{aToken}}
+Content-Type: application/json
+
+{"photoRequired": true, "dailyCheckInCap": 3, "visibility": "FRIENDS"}
+
+### 15. 사진 없이 체크인 → 422 PHOTO_REQUIRED
+POST {{host}}/visits
+X-Explorer-Token: {{bToken}}
+Content-Type: application/json
+
+{"regionCode": "KR-26030", "visitDate": "2026-10-01", "mapId": "{{mapId}}"}
+
+### 16. 설정 원복 → 200
+PUT {{host}}/maps/{{mapId}}/settings
+X-Explorer-Token: {{aToken}}
+Content-Type: application/json
+
+{"photoRequired": false, "dailyCheckInCap": 5}
+
+### 16-1. 하루 상한은 기본값(5) 이하로 낮추기만 → 6 이면 400 INVALID_SETTINGS (개인 지도는 설정 자체가 422 PERSONAL_MAP_ONLY_ME)
+PUT {{host}}/maps/{{mapId}}/settings
+X-Explorer-Token: {{aToken}}
+Content-Type: application/json
+
+{"photoRequired": false, "dailyCheckInCap": 6}
+
+### 17. 지도장 이의: B 의 KR-26020 → 200 {disputed:true} (지도 내 랭킹 집계 제외용)
+PUT {{host}}/maps/{{mapId}}/visits/KR-26020/{{bId}}/dispute
+X-Explorer-Token: {{aToken}}
+Content-Type: application/json
+
+{"disputed": true}
+
+### 18. 초대코드 재발급(지도장) → 200 {inviteCode 새 값}
+POST {{host}}/maps/{{mapId}}/invite-code
+X-Explorer-Token: {{aToken}}
+
+> {% client.global.set("invite", response.body.inviteCode); %}
+
+### 19. 지도장 A 탈퇴 → 422 OWNER_CANNOT_LEAVE (넘긴 뒤 가능)
+POST {{host}}/maps/{{mapId}}/leave
+X-Explorer-Token: {{aToken}}
+
+### 20. B 탈퇴 → 200 {hiddenRegionCount:2, restoreUntil, message "내 영토 2곳이 지도에서 사라졌어요 ... 그사이 자리가 차면 다시 합류할 수 없어요."}
+POST {{host}}/maps/{{mapId}}/leave
+X-Explorer-Token: {{bToken}}
+
+### 21. (1초 뒤) 지도 상세 → claims[KR-26010=A], departing 1. KR-26020 은 지도에서 사라짐
+GET {{host}}/maps/{{mapId}}
+X-Explorer-Token: {{aToken}}
+
+### 22. B 재가입(유예 7일 안) → 200 {rejoined:true}
+POST {{host}}/maps/join
+X-Explorer-Token: {{bToken}}
+Content-Type: application/json
+
+{"inviteCode": "{{invite}}"}
+
+### 23. (1초 뒤) 지도 영토 → visits 3 복구. 선점: KR-26010 은 여전히 A(선점은 돌아오지 않음), KR-26020 은 B
+GET {{host}}/maps/{{mapId}}
+X-Explorer-Token: {{bToken}}
+
+### 24. 지도장 넘기기 A → B → 200 {ownerId: bId}
+POST {{host}}/maps/{{mapId}}/transfer-owner
+X-Explorer-Token: {{aToken}}
+Content-Type: application/json
+
+{"explorerId": "{{bId}}"}
+
+### 25. 이제 A 는 탈퇴 가능 → 200 {hiddenRegionCount:1}
+POST {{host}}/maps/{{mapId}}/leave
+X-Explorer-Token: {{aToken}}
+
+### 26. (1초 뒤) B 의 진행 → KR-26010 선점 이전 +10 (ledger claim:{mapId}:KR-26010:{bId})
+GET {{host}}/progress
+X-Explorer-Token: {{bToken}}

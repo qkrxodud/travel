@@ -12,9 +12,6 @@ import com.kobi.territory.catalog.domain.definition.LevelTitle;
 import com.kobi.territory.catalog.domain.definition.ProgressionDefinitions;
 import com.kobi.territory.catalog.domain.definition.QuestDefinition;
 import com.kobi.territory.catalog.domain.catalog.CatalogRepository;
-import com.kobi.territory.catalog.domain.item.ItemDefinition;
-import com.kobi.territory.catalog.domain.item.ItemDefinitions;
-import com.kobi.territory.catalog.domain.item.ItemSlot;
 import com.kobi.territory.catalog.domain.region.Province;
 import com.kobi.territory.catalog.domain.region.Provinces;
 import com.kobi.territory.catalog.domain.region.Region;
@@ -33,7 +30,8 @@ import java.util.Map;
 import org.springframework.stereotype.Repository;
 
 /**
- * classpath:catalog/*.json 을 시작 시 한 번 읽어 메모리에 올린다.
+ * classpath:catalog/*.json 을 시작 시 한 번 읽어 메모리에 올린다(지역·시·도·보상·진행 정의 — 아이템 정의는 3단계부터
+ * DB item_definition, {@link JpaItemDefinitionRepository}).
  * 데이터 원본: 프로토타입 doc/나의 영토.html → tools/catalog/gen-catalog.js 로 생성.
  * 파싱만 하고, 정합성 검증은 도메인 Catalog 생성자가 한다(어긋나면 기동 실패).
  */
@@ -53,16 +51,11 @@ public class JsonCatalogRepository implements CatalogRepository {
                 regionJson.version, regionJson.replacedBy == null ? null : RegionCode.of(regionJson.replacedBy),
                 regionJson.retiredAt == null ? null : LocalDate.parse(regionJson.retiredAt)))
             .toList();
-        List<ItemDefinition> items = read(om, "items.json", new TypeReference<List<ItemJson>>() {}).stream()
-            .map(itemJson -> new ItemDefinition(itemJson.itemId, itemJson.regionCode == null ? null : RegionCode.of(itemJson.regionCode), itemJson.name, itemJson.emoji,
-                ItemSlot.valueOf(itemJson.slot), Rarity.valueOf(itemJson.tier), itemJson.theme,
-                itemJson.look == null ? null : new ItemDefinition.Look(itemJson.look.type, itemJson.look.primary, itemJson.look.secondary)))
-            .toList();
         RewardJson rj = read(om, "reward-rules.json", new TypeReference<RewardJson>() {});
         Map<Rarity, Integer> xp = new HashMap<>();
         rj.xpByRarity.forEach((rarityName, amount) -> xp.put(Rarity.valueOf(rarityName), amount));
         // 정합성 검증은 도메인(Catalog·일급 컬렉션)이 생성 시 한다
-        this.catalog = new Catalog(Regions.of(regions), Provinces.of(provinces), ItemDefinitions.of(items),
+        this.catalog = new Catalog(Regions.of(regions), Provinces.of(provinces),
             new RewardRules(xp, rj.provinceFirstBonus, rj.setCompleteBonus, rj.claimBonus), readString("regions.geojson"),
             progression(om));
     }
@@ -121,11 +114,6 @@ public class JsonCatalogRepository implements CatalogRepository {
 
     record RegionJson(String code, String name, String provinceCode, String rarity, String countryCode, int version,
                       String replacedBy, String retiredAt) {}
-
-    record LookJson(String type, String primary, String secondary) {}
-
-    record ItemJson(String itemId, String regionCode, String name, String emoji, String slot, String tier, String theme,
-                    LookJson look) {}
 
     record LevelTitleJson(int level, String name) {}
 

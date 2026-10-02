@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -64,6 +65,7 @@ class MySqlConcurrencyTest {
     @Autowired ObjectMapper om;
     @Autowired MutableClock clock;
     @Autowired RegionCatalog catalog;
+    @Autowired com.kobi.territory.exploration.application.MapPurgeJob purgeJob;
 
     private final HttpClient http = HttpClient.newHttpClient();
 
@@ -78,12 +80,17 @@ class MySqlConcurrencyTest {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
             .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body))
             .header("Content-Type", "application/json");
-        if (explorerId != null) builder.header("X-Explorer-Id", explorerId);
+        if (explorerId != null) builder.header("X-Explorer-Token", tokens.getOrDefault(explorerId, explorerId));
         return http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    /** explorerId → 접근 토큰(3단계 결정 2). 테스트 본문은 explorerId 로 쓰고 요청 헤더만 토큰으로 바꾼다. */
+    private final Map<String, String> tokens = new ConcurrentHashMap<>();
+
     private JsonNode newExplorer() throws Exception {
-        return om.readTree(send("POST", "/explorers", null, null).body());
+        JsonNode explorer = om.readTree(send("POST", "/explorers", null, null).body());
+        tokens.put(explorer.get("explorerId").asText(), explorer.get("accessToken").asText());
+        return explorer;
     }
 
     /** 모든 요청을 래치로 동시에 출발시킨다. */
@@ -277,5 +284,157 @@ class MySqlConcurrencyTest {
         assertThat(send("POST", "/dev/recalculate", me, null).statusCode()).isEqualTo(200);
         assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(285);
         System.out.println("[QA S-1] 재계산 " + statuses.size() + "회를 릴레이와 겹쳐 실행 — xp 285, FAILED 0");
+    }
+
+    // ---- 3단계 QA P1-1: 공유 지도 커맨드 경합(지도 행 잠금) ----------------------------------------------------------
+
+    private String createMap(String owner) throws Exception {
+        return om.readTree(send("POST", "/maps", owner, "{\"name\":\"경합 원정대\"}").body()).get("mapId").asText();
+    }
+
+    private String inviteOf(String member, String mapId) throws Exception {
+        return om.readTree(send("GET", "/maps/" + mapId, member, null).body()).get("inviteCode").asText();
+    }
+
+    /** 모든 작업을 래치로 동시에 출발시킨다. */
+    private List<Res> concurrently(List<java.util.concurrent.Callable<HttpResponse<String>>> calls) throws Exception {
+        CountDownLatch go = new CountDownLatch(1);
+        List<Future<Res>> futures = new ArrayList<>();
+        for (var call : calls) {
+            futures.add(POOL.submit(() -> {
+                go.await();
+                HttpResponse<String> response = call.call();
+                String errorCode = response.statusCode() < 300 ? null : om.readTree(response.body()).path("code").asText();
+                return new Res(response.statusCode(), errorCode);
+            }));
+        }
+        go.countDown();
+        List<Res> out = new ArrayList<>();
+        for (Future<Res> future : futures) out.add(future.get());
+        return out;
+    }
+
+    private int activeMembers(String mapId) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND left_at IS NULL", Integer.class, mapId);
+    }
+
+    @RepeatedTest(3)
+    void 자리가_2개_남은_지도에_4명이_동시에_합류하면_정확히_2명만_들어간다() throws Exception {
+        String owner = newExplorer().get("explorerId").asText();
+        String mapId = createMap(owner);
+        String first = newExplorer().get("explorerId").asText();
+        assertThat(send("POST", "/maps/join", first, "{\"inviteCode\":\"" + inviteOf(owner, mapId) + "\"}").statusCode())
+            .isEqualTo(200);
+        String code = inviteOf(owner, mapId);
+        List<String> joiners = new ArrayList<>();
+        for (int i = 0; i < 4; i++) joiners.add(newExplorer().get("explorerId").asText());
+
+        var tally = tally(concurrently(joiners.stream().<java.util.concurrent.Callable<HttpResponse<String>>>map(joiner ->
+            () -> send("POST", "/maps/join", joiner, "{\"inviteCode\":\"" + code + "\"}")).toList()));
+
+        assertThat(tally).containsEntry("200", 2L).containsEntry("409 MAP_FULL", 2L).hasSize(2);
+        assertThat(activeMembers(mapId)).isEqualTo(4);
+        assertThat(send("GET", "/maps/" + mapId, owner, null).statusCode()).isEqualTo(200);
+        assertThat(send("GET", "/maps", first, null).statusCode()).isEqualTo(200);
+    }
+
+    @RepeatedTest(3)
+    void 지도장_넘기기와_그_대상의_탈퇴가_동시에_와도_OWNER는_정확히_1명이고_MemberLeft와_상태가_맞다() throws Exception {
+        String owner = newExplorer().get("explorerId").asText();
+        String member = newExplorer().get("explorerId").asText();
+        String mapId = createMap(owner);
+        assertThat(send("POST", "/maps/join", member, "{\"inviteCode\":\"" + inviteOf(owner, mapId) + "\"}").statusCode())
+            .isEqualTo(200);
+
+        List<Res> results = concurrently(List.of(
+            () -> send("POST", "/maps/" + mapId + "/transfer-owner", owner, "{\"explorerId\":\"" + member + "\"}"),
+            () -> send("POST", "/maps/" + mapId + "/leave", member, null)));
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND left_at IS NULL AND role = 'OWNER'",
+            Integer.class, mapId)).isEqualTo(1);
+        int memberLeft = jdbc.queryForObject("SELECT COUNT(*) FROM outbox WHERE aggregate_id = ? AND event_type LIKE '%MemberLeft'",
+            Integer.class, mapId);
+        boolean left = jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND explorer_id = ? AND left_at IS NOT NULL",
+            Integer.class, mapId, member) == 1;
+        assertThat(memberLeft).isEqualTo(left ? 1 : 0);
+        // 둘 중 하나만 성공한다: 양도가 먼저면 탈퇴가 422(지도장), 탈퇴가 먼저면 양도가 403(멤버 아님)
+        assertThat(results.stream().filter(result -> result.status() == 200).count()).isEqualTo(1);
+        assertThat(left).isEqualTo(results.get(1).status() == 200);
+        assertThat(send("GET", "/maps/" + mapId, left ? owner : member, null).statusCode()).isEqualTo(200);
+    }
+
+    @RepeatedTest(3)
+    void 유예_종료_배치와_재가입이_동시에_와도_응답과_멤버_행이_맞다() throws Exception {
+        String owner = newExplorer().get("explorerId").asText();
+        String member = newExplorer().get("explorerId").asText();
+        String mapId = createMap(owner);
+        String code = inviteOf(owner, mapId);
+        assertThat(send("POST", "/maps/join", member, "{\"inviteCode\":\"" + code + "\"}").statusCode()).isEqualTo(200);
+        assertThat(send("POST", "/maps/" + mapId + "/leave", member, null).statusCode()).isEqualTo(200);
+        clock.advance(Duration.ofDays(8));
+
+        List<Res> results = concurrently(List.of(
+            () -> send("POST", "/maps/join", member, "{\"inviteCode\":\"" + code + "\"}"),
+            () -> {
+                purgeJob.run();
+                return send("GET", "/health", null, null);
+            }));
+
+        assertThat(results.get(0).status()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND explorer_id = ? AND left_at IS NULL",
+            Integer.class, mapId, member)).isEqualTo(1);
+        assertThat(activeMembers(mapId)).isEqualTo(2);
+    }
+
+    // ---- 3단계 QA r2 P1-2: 탈퇴와 동시에 들어온 본인 체크인이 지도에 영구히 남지 않는다 ------------------------------
+
+    private void awaitRelayed(String mapId) {
+        Awaitility.await().atMost(Duration.ofSeconds(30)).until(() -> jdbc.queryForObject(
+            "SELECT COUNT(*) FROM outbox WHERE published_at IS NULL AND aggregate_id = ?", Integer.class, mapId) == 0);
+    }
+
+    @RepeatedTest(15)
+    void 다른_멤버가_영토를_잠근_사이_탈퇴와_본인_체크인이_동시에_와도_탈퇴자의_방문은_남지_않는다() throws Exception {
+        String owner = newExplorer().get("explorerId").asText();
+        String leaver = newExplorer().get("explorerId").asText();
+        String other = newExplorer().get("explorerId").asText();
+        String mapId = createMap(owner);
+        String code = inviteOf(owner, mapId);
+        for (String joiner : List.of(leaver, other)) {
+            assertThat(send("POST", "/maps/join", joiner, "{\"inviteCode\":\"" + code + "\"}").statusCode()).isEqualTo(200);
+        }
+        String today = LocalDate.now(clock).toString();
+        List<String> regions = seoul(3);
+        AtomicBoolean ticking = new AtomicBoolean(true);
+        Future<?> ticker = POOL.submit(() -> { // 처리 시각이 1ms씩 흐르게(QA 재현 조건)
+            while (ticking.get()) {
+                clock.advance(Duration.ofMillis(1));
+                Thread.sleep(1);
+            }
+            return null;
+        });
+        try {
+            concurrently(List.of(
+                () -> send("POST", "/visits", other, "{\"regionCode\":\"" + regions.get(0) + "\",\"visitDate\":\"" + today
+                    + "\",\"mapId\":\"" + mapId + "\"}"),
+                () -> send("POST", "/visits", other, "{\"regionCode\":\"" + regions.get(1) + "\",\"visitDate\":\"" + today
+                    + "\",\"mapId\":\"" + mapId + "\"}"),
+                () -> send("POST", "/maps/" + mapId + "/leave", leaver, null),
+                () -> send("POST", "/visits", leaver, "{\"regionCode\":\"" + regions.get(2) + "\",\"visitDate\":\"" + today
+                    + "\",\"mapId\":\"" + mapId + "\"}")));
+        } finally {
+            ticking.set(false);
+            ticker.get();
+        }
+        awaitRelayed(mapId);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE map_id = ? AND checked_in_by = ? AND hidden_at IS NULL",
+            Integer.class, mapId, leaver)).as("탈퇴자의 보이는 방문").isZero();
+
+        clock.advance(Duration.ofDays(8));
+        purgeJob.run();
+        awaitRelayed(mapId);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit v WHERE v.map_id = ? AND NOT EXISTS (SELECT 1 FROM map_member m "
+            + "WHERE m.map_id = v.map_id AND m.explorer_id = v.checked_in_by AND m.left_at IS NULL)", Integer.class, mapId))
+            .as("유예 종료 뒤 비멤버 방문").isZero();
     }
 }

@@ -11,6 +11,7 @@ import java.time.Instant;
  * @param remaining        취소 후 이 멤버의 이 지도 기준 영토 수
  * @param regionStillOnMap 취소 후에도 그 지역이 이 지도에 다른 멤버의 방문으로 남는지(D2) — 도감(지도 단위)은 false일 때만
  *                         세트 진행에서 지역을 뺀다. 탐험가 단위 회수(기본 XP·지역 아이템)는 하류가 explorer_region 으로 판단한다.
+ * @param visitGeneration  취소된 방문의 체크인 회차(RegionVisited.visitGeneration 과 같은 값). 0 = 예전 이벤트
  */
 public record VisitCancelled(
     String explorerId,
@@ -21,7 +22,8 @@ public record VisitCancelled(
     boolean wasClaim,
     int remaining,
     boolean regionStillOnMap,
-    Instant cancelledAt
+    Instant cancelledAt,
+    int visitGeneration
 ) implements DomainEvent {
     @Override
     public Instant occurredAt() {

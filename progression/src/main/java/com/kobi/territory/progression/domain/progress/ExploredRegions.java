@@ -38,20 +38,29 @@ public final class ExploredRegions {
         return new ExploredRegions(restored);
     }
 
-    /** 지도 mapId 에서 이 지역 방문이 살아났다. @return 탐험가 기준으로 새로 활성이 됐는지(0 → 1) */
-    boolean add(RegionCode code, String provinceCode, Rarity rarity, String mapId, Instant at) {
+    /** 지도 mapId 의 generation 회차 체크인이 이미 지난 일(늦게 온 재전달)인지 — 그러면 아무것도 반영하지 않는다(결정 6). */
+    boolean staleVisit(RegionCode code, String mapId, int generation) {
+        ExploredRegion current = byCode.get(code);
+        return current != null && current.staleVisit(mapId, generation);
+    }
+
+    /** 지도 mapId 에서 이 지역 방문이 살아났다(generation 회차). @return 탐험가 기준으로 새로 활성이 됐는지(0 → 1) */
+    boolean add(RegionCode code, String provinceCode, Rarity rarity, String mapId, int generation, Instant at) {
         ExploredRegion current = byCode.get(code);
         boolean wasActive = current != null && current.active();
         ExploredRegion base = current != null ? current : ExploredRegion.firstVisit(code, provinceCode, rarity, at);
-        put(base.withMap(mapId));
+        put(base.withMap(mapId, generation));
         return !wasActive;
     }
 
-    /** 지도 mapId 의 이 지역 방문이 취소됐다. @return 탐험가 기준으로 활성이 끝났는지(1 → 0). 모르는 지도면 no-op(false) */
-    boolean remove(RegionCode code, String mapId) {
+    /**
+     * 지도 mapId 의 이 지역 방문(generation 회차)이 취소됐다. @return 탐험가 기준으로 활성이 끝났는지(1 → 0).
+     * 모르는 지도이거나 더 새 회차를 이미 봤으면 no-op(false).
+     */
+    boolean remove(RegionCode code, String mapId, int generation) {
         ExploredRegion current = byCode.get(code);
-        if (current == null || !current.activeMaps().contains(mapId)) return false;
-        ExploredRegion next = current.withoutMap(mapId);
+        if (current == null || current.staleCancel(mapId, generation) || !current.activeMaps().contains(mapId)) return false;
+        ExploredRegion next = current.withoutMap(mapId, generation);
         put(next);
         return !next.active();
     }
@@ -102,9 +111,22 @@ public final class ExploredRegions {
         return changed.stream().map(byCode::get).toList();
     }
 
-    /** 재계산용: 행(처음 밟은 시각)은 남기고 활성 지도만 비운 사본 — 재생이 현재 방문으로 다시 채운다. */
-    ExploredRegions deactivated() {
-        return new ExploredRegions(byCode.values().stream().map(ExploredRegion::deactivated).toList());
+    /**
+     * 재계산용: 행(처음 밟은 시각)은 남기고, 지금 멤버인 지도(currentMaps)의 활성만 비운 사본 — 재생이 현재 방문으로 다시 채운다.
+     * 이제 멤버가 아닌 지도(탈퇴)의 활성은 그대로 둔다(탈퇴는 탐험가 단위 기록을 줄이지 않는다 — §5).
+     */
+    ExploredRegions deactivated(Set<String> currentMaps) {
+        return new ExploredRegions(byCode.values().stream().map(region -> {
+            Set<String> frozen = new LinkedHashSet<>(region.activeMaps());
+            frozen.addAll(region.marks().keySet());
+            frozen.removeAll(currentMaps);
+            return region.deactivatedExcept(frozen);
+        }).toList());
+    }
+
+    /** 활성인 지역 코드. */
+    Set<RegionCode> activeCodes() {
+        return active().map(ExploredRegion::code).collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private Stream<ExploredRegion> active() {

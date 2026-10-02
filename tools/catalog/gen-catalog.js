@@ -112,7 +112,8 @@ fs.mkdirSync(CAT, { recursive: true }); fs.mkdirSync(DEV, { recursive: true });
 const w = (name, obj, pretty) => fs.writeFileSync(name, pretty ? JSON.stringify(obj, null, 1) + '\n' : JSON.stringify(obj));
 w(CAT + '/provinces.json', provinces, true);
 w(CAT + '/regions.json', regions, true);
-w(CAT + '/items.json', items, true);
+// 아이템 정의는 3단계부터 DB(item_definition). items.json 은 이관 원본으로만 남는다 → gen-item-sql.js 가 V3_1 INSERT 를 만든다.
+w(__dirname + '/items.json', items, true);
 w(CAT + '/regions.geojson', geojson, false);
 w(CAT + '/reward-rules.json', rewardRules, true);
 w(DEV + '/sample-visits.json', sample, true);

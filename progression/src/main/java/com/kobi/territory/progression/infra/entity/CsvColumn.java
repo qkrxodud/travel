@@ -18,4 +18,5 @@ final class CsvColumn {
     static String write(Collection<String> values) {
         return values.stream().sorted().collect(Collectors.joining(","));
     }
+
 }

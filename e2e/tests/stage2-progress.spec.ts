@@ -122,7 +122,7 @@ test.describe('2단계 진행 ↔ 서버', () => {
 
     // 회귀(QA P3-10): 가방·랭킹 탭이 서버 진행 값과 함께 정상 렌더링
     await tab(page, 'bag');
-    await expect(page.locator('#n-bag')).toHaveText('4'); // 함양군 취소 후 지역 아이템 4
+    await expect(page.locator('#n-bag')).toHaveText('5', LATE); // 함양군 취소 후 지역 아이템 4 + 세트 배경 set:jiri(3단계 서버 가방, 회수 없음)
     await expect(page.locator('#bag-inv .item')).not.toHaveCount(0);
     await tab(page, 'rank');
     const meRow = page.locator('#rank li.me');

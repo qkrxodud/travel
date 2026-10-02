@@ -31,19 +31,21 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @IntegrationTest
 class ProgressionApiTest {
 
-    private static final String H = "X-Explorer-Id";
+    private static final String H = "X-Explorer-Token";
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper om;
     @Autowired MutableClock clock;
 
     private String me;
+    private String token;
     private String myMap;
 
     @BeforeEach
     void issue() throws Exception {
         JsonNode body = json(mvc.perform(post("/explorers")).andExpect(status().isCreated()));
         me = body.get("explorerId").asText();
+        token = body.get("accessToken").asText();
         myMap = body.get("personalMapId").asText();
     }
 
@@ -52,7 +54,7 @@ class ProgressionApiTest {
     }
 
     private MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder builder) {
-        return builder.header(H, me);
+        return builder.header(H, token);
     }
 
     private void checkIn(String code) throws Exception {
@@ -74,10 +76,10 @@ class ProgressionApiTest {
 
     @Test
     void 탐험가_식별() throws Exception {
-        error(mvc.perform(get("/progress")), 401, "EXPLORER_ID_REQUIRED");
-        error(mvc.perform(get("/quests").header(H, "not-a-uuid")), 401, "EXPLORER_ID_REQUIRED");
-        error(mvc.perform(get("/collection").header(H, "00000000-0000-0000-0000-000000000000")), 404, "EXPLORER_NOT_FOUND");
-        error(mvc.perform(get("/progress").header(H, "00000000-0000-0000-0000-000000000000")), 404, "EXPLORER_NOT_FOUND");
+        error(mvc.perform(get("/progress")), 401, "EXPLORER_TOKEN_REQUIRED");
+        error(mvc.perform(get("/quests").header(H, "not-a-token")), 401, "EXPLORER_TOKEN_INVALID");
+        error(mvc.perform(get("/collection").header(H, "00000000-0000-0000-0000-000000000000")), 401, "EXPLORER_TOKEN_INVALID");
+        error(mvc.perform(get("/progress").header(H, me)), 401, "EXPLORER_TOKEN_INVALID");
     }
 
     @Test
@@ -175,7 +177,9 @@ class ProgressionApiTest {
     void dev_재계산() throws Exception {
         checkIn("KR-11010");
         awaitXp(35);
-        mvc.perform(as(post("/dev/recalculate"))).andExpect(status().isOk()).andExpect(jsonPath("$.recalculated").value(1));
+        // 미전달 이벤트(도감·퀘스트 구독자)가 남아 있으면 보류(S3-3) — 릴레이가 비울 때까지 다시 시도
+        await().atMost(Duration.ofSeconds(10)).until(() -> json(mvc.perform(as(post("/dev/recalculate")))
+            .andExpect(status().isOk())).get("recalculated").asInt() == 1);
         assertThat(progress().get("xp").asInt()).isEqualTo(35);
         assertThat(List.of(progress().get("badges").get(0).get("earned").asBoolean())).containsExactly(true);
     }

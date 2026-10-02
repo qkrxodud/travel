@@ -4,25 +4,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kobi.territory.catalog.api.query.ItemView;
 import com.kobi.territory.catalog.api.query.RegionView;
 import com.kobi.territory.catalog.application.CatalogService;
+import com.kobi.territory.catalog.application.ItemDefinitionCache;
 import com.kobi.territory.catalog.domain.catalog.Catalog;
-import com.kobi.territory.catalog.domain.item.ItemSlot;
 import com.kobi.territory.catalog.domain.region.Region;
 import com.kobi.territory.catalog.infra.repository.JsonCatalogRepository;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
-/** 카탈로그 리소스 JSON 정합성(Spring 없이). 데이터 원본: 프로토타입 → tools/catalog/gen-catalog.js */
+/**
+ * 카탈로그 리소스 JSON 정합성(Spring 없이). 데이터 원본: 프로토타입 → tools/catalog/gen-catalog.js
+ * 아이템 정의는 3단계부터 DB(V3_1 이관) — 아이템 데이터 검증은 app-api ItemDefinitionMigrationTest 로 옮겼다.
+ */
 class CatalogDataTest {
 
     private static final Catalog DATA = new JsonCatalogRepository().load();
-    private static final CatalogService CATALOG = new CatalogService(() -> DATA);
+    private static final CatalogService CATALOG = new CatalogService(() -> DATA, new ItemDefinitionCache(InMemoryItemDefinitionRepository.empty()));
 
     @Test
     void 지역_250개_시도_17개() {
@@ -58,31 +58,6 @@ class CatalogDataTest {
             assertThat(region.rarity()).as(region.name()).isEqualTo(region.name().endsWith("군") ? Rarity.RARE : Rarity.COMMON);
         }
         assertThat(CATALOG.activeRegions().stream().filter(region -> region.rarity() == Rarity.RARE)).hasSize(72);
-    }
-
-    @Test
-    void 지역마다_특산물_아이템이_하나씩_있고_티어는_지역_희귀도와_같다() {
-        assertThat(DATA.items().all()).hasSize(250);
-        for (RegionView region : CATALOG.activeRegions()) {
-            ItemView item = CATALOG.regionItem(RegionCode.of(region.code())).orElseThrow();
-            assertThat(item.itemId()).isEqualTo("region:" + region.code());
-            assertThat(item.tier()).isEqualTo(region.rarity());
-            assertThat(item.name()).isNotBlank();
-            assertThat(ItemSlot.valueOf(item.slot())).isNotNull();
-        }
-        // 전설 지역 아이템은 배경(전설 풍경)
-        assertThat(DATA.items().all().stream().filter(item -> item.tier() == Rarity.LEGEND))
-            .allSatisfy(item -> assertThat(item.slot()).isEqualTo(ItemSlot.BG));
-    }
-
-    @Test
-    void 상호_브랜드명은_일반명사화되어_있다() {
-        Set<String> names = DATA.items().all().stream().map(item -> item.name()).collect(Collectors.toSet());
-        for (String brand : List.of("성심당", "이성당", "에버랜드", "라이온즈파크", "챔피언스필드", "황남빵", "예술의전당")) {
-            assertThat(names).noneMatch(name -> name.contains(brand));
-        }
-        assertThat(CATALOG.regionItem(RegionCode.of("KR-25040")).orElseThrow().name()).startsWith("대전 튀김소보로");
-        assertThat(names).anyMatch(name -> name.startsWith("군산 단팥빵"));
     }
 
     @Test

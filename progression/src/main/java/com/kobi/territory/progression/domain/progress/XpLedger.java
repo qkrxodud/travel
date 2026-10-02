@@ -124,8 +124,10 @@ public final class XpLedger {
     /**
      * 재계산용: 지역 기본 XP 항목만 뺀 장부. 기본 XP 는 영토(현재 방문)에서 다시 만들고, 나머지(시·도 첫 발·선점·세트·퀘스트)는
      * 취소 비대칭으로 남은 보상이거나 사용자 행동이라 지우지 않는다 — 재생이 빠진 것만 덧붙인다.
+     * keep: 탈퇴한 지도 덕분에 계속 활성인 지역 — 재생할 방문이 없으므로 그 기본 XP 항목은 남긴다(§5 탈퇴는 줄이지 않음).
      */
-    XpLedger withoutRegionBase() {
-        return new XpLedger(entries.stream().filter(entry -> entry.source() != XpSource.REGION_BASE).toList());
+    XpLedger withoutRegionBase(ExplorerId explorer, Set<RegionCode> keep) {
+        return new XpLedger(entries.stream().filter(entry -> entry.source() != XpSource.REGION_BASE
+            || keep.stream().anyMatch(region -> entry.refId().startsWith(RefIds.regionPrefix(explorer, region)))).toList());
     }
 }

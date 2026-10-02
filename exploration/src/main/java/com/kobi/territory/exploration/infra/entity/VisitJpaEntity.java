@@ -20,7 +20,10 @@ import java.time.LocalDate;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-/** visit 테이블 ↔ Visit(Territory 의 자식). UQ(map_id, region_code, checked_in_by). 취소는 물리 삭제. */
+/**
+ * visit 테이블 ↔ Visit(Territory 의 자식). UQ(map_id, region_code, checked_in_by). 취소는 물리 삭제.
+ * V3: generation(체크인 회차), claim_rank_at(선점 순서), hidden_at(탈퇴 유예 숨김), disputed(지도장 이의).
+ */
 @Entity
 @Table(name = "visit")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -54,6 +57,19 @@ public class VisitJpaEntity {
     @Column(name = "visited_at", nullable = false)
     private Instant visitedAt;
 
+    @Column(nullable = false)
+    private int generation;
+
+    /** 선점 순서 기준(V3 이전 행은 NULL → visited_at). */
+    @Column(name = "claim_rank_at")
+    private Instant claimRankAt;
+
+    @Column(name = "hidden_at")
+    private Instant hiddenAt;
+
+    @Column(nullable = false)
+    private boolean disputed;
+
     public static VisitJpaEntity from(MapId mapId, Visit visit) {
         VisitJpaEntity entity = new VisitJpaEntity();
         entity.mapId = mapId.value();
@@ -61,15 +77,19 @@ public class VisitJpaEntity {
         entity.checkedInBy = visit.checkedInBy().value();
         entity.verification = visit.verification().name();
         entity.visitedAt = visit.visitedAt();
+        entity.generation = visit.generation();
         entity.apply(visit);
         return entity;
     }
 
-    /** 수정 가능한 값(방문일·메모·사진)을 도메인 상태로 맞춘다. */
+    /** 바뀔 수 있는 값(방문일·메모·사진·선점 순서·숨김·이의)을 도메인 상태로 맞춘다. */
     public void apply(Visit visit) {
         this.visitDate = visit.visitDate().value();
         this.memo = visit.memo().value();
         this.photoUrl = visit.photo() == null ? null : visit.photo().url();
+        this.claimRankAt = visit.claimRankAt();
+        this.hiddenAt = visit.hiddenAt();
+        this.disputed = visit.disputed();
     }
 
     public RegionCode regionCode() {
@@ -91,7 +111,8 @@ public class VisitJpaEntity {
 
     /** 지역 정보(카탈로그 스냅샷)는 저장하지 않으므로 호출자가 넘긴다. */
     public Visit toDomain(RegionSnapshot region) {
-        return new Visit(region, ExplorerId.of(checkedInBy), VisitDate.of(visitDate), Memo.of(memo),
-            PhotoRef.ofNullable(photoUrl), Verification.valueOf(verification), visitedAt);
+        return Visit.restore(region, ExplorerId.of(checkedInBy), VisitDate.of(visitDate), Memo.of(memo),
+            PhotoRef.ofNullable(photoUrl), Verification.valueOf(verification), visitedAt, Math.max(generation, 1),
+            claimRankAt == null ? visitedAt : claimRankAt, hiddenAt, disputed);
     }
 }

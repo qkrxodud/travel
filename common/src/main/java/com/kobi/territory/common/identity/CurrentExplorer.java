@@ -6,11 +6,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 요청의 X-Explorer-Id 헤더를 ExplorerId로 받는다. 헤더가 없거나 형식이 틀리면 401 EXPLORER_ID_REQUIRED.
- * 존재 여부(404 EXPLORER_NOT_FOUND)는 유스케이스가 확인한다.
+ * 요청의 X-Explorer-Token 헤더(비밀 접근 토큰, 3단계 결정 2)로 인증한 탐험가의 ExplorerId 를 받는다.
+ * 헤더가 없으면 401 EXPLORER_TOKEN_REQUIRED, 모르는 토큰이면 401 EXPLORER_TOKEN_INVALID.
+ * explorerId 자체는 공개 식별자라 인증에 쓰지 않는다(4단계 구글 로그인 때 세션으로 대체).
  */
 @Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface CurrentExplorer {
-    String HEADER = "X-Explorer-Id";
+    String HEADER = "X-Explorer-Token";
 }

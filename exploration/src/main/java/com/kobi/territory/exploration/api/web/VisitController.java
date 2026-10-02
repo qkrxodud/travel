@@ -52,7 +52,7 @@ public class VisitController {
             req.visitDate(), req.memo(), req.photoUrl()));
         PreviewResponse preview = PreviewResponse.of(outcome.preview());
         VisitFacts facts = outcome.result().facts();
-        return new CheckInResponse(outcome.result().mapId().value(), VisitResponse.of(outcome.result().visit(), catalog),
+        return new CheckInResponse(outcome.result().mapId().value(), VisitResponse.of(outcome.view(), catalog),
             facts.nth(), facts.firstInProvince(), facts.firstClaim(), preview.xp(), preview.items());
     }
 
@@ -62,7 +62,7 @@ public class VisitController {
                               @RequestBody EditVisitRequest req) {
         CheckInService.EditOutcome edited = checkIns.edit(new EditVisitCommand(explorerId, mapId, RegionCode.of(code), req.visitDate(),
             req.memo(), req.photoUrl()));
-        return VisitResponse.of(edited.visit(), catalog);
+        return VisitResponse.of(edited.view(), catalog);
     }
 
     @DeleteMapping("/{code}")

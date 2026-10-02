@@ -2,6 +2,7 @@ package com.kobi.territory.exploration.infra.entity;
 
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.exploration.domain.map.CountryCode;
+import com.kobi.territory.exploration.domain.map.Departure;
 import com.kobi.territory.exploration.domain.map.ExpeditionMap;
 import com.kobi.territory.exploration.domain.map.InviteCode;
 import com.kobi.territory.exploration.domain.map.MapId;
@@ -13,6 +14,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.List;
 import lombok.AccessLevel;
@@ -55,6 +57,10 @@ public class ExpeditionMapJpaEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /** 낙관적 락 — 지도 커맨드는 행을 잠글 때 강제 증가한다(멤버 행만 바뀌어도 버전이 오른다, QA P1-1). */
+    @Version
+    private Long version;
+
     public static ExpeditionMapJpaEntity from(ExpeditionMap map) {
         ExpeditionMapJpaEntity entity = new ExpeditionMapJpaEntity();
         entity.id = map.id().value();
@@ -80,11 +86,13 @@ public class ExpeditionMapJpaEntity {
         return id;
     }
 
-    /** 루트 + 자식(map_member) 행으로 애그리거트를 복원한다. */
+    /** 루트 + 자식(map_member — 현재 멤버와 탈퇴 유예 중) 행으로 애그리거트를 복원한다. */
     public ExpeditionMap toDomain(List<MapMemberJpaEntity> memberRows) {
-        List<Member> members = memberRows.stream().map(MapMemberJpaEntity::toDomain).toList();
+        List<Member> members = memberRows.stream().filter(row -> !row.departed()).map(MapMemberJpaEntity::toDomain).toList();
+        List<Departure> departures = memberRows.stream().filter(MapMemberJpaEntity::departed)
+            .map(MapMemberJpaEntity::toDeparture).toList();
         return ExpeditionMap.restore(MapId.of(id), name, new CountryCode(countryCode), new InviteCode(inviteCode),
             ExplorerId.of(ownerId), MapKind.valueOf(kind),
-            new MapSettings(photoRequired, dailyCheckInCap, MapVisibility.valueOf(visibility)), createdAt, members);
+            new MapSettings(photoRequired, dailyCheckInCap, MapVisibility.valueOf(visibility)), createdAt, members, departures);
     }
 }

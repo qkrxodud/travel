@@ -13,12 +13,16 @@ import jakarta.persistence.Table;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-/** explorer_region — 탐험가 단위 지역(ExploredRegion). active_map_ids 는 활성 지도 id 집합(쉼표 구분). */
+/**
+ * explorer_region — 탐험가 단위 지역(ExploredRegion). active_map_ids 는 활성 지도 id 집합(쉼표 구분).
+ * 지도별 방문 회차 표시(결정 6)는 자식 행 explorer_region_mark({@link ExplorerRegionMarkJpaEntity}).
+ */
 @Entity
 @Table(name = "explorer_region")
 @IdClass(ExplorerRegionJpaEntity.Key.class)
@@ -72,13 +76,15 @@ public class ExplorerRegionJpaEntity {
         return regionCode;
     }
 
-    public ExploredRegion toDomain() {
+    public ExploredRegion toDomain(Map<String, Integer> marks) {
         return ExploredRegion.restore(RegionCode.of(regionCode), provinceCode, Rarity.valueOf(rarity), firstVisitedAt,
-            CsvColumn.read(activeMapIds));
+            CsvColumn.read(activeMapIds), marks);
     }
 
-    public static ExploredRegions toDomain(List<ExplorerRegionJpaEntity> rows) {
-        return ExploredRegions.of(rows.stream().map(ExplorerRegionJpaEntity::toDomain).toList());
+    /** 지역 행 + 회차 표시 행으로 탐험가 단위 지역 전체를 복원한다. */
+    public static ExploredRegions toDomain(List<ExplorerRegionJpaEntity> rows, List<ExplorerRegionMarkJpaEntity> markRows) {
+        Map<String, Map<String, Integer>> marks = ExplorerRegionMarkJpaEntity.byRegion(markRows);
+        return ExploredRegions.of(rows.stream().map(row -> row.toDomain(marks.getOrDefault(row.regionCode, Map.of()))).toList());
     }
 
     @EqualsAndHashCode

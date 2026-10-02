@@ -153,7 +153,8 @@ class ProgressionIntegrationTest {
             Integer.class, explorerId)).as("전북·전남·경남 첫 방문(탐험가 기준)").isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox o JOIN outbox_delivery d ON d.event_id = o.id "
             + "WHERE o.aggregate_id = ? AND d.status = 'DELIVERED' AND d.subscriber LIKE 'progression.%'", Integer.class, mapId))
-            .as("RegionVisited 5건 × 진행·도감·퀘스트 3구독자 + SetCompleted 1건 × 진행").isEqualTo(5 * 3 + 1);
+            .as("RegionVisited 5건 × 진행·도감·퀘스트 3구독자 + SetCompleted 1건 × 진행 + MapCreated 1건 × 진행(루트 선생성, S3-1)")
+            .isEqualTo(5 * 3 + 1 + 1);
     }
 
     @Test

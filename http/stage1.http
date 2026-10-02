@@ -9,7 +9,7 @@ DELETE {{host}}/dev/reset
 # @name issue
 POST {{host}}/explorers
 
-> {% client.global.set("explorerId", response.body.explorerId); %}
+> {% client.global.set("explorerId", response.body.explorerId); client.global.set("token", response.body.accessToken); %}
 
 ### 2. 카탈로그: 지역 250개 / 시·도 17개 / GeoJSON
 GET {{host}}/catalog/provinces
@@ -19,55 +19,55 @@ GET {{host}}/catalog/regions.geojson
 
 ### 3. 체크인 미리보기 → xp.lines(일반 지역 기본 10 + 서울 첫 발 도장 15 + 선점 보너스 10), xp.total 35, items[0]=region:KR-11010
 GET {{host}}/visits/preview?region=KR-11010
-X-Explorer-Id: {{explorerId}}
+X-Explorer-Token: {{token}}
 
 ### 4. 체크인 → 201 {visit, nth:1, firstInProvince:true, firstClaim:true, xp, items}
 POST {{host}}/visits
-X-Explorer-Id: {{explorerId}}
+X-Explorer-Token: {{token}}
 Content-Type: application/json
 
 {"regionCode": "KR-11010", "visitDate": "2025-04-05", "memo": "경복궁 야간개장"}
 
 ### 5. 영토 → conquest {visited:1,total:250,percent:0}, provinces[17], visits[1]
 GET {{host}}/territory
-X-Explorer-Id: {{explorerId}}
+X-Explorer-Token: {{token}}
 
 ### 6. 기록 수정(부분) → 200 VisitResponse
 PATCH {{host}}/visits/KR-11010
-X-Explorer-Id: {{explorerId}}
+X-Explorer-Token: {{token}}
 Content-Type: application/json
 
 {"memo": "광화문까지 산책"}
 
 ### 7. 오류 예시: 중복 → 409 {"code":"DUPLICATE_VISIT"}, 미래 날짜 → 422 FUTURE_VISIT_DATE
 POST {{host}}/visits
-X-Explorer-Id: {{explorerId}}
+X-Explorer-Token: {{token}}
 Content-Type: application/json
 
 {"regionCode": "KR-11010", "visitDate": "2025-04-05"}
 
 ### 8. 취소 → 204 (다시 하면 404 VISIT_NOT_FOUND)
 DELETE {{host}}/visits/KR-11010
-X-Explorer-Id: {{explorerId}}
+X-Explorer-Token: {{token}}
 
 ### 9. 영토 → visited 0
 GET {{host}}/territory
-X-Explorer-Id: {{explorerId}}
+X-Explorer-Token: {{token}}
 
-### 10. 헤더 없음 → 401 {"code":"EXPLORER_ID_REQUIRED"}
+### 10. 헤더 없음 → 401 {"code":"EXPLORER_TOKEN_REQUIRED"}
 GET {{host}}/territory
 
 ### 11. [local] 예시 시드(45곳) / 전부 지우기 / 온보딩 종료 시뮬레이션(가입 시각 73h 과거로)
 POST {{host}}/dev/seed
-X-Explorer-Id: {{explorerId}}
+X-Explorer-Token: {{token}}
 
 ###
 DELETE {{host}}/dev/visits
-X-Explorer-Id: {{explorerId}}
+X-Explorer-Token: {{token}}
 
 ###
 POST {{host}}/dev/explorers/age
-X-Explorer-Id: {{explorerId}}
+X-Explorer-Token: {{token}}
 Content-Type: application/json
 
 {"hours": 73}

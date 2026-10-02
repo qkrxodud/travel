@@ -23,6 +23,7 @@ public class TerritoryConfig {
 
     @Bean
     public ExplorationSettings explorationSettings(TerritoryProperties props) {
-        return new ExplorationSettings(props.checkIn().dailyCap(), props.checkIn().onboardingGraceHours());
+        return new ExplorationSettings(props.checkIn().dailyCap(), props.checkIn().onboardingGraceHours(),
+            props.map().leaveGraceDays());
     }
 }

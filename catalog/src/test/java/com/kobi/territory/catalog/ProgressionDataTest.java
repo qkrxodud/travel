@@ -6,13 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.kobi.territory.catalog.api.query.ProgressionRules;
 import com.kobi.territory.catalog.api.query.RewardLineView;
 import com.kobi.territory.catalog.application.CatalogService;
+import com.kobi.territory.catalog.application.ItemDefinitionCache;
 import com.kobi.territory.catalog.domain.definition.BadgeCondition;
 import com.kobi.territory.catalog.domain.definition.BadgeDefinition;
 import com.kobi.territory.catalog.domain.catalog.Catalog;
 import com.kobi.territory.catalog.domain.definition.ThemeDefinition;
-import com.kobi.territory.catalog.domain.item.ItemDefinitions;
-import com.kobi.territory.catalog.domain.item.ItemDefinition;
-import com.kobi.territory.catalog.domain.item.ItemSlot;
 import com.kobi.territory.catalog.domain.definition.LevelRules;
 import com.kobi.territory.catalog.domain.definition.LevelTitle;
 import com.kobi.territory.catalog.domain.definition.ProgressionDefinitions;
@@ -34,7 +32,7 @@ import org.junit.jupiter.api.Test;
 class ProgressionDataTest {
 
     private static final Catalog DATA = new JsonCatalogRepository().load();
-    private static final CatalogService CATALOG = new CatalogService(() -> DATA);
+    private static final CatalogService CATALOG = new CatalogService(() -> DATA, new ItemDefinitionCache(InMemoryItemDefinitionRepository.empty()));
     private static final RewardRules RULES = new RewardRules(Map.of(Rarity.COMMON, 10, Rarity.RARE, 20, Rarity.LEGEND, 50),
         15, 100, 10);
 
@@ -105,16 +103,14 @@ class ProgressionDataTest {
         Regions regions = Regions.of(List.of(new Region(RegionCode.of("KR-11010"), "종로구", "KR-11", Rarity.COMMON, "KR", 1,
             null, null)));
         Provinces provinces = Provinces.of(List.of(new Province("KR-11", "서울", "서울특별시", 1, 1)));
-        ItemDefinitions items = ItemDefinitions.of(List.of(new ItemDefinition("region:KR-11010",
-            RegionCode.of("KR-11010"), "i", "*", ItemSlot.HAND, Rarity.COMMON, null, null)));
         LevelRules levels = new LevelRules(5, List.of(new LevelTitle(1, "초보")));
         var badSet = new ProgressionDefinitions(levels, List.of(new ThemeDefinition("x", "x", "", "t",
             List.of(RegionCode.of("KR-99999")), null)), List.of(), List.of());
-        assertThatThrownBy(() -> new Catalog(regions, provinces, items, RULES, "{}", badSet))
+        assertThatThrownBy(() -> new Catalog(regions, provinces, RULES, "{}", badSet))
             .hasMessageContaining("모르는 지역");
         var badBadge = new ProgressionDefinitions(levels, List.of(), List.of(new BadgeDefinition("b", "1", "b", "",
             new BadgeCondition(BadgeCondition.Type.PROVINCES_COMPLETE, 0, List.of("KR-99"), null, 0))), List.of());
-        assertThatThrownBy(() -> new Catalog(regions, provinces, items, RULES, "{}", badBadge))
+        assertThatThrownBy(() -> new Catalog(regions, provinces, RULES, "{}", badBadge))
             .hasMessageContaining("모르는 시·도");
     }
 }

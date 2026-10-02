@@ -1,6 +1,7 @@
 package com.kobi.territory.exploration.application;
 
 import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.common.model.RegionCode;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
 import com.kobi.territory.exploration.domain.territory.ConquestRate;
 import com.kobi.territory.exploration.domain.map.ExpeditionMap;
@@ -13,6 +14,7 @@ import com.kobi.territory.exploration.domain.map.MapSelector;
 import com.kobi.territory.exploration.domain.territory.Territory;
 import com.kobi.territory.exploration.domain.territory.TerritoryRepository;
 import com.kobi.territory.exploration.domain.territory.Visit;
+import com.kobi.territory.exploration.domain.territory.VisitView;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +42,8 @@ public class TerritoryQueryService implements TerritoryQuery {
     public TerritoryOverview overview(ExplorerId explorerId, String mapId) {
         MapMembership mm = mapAccess.resolve(explorerId, MapSelector.of(mapId));
         Territory territory = territories.load(mm.map().id());
-        return new TerritoryOverview(mm.map(), territory.conquest(regions.provinceTotals()), territory.visitsRecentFirst());
+        return new TerritoryOverview(mm.map(), territory.conquest(regions.provinceTotals()), territory.viewedBy(explorerId),
+            territory.claims());
     }
 
     @Override
@@ -71,9 +74,25 @@ public class TerritoryQueryService implements TerritoryQuery {
 
     @Override
     public List<RegionVisited> visitHistory(String mapId) {
-        return territories.load(MapId.of(mapId)).history().stream().map(CheckInService::regionVisited).toList();
+        List<ExplorerId> memberIds = maps.findById(MapId.of(mapId)).map(ExpeditionMap::memberIds).orElse(List.of());
+        return territories.load(MapId.of(mapId)).history().stream()
+            .map(result -> CheckInService.regionVisited(result, memberIds)).toList();
     }
 
-    /** @param visits 방문일 최근 순(같으면 처리 시각 최근 순) */
-    public record TerritoryOverview(ExpeditionMap map, ConquestRate conquest, List<Visit> visits) {}
+    @Override
+    public List<String> memberIdsOf(String mapId) {
+        return maps.findById(MapId.of(mapId)).map(map -> map.memberIds().stream().map(ExplorerId::value).toList())
+            .orElse(List.of());
+    }
+
+    @Override
+    public boolean visitsRegionAnywhere(String explorerId, String regionCode) {
+        return territories.hasVisibleVisit(ExplorerId.of(explorerId), RegionCode.of(regionCode));
+    }
+
+    /**
+     * @param visits 요청한 탐험가가 보는 방문(방문일 최근 순 — 다른 멤버 메모·사진은 비워짐)
+     * @param claims 지역마다 선점 방문
+     */
+    public record TerritoryOverview(ExpeditionMap map, ConquestRate conquest, List<VisitView> visits, List<Visit> claims) {}
 }

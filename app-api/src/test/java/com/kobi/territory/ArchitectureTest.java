@@ -23,7 +23,7 @@ import java.util.Arrays;
  * </ol>
  * Gradle 의존(build.gradle)과 함께 갱신한다. 둘 중 하나만 고치면 컴파일 불가 또는 이 테스트 실패.
  * <p>
- * allowEmptyShould(true)는 아직 클래스가 없는 모듈(wardrobe·social·sharing)이 주어인 규칙에만 붙인다.
+ * allowEmptyShould(true)는 아직 클래스가 없는 모듈(social·sharing)이 주어인 규칙에만 붙인다(wardrobe 는 3단계에서 제거).
  * 클래스가 생기는 단계에서 제거한다(패키지 오타가 조용히 통과하지 않게).
  */
 @AnalyzeClasses(packages = "com.kobi.territory", importOptions = ImportOption.DoNotIncludeTests.class)
@@ -53,6 +53,9 @@ class ArchitectureTest {
     static final ArchRule progression_domain_depends_only_on_common = domainOnlyOnCommon("progression");
 
     @ArchTest
+    static final ArchRule wardrobe_domain_depends_only_on_common = domainOnlyOnCommon("wardrobe");
+
+    @ArchTest
     static final ArchRule common_has_no_web_jpa_or_context =
         noClasses().that().resideInAPackage(ROOT + "common..")
             .should().dependOnClassesThat()
@@ -74,15 +77,18 @@ class ArchitectureTest {
     @ArchTest static final ArchRule catalog_public_contract_is_standalone = publicContractStandalone(ROOT, "catalog");
     @ArchTest static final ArchRule exploration_public_contract_is_standalone = publicContractStandalone(ROOT, "exploration");
     @ArchTest static final ArchRule progression_public_contract_is_standalone = publicContractStandalone(ROOT, "progression");
+    @ArchTest static final ArchRule wardrobe_public_contract_is_standalone = publicContractStandalone(ROOT, "wardrobe");
     @ArchTest static final ArchRule catalog_api_has_only_event_query_web = apiHasOnlyEventQueryWeb(ROOT, "catalog");
     @ArchTest static final ArchRule exploration_api_has_only_event_query_web = apiHasOnlyEventQueryWeb(ROOT, "exploration");
     @ArchTest static final ArchRule progression_api_has_only_event_query_web = apiHasOnlyEventQueryWeb(ROOT, "progression");
+    @ArchTest static final ArchRule wardrobe_api_has_only_event_query_web = apiHasOnlyEventQueryWeb(ROOT, "wardrobe");
 
     // ---- 3-1. infra 하위(entity·repository)는 같은 컨텍스트 infra 안에서만 (infra 하위 패키지 규칙) -------------
 
     @ArchTest static final ArchRule catalog_infra_is_internal = infraInternal(ROOT, "catalog");
     @ArchTest static final ArchRule exploration_infra_is_internal = infraInternal(ROOT, "exploration");
     @ArchTest static final ArchRule progression_infra_is_internal = infraInternal(ROOT, "progression");
+    @ArchTest static final ArchRule wardrobe_infra_is_internal = infraInternal(ROOT, "wardrobe");
 
     // ---- 4. 의존 매트릭스(허용되지 않은 컨텍스트는 api도 금지) -----------------------------
 
@@ -98,9 +104,10 @@ class ArchitectureTest {
     static final ArchRule progression_matrix =
         forbid("progression", "wardrobe", "social", "sharing");
 
+    /** wardrobe: common, catalog, exploration(api), progression(api) 허용(§1) — api 밖 참조는 규칙 2 가 막는다. */
     @ArchTest
     static final ArchRule wardrobe_matrix =
-        forbid("wardrobe", "social", "sharing").allowEmptyShould(true);
+        forbid("wardrobe", "social", "sharing");
 
     @ArchTest
     static final ArchRule social_matrix =

@@ -172,9 +172,9 @@ test.describe('1단계 지도 탭 ↔ 서버', () => {
     await expect(region(page, JONGNO)).toHaveClass(/\bon\b/);
     await expect(page.locator('#note-txt')).toContainText('예시 데이터');
     await expect(page.locator('#log li').first()).toContainText('뚝섬 한강'); // 일지는 최근 40건, 방문일 최근 순
-    // 다른 탭(가방)은 같은 방문 목록에서 클라이언트가 파생 계산한다
     await page.locator('#tabs [data-tab="bag"]').click();
-    await expect(page.locator('#n-bag')).toHaveText('45');
+    // 3단계: 가방은 서버 값 — 샘플 지역 아이템 45 + 샘플이 완성하는 세트의 배경 1(이벤트로 비동기 반영)
+    await expect(page.locator('#n-bag')).toHaveText('46', { timeout: 10_000 });
     await page.locator('#tabs [data-tab="map"]').click();
 
     await page.reload();

@@ -1,5 +1,6 @@
 package com.kobi.territory.exploration.infra.repository;
 
+import com.kobi.territory.exploration.domain.explorer.AccessTokenHash;
 import com.kobi.territory.exploration.infra.entity.ExplorerJpaEntity;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.exploration.domain.explorer.Explorer;
@@ -30,5 +31,10 @@ class JpaExplorerRepository implements ExplorerRepository {
     @Override
     public Optional<Explorer> findById(ExplorerId id) {
         return jpa.findById(id.value()).map(ExplorerJpaEntity::toDomain);
+    }
+
+    @Override
+    public Optional<ExplorerId> findIdByTokenHash(AccessTokenHash tokenHash) {
+        return jpa.findByAccessTokenHash(tokenHash.value()).map(ExplorerJpaEntity::explorerId);
     }
 }

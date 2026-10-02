@@ -210,7 +210,7 @@ class ExplorerProgressTest {
         ExplorerProgress progress = fresh();
         progress.applyVisit(visit(JONGNO, at(1)), POLICY);
         progress.applyQuestReward(QuestPeriod.of(YearMonth.of(2026, 10)), "m3", 60, at(2), POLICY);
-        ExplorerProgress base = progress.rebuildBase();
+        ExplorerProgress base = progress.rebuildBase(java.util.Set.of(MAP));
         assertThat(base.xp()).isEqualTo(15 + 10 + 60); // 시·도 첫 발·선점·퀘스트 유지, 기본 10만 빠짐
         assertThat(base.regions().find(JONGNO).orElseThrow().active()).isFalse();
         assertThat(base.regions().find(JONGNO).orElseThrow().firstVisitedAt()).isEqualTo(at(1));

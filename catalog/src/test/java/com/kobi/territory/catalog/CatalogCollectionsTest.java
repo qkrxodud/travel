@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.kobi.territory.catalog.domain.catalog.Catalog;
+import com.kobi.territory.catalog.domain.item.GrantRule;
 import com.kobi.territory.catalog.domain.item.ItemDefinition;
 import com.kobi.territory.catalog.domain.item.ItemDefinitions;
 import com.kobi.territory.catalog.domain.item.ItemSlot;
+import com.kobi.territory.catalog.domain.item.ValidPeriod;
 import com.kobi.territory.catalog.domain.region.Province;
 import com.kobi.territory.catalog.domain.region.Provinces;
 import com.kobi.territory.catalog.domain.region.Region;
@@ -27,7 +29,8 @@ class CatalogCollectionsTest {
     }
 
     static ItemDefinition item(String code) {
-        return new ItemDefinition("region:" + code, RegionCode.of(code), "i", "*", ItemSlot.HAND, Rarity.COMMON, null, null);
+        return new ItemDefinition("region:" + code, "i", "*", ItemSlot.HAND, Rarity.COMMON, null, null,
+            new GrantRule.RegionVisit(RegionCode.of(code)), ValidPeriod.ALWAYS, java.time.Instant.EPOCH);
     }
 
     static final RewardRules RULES = new RewardRules(Map.of(Rarity.COMMON, 10, Rarity.RARE, 20, Rarity.LEGEND, 50), 15, 100, 10);
@@ -67,11 +70,12 @@ class CatalogCollectionsTest {
     }
 
     @Test
-    void Catalog는_생성_시_정합성을_검증한다() {
+    void Catalog는_지역_아이템_누락을_검증한다() {
         Regions regions = Regions.of(List.of(region("KR-11010", "KR-11", null)));
         Provinces provinces = Provinces.of(List.of(new Province("KR-11", "서울", "서울특별시", 1, 1)));
-        new Catalog(regions, provinces, ItemDefinitions.of(List.of(item("KR-11010"))), RULES, "{}");
-        assertThatThrownBy(() -> new Catalog(regions, provinces, ItemDefinitions.of(List.of()), RULES, "{}"))
+        Catalog catalog = new Catalog(regions, provinces, RULES, "{}");
+        catalog.requireItemCoverage(ItemDefinitions.of(List.of(item("KR-11010"))));
+        assertThatThrownBy(() -> catalog.requireItemCoverage(ItemDefinitions.of(List.of())))
             .isInstanceOf(IllegalStateException.class);
     }
 }

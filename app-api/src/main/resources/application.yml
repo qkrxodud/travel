@@ -31,7 +31,10 @@ territory:
     daily-cap: 5
     onboarding-grace-hours: 72
   map:
+    # 탈퇴 유예: 이 기간 안에 초대코드로 돌아오면 방문 복구(선점은 안 돌아옴), 지나면 배치가 숨긴 방문을 하드 삭제한다.
     leave-grace-days: 7
+    # 유예 종료 배치 주기(ms)
+    purge-interval-ms: 600000
   share-card:
     cache-ttl-minutes: 10
   # "하루"(하루 상한)·"오늘"(미래 날짜 판정)의 기준 시간대. Clock 빈의 zone 이 된다.
@@ -47,6 +50,17 @@ territory:
       backoff:
         initial-ms: 500
         max-ms: 30000
+      # 낙관적 락 충돌 재시도의 시간 상한(결정 5) — 첫 충돌부터 이 시간을 넘기면 FAILED(재전달 경로로).
+      conflict-retry-limit: 10m
+  wardrobe:
+    # 꾸미기 점수(StylePoints) = 착용 아이템(슬롯 + 장식) 희귀도 점수 합. 프로토타입 TIER.pts 와 같은 값.
+    style-points:
+      common: 1
+      rare: 3
+      legend: 8
+  # 운영 API(/admin/**) 관리자 토큰(X-Admin-Token). 기본값 없음 — local 은 application-local.yml, prod 는 환경변수.
+  # 4단계 로그인 도입 후 역할 기반 인가로 대체.
+  # admin.token: (프로파일별)
   progression:
     # 운영 재계산 배치 진입점: 기동 시 모든 탐험가의 진행·도감·퀘스트를 Territory 로부터 다시 만든다(정의 변경·버그 복구용).
     #   java -jar territory.jar --territory.progression.recalculate-on-startup=true

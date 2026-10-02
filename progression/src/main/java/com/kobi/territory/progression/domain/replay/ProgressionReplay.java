@@ -25,11 +25,13 @@ import java.util.Map;
  * 재계산은 "덧붙이기"다 — 현재 방문으로만 정해지는 값(지역 활성·기본 XP·스트릭·도감의 모은 지역)만 다시 만들고,
  * 취소 비대칭·추가만 규칙으로 남은 것(보너스 XP·테마(세트) 완성 기록·뱃지·칭호·퀘스트 집계와 보상 기록)은 지우지 않는다.
  * <ul>
- *   <li>도감: 지도마다 rebuildBase(완성 기록 유지)에서 그 지도의 모든 멤버 방문을 재생</li>
- *   <li>진행: rebuildBase 에서 본인 방문 + 본인이 완성시킨 테마를 시간 순으로 재생</li>
+ *   <li>도감: 지도마다 rebuildBase(완성 기록·수령자 유지)에서 그 지도의 모든 멤버 방문을 재생</li>
+ *   <li>진행: rebuildBase(지금 멤버인 지도만 비움 — 탈퇴한 지도의 활성은 유지, §5) 에서 본인 방문 + 본인이 수령자인 새 완성을
+ *       시간 순으로 재생</li>
  *   <li>퀘스트: 이번 달 보드·상시 보드에 덧붙여 센다(같은 지역은 한 번). 지난 달 보드는 불변이라 손대지 않는다.
  *       mprov 의 "처음 가는 시·도"는 재생 중인 진행의 지역 기록(처음 밟은 시각)으로 판단한다</li>
- *   <li>복구 규칙(QA P1-2): 완성 기록이 있는데 세트 보너스가 장부에 없거나, 보상을 받은 퀘스트인데 퀘스트 XP 가 장부에 없으면 지급</li>
+ *   <li>복구 규칙(QA P1-2): 완성 기록(본인이 완성 시점 멤버였던 것만 — 결정 1·R2-1)이 있는데 세트 보너스가 장부에 없거나,
+ *       보상을 받은 퀘스트인데 퀘스트 XP 가 장부에 없으면 지급</li>
  * </ul>
  */
 public final class ProgressionReplay {
@@ -50,18 +52,18 @@ public final class ProgressionReplay {
             CollectionBook collectionBook = collections.getOrDefault(mapId, CollectionBook.empty(mapId)).rebuildBase();
             for (ReplayVisit replayVisit : visits) {
                 List<ThemeCompletion> completions = collectionBook.applyVisit(replayVisit.visit().region(),
-                    replayVisit.explorer(), replayVisit.visit().visitedAt(), themes);
+                    replayVisit.explorer(), replayVisit.visit().visitedAt(), themes, replayVisit.members());
                 if (replayVisit.explorer().equals(explorer)) {
                     timeline.add(new Step(replayVisit.visit().visitedAt(), 0, replayVisit, null));
                 }
-                completions.stream().filter(completion -> completion.completedBy().equals(explorer))
+                completions.stream().filter(completion -> completion.rewards(explorer))
                     .forEach(completion -> timeline.add(new Step(completion.completedAt(), 1, null, completion)));
             }
             rebuilt.add(collectionBook);
         });
         timeline.sort(Comparator.comparing(Step::at).thenComparingInt(Step::order));
 
-        ExplorerProgress progress = current.rebuildBase();
+        ExplorerProgress progress = current.rebuildBase(histories.keySet());
         QuestBoard monthly = boardOf(boards, explorer, QuestPeriod.of(now));
         QuestBoard always = boardOf(boards, explorer, QuestPeriod.ALL);
         for (Step step : timeline) {
@@ -79,8 +81,8 @@ public final class ProgressionReplay {
             }
         }
 
-        List<String> completedThemeIds = rebuilt.stream().flatMap(book -> book.completedThemeIds().stream()).distinct()
-            .toList();
+        List<String> completedThemeIds = rebuilt.stream().flatMap(book -> book.themeIdsRewardedTo(explorer).stream())
+            .distinct().toList();
         List<QuestXp> claimed = boards.stream().flatMap(board -> board.claimedRewards(questRules).stream())
             .map(reward -> new QuestXp(reward.period(), reward.questId(), reward.xp())).toList();
         progress.recoverRewards(completedThemeIds, claimed, at, policy);

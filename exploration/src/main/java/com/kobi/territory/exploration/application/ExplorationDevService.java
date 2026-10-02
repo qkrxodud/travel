@@ -2,7 +2,7 @@ package com.kobi.territory.exploration.application;
 
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
-import com.kobi.territory.exploration.domain.map.CheckInPolicy;
+import com.kobi.territory.exploration.domain.policy.CheckInPolicy;
 import com.kobi.territory.exploration.domain.map.MapId;
 import com.kobi.territory.exploration.domain.map.MapSelector;
 import com.kobi.territory.exploration.domain.territory.Territory;

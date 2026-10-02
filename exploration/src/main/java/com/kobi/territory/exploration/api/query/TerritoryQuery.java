@@ -21,7 +21,7 @@ public interface TerritoryQuery {
      */
     String resolveMapId(String explorerId, String mapIdOrNull);
 
-    /** 탐험가가 멤버인 지도 id 전부(2단계는 개인 지도 1개). */
+    /** 탐험가가 지금 멤버인 지도 id 전부(탈퇴 유예 중인 지도 제외). */
     List<String> mapIdsOf(String explorerId);
 
     /** 모든 탐험가 id(재계산 배치 전체 실행용). */
@@ -29,7 +29,14 @@ public interface TerritoryQuery {
 
     /**
      * 지도의 현재 방문을 처리 시각 순으로 재생한 RegionVisited 목록(사실 값 nth·isFirstInProvince·isFirstClaim 재계산).
-     * 진행·도감·퀘스트 재계산 배치(RecalculateService) 전용. 취소된 방문은 포함하지 않는다.
+     * 진행·도감·퀘스트 재계산 배치(RecalculateService) 전용. 취소된 방문·탈퇴로 숨긴 방문은 포함하지 않는다.
+     * memberIds 는 지금 멤버(재생은 과거 시점 멤버를 모른다 — 재계산에서 새로 생기는 완성에만 쓰인다).
      */
     List<RegionVisited> visitHistory(String mapId);
+
+    /** 지도의 현재 멤버 id(탈퇴 유예 중 제외). 지도가 없으면 빈 목록. */
+    List<String> memberIdsOf(String mapId);
+
+    /** 이 탐험가가 어느 지도에든 이 지역 방문(숨기지 않은 것)을 갖고 있는지 — 탐험가 단위 회수 판단 보조. */
+    boolean visitsRegionAnywhere(String explorerId, String regionCode);
 }

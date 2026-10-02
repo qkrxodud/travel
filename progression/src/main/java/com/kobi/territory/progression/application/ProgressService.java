@@ -3,6 +3,8 @@ package com.kobi.territory.progression.application;
 import com.kobi.territory.common.event.EventOutbox;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
+import com.kobi.territory.exploration.api.event.ClaimTransferred;
+import com.kobi.territory.exploration.api.event.MapCreated;
 import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.event.VisitCancelled;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
@@ -30,6 +32,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ProgressService {
 
     static final String AGGREGATE = "ExplorerProgress";
+    /** MapCreated.kind 중 개인 지도(탐험 공개 계약 값). */
+    static final String PERSONAL = "PERSONAL";
 
     private final ExplorerProgressRepository progresses;
     private final ProgressionCatalog catalog;
@@ -59,8 +63,8 @@ public class ProgressService {
     @Transactional
     public void onVisitCancelled(VisitCancelled event) {
         ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
-        ProgressChange change = progress.revokeVisit(event.mapId(), RegionCode.of(event.regionCode()), event.cancelledAt(),
-            catalog.policy());
+        ProgressChange change = progress.revokeVisit(event.mapId(), RegionCode.of(event.regionCode()), event.visitGeneration(),
+            event.cancelledAt(), catalog.policy());
         progresses.save(progress);
         publish(progress, change);
     }
@@ -71,6 +75,28 @@ public class ProgressService {
         ProgressChange change = progress.applyThemeCompleted(event.setId(), event.completedAt(), catalog.policy());
         progresses.save(progress);
         publish(progress, change);
+    }
+
+    /** 선점 이전 → 새 선점자(event.explorerId) 선점 보너스(+10, refId claim:{mapId}:{code}:{e}). 멱등. */
+    @Transactional
+    public void onClaimTransferred(ClaimTransferred event) {
+        ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
+        ProgressChange change = progress.applyClaimTransferred(event.mapId(), RegionCode.of(event.regionCode()), event.rarity(),
+            event.transferredAt(), catalog.policy());
+        progresses.save(progress);
+        publish(progress, change);
+    }
+
+    /**
+     * 개인 지도 생성(= 탐험가 가입) → 진행 루트 행을 미리 만든다(구조 QA S3-1 — 이후 이벤트 처리·재계산의 findLocked 가 항상
+     * 있는 행을 잠가 "없는 행 잠금"의 갭 잠금 교착이 생기지 않게). 이미 있으면 아무것도 하지 않는다(멱등). 공유 지도는 해당 없음.
+     */
+    @Transactional
+    public void onMapCreated(MapCreated event) {
+        if (!PERSONAL.equals(event.kind())) return;
+        ExplorerId owner = ExplorerId.of(event.ownerId());
+        if (progresses.find(owner).isPresent()) return;
+        progresses.save(ExplorerProgress.start(owner, catalog.policy(), event.createdAt()));
     }
 
     @Transactional
@@ -102,7 +128,7 @@ public class ProgressService {
 
     static ProgressVisit visitOf(RegionVisited event) {
         return new ProgressVisit(event.mapId(), RegionCode.of(event.regionCode()), event.provinceCode(), event.rarity(),
-            event.visitedAt(), event.isFirstClaim());
+            event.visitedAt(), event.isFirstClaim(), event.visitGeneration());
     }
 
     private ExplorerProgress load(ExplorerId explorerId) {

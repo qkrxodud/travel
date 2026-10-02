@@ -9,6 +9,7 @@ import com.kobi.territory.progression.domain.progress.XpLedgerEntry;
 import com.kobi.territory.progression.domain.quest.QuestBoard;
 import com.kobi.territory.progression.domain.quest.QuestFact;
 import com.kobi.territory.progression.domain.quest.QuestPeriod;
+import static com.kobi.territory.progression.domain.Fixtures.FRIEND;
 import static com.kobi.territory.progression.domain.Fixtures.GAPYEONG;
 import static com.kobi.territory.progression.domain.Fixtures.JONGNO;
 import static com.kobi.territory.progression.domain.Fixtures.JUNG;
@@ -21,6 +22,8 @@ import static com.kobi.territory.progression.domain.Fixtures.T0;
 import static com.kobi.territory.progression.domain.Fixtures.visit;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
 import java.time.Instant;
 import java.time.YearMonth;
@@ -132,5 +135,33 @@ class ProgressionReplayTest {
         // 다시 돌려도 한 번만(멱등)
         ProgressionReplay.Result again = replay(result.progress(), List.of(), null, List.of(september, always));
         assertThat(again.progress().xp()).isEqualTo(40);
+    }
+
+    @Test
+    void 복구_규칙은_완성_시점_멤버였던_테마만_지급한다_R2_1() {
+        // 공유 지도에서 FRIEND 와 ME 가 있을 때 FRIEND 가 완성 → 수령자 둘. 나중 합류한 LATE 는 수령자가 아니다
+        ExplorerId late = ExplorerId.of("55555555-5555-5555-5555-555555555555");
+        CollectionBook book = CollectionBook.empty(MAP);
+        book.applyVisit(JONGNO, FRIEND, T0, THEMES, List.of(ME, FRIEND));
+        book.applyVisit(JUNG, FRIEND, T0.plusSeconds(1), THEMES, List.of(ME, FRIEND));
+
+        ProgressionReplay.Result lateResult = ProgressionReplay.replay(late, ExplorerProgress.start(late, POLICY, T0),
+            Map.of(MAP, List.of()), Map.of(MAP, book), List.of(), POLICY, THEMES, QUEST_RULES, OCT, LATER);
+        assertThat(lateResult.progress().ledger().has(RefIds.theme(late, "han"))).isFalse();
+        assertThat(lateResult.progress().titles()).doesNotContainKey("set-han");
+
+        ProgressionReplay.Result myResult = replay(ExplorerProgress.start(ME, POLICY, T0), List.of(), book, List.of());
+        assertThat(myResult.progress().ledger().has(RefIds.theme(ME, "han"))).isTrue(); // 완성 시점 멤버(직접 칠하지 않았어도)
+    }
+
+    @Test
+    void 공유_지도_재생에서_새로_생기는_완성은_멤버_전원이_받는다() {
+        List<ReplayVisit> history = List.of(
+            new ReplayVisit(FRIEND, new ProgressVisit(MAP, JONGNO, "KR-11", Rarity.COMMON, T0, true), List.of(ME, FRIEND)),
+            new ReplayVisit(FRIEND, new ProgressVisit(MAP, JUNG, "KR-11", Rarity.COMMON, T0.plusSeconds(1), true),
+                List.of(ME, FRIEND)));
+        ProgressionReplay.Result result = replay(ExplorerProgress.start(ME, POLICY, T0), history, null, List.of());
+        assertThat(result.progress().ledger().has(RefIds.theme(ME, "han"))).isTrue();
+        assertThat(result.progress().xp()).isEqualTo(100); // 내 방문은 없다 — 테마 보너스만
     }
 }
