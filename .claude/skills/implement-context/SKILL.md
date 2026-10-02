@@ -16,6 +16,7 @@ description: 나의 영토(territory) 바운디드 컨텍스트의 도메인 코
 | `domain` | 애그리거트, VO, 도메인 이벤트, Repository 인터페이스 | common만 |
 | `infra` | JPA 엔티티/리포지토리 구현, 외부 클라이언트 | domain, application |
 
+- **application 서비스는 얇게 (사용자 확정 규칙)**: 서비스에는 리포지토리 조회·저장, 트랜잭션·잠금, 이벤트/outbox 적재, 정책 VO 조립 같은 **DB·인프라 접근과 호출 순서만** 둔다. 판단·계산·검증·분기(상한 체크, nth·isFirstInProvince 계산, 보상 계산, 정복률 집계 등)는 전부 애그리거트·VO·도메인 서비스, 그리고 **일급 컬렉션**(예: `Visits`, `OwnedItems`, `XpLedger`)으로 옮긴다. 서비스에 `if`/반복문으로 된 비즈니스 규칙이 보이면 QA 결함이다. 이유: 규칙을 Spring 없이 단위 테스트하고, 서비스는 "불러와서 → 도메인에 시키고 → 저장"만 읽히게.
 - domain은 순수 Java — Spring·JPA 어노테이션 금지. JPA 엔티티는 infra에 따로 두고 리포지토리가 변환한다. 이유: 애그리거트 단위 테스트가 컨텍스트 없이 돌고, 컨텍스트를 서비스로 떼어낼 때 모듈째 가져갈 수 있다.
 - 다른 컨텍스트는 그 컨텍스트의 `api` 패키지만 참조한다. Gradle로는 못 막으므로 ArchUnit 규칙으로 강제한다 — 위반하면 빌드가 깨진다.
 - **의존 규칙의 진화**: 뼈대(0단계)의 Gradle 의존·ArchUnit 규칙은 "도메인 모듈 간 참조 전면 금지"다. 1단계부터 구독 관계가 생기면 domain-model.md §1의 의존 매트릭스에 맞춰 **둘을 함께 갱신한다**: Gradle에 `implementation project(':exploration')` 등 허용된 의존을 추가하고, ArchUnit 규칙을 "다른 컨텍스트의 `api` 패키지 외 참조 금지" 형태(`..exploration..`은 `..exploration.api..`를 제외하고 타 컨텍스트에서 참조 불가)로 바꾼다. 둘 중 하나만 고치면 컴파일 불가 또는 ArchUnit 실패가 난다.

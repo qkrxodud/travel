@@ -8,6 +8,11 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 100
+        # Instant 를 DATETIME(6)(UTC 저장)에 매핑한다 — 기본값(TIMESTAMP WITH TIME ZONE)이면 validate가 실패한다.
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP
+        jdbc:
+          time_zone: UTC
   jackson:
     time-zone: Asia/Seoul
 
@@ -29,3 +34,9 @@ territory:
     leave-grace-days: 7
   share-card:
     cache-ttl-minutes: 10
+  # "하루"(하루 상한)·"오늘"(미래 날짜 판정)의 기준 시간대. Clock 빈의 zone 이 된다.
+  time-zone: Asia/Seoul
+  outbox:
+    relay:
+      enabled: true
+      delay-ms: 1000

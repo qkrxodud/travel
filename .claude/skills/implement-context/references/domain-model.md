@@ -40,7 +40,7 @@
 | sharing | common, catalog, 모든 컨텍스트의 api(Query) | 다른 컨텍스트의 domain |
 | app-api | 전부 | 도메인 로직 작성 금지 |
 
-common에 두는 것: ExplorerId, RegionCode, DomainEvent, Outbox, Clock. Spring 의존 없음(이벤트 퍼블리셔 인터페이스용 spring-context만 예외).
+common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox, Clock. Spring 의존 없음(이벤트 퍼블리셔 인터페이스용 spring-context만 예외). Rarity는 공개 이벤트(RegionVisited 등)에 실리는 Published Language 값이고 exploration.domain이 catalog를 참조할 수 없어 공유 커널에 둔다.
 
 ## 2. 애그리거트 9개 상세
 
@@ -124,6 +124,7 @@ common에 두는 것: ExplorerId, RegionCode, DomainEvent, Outbox, Clock. Spring
 - 이벤트: `MapCreated` → 탐험이 빈 Territory·Collection 생성. `MemberJoined` → 인벤토리가 완성된 세트 보상을 새 멤버에게 지급. `MemberLeft` → 탈퇴 유예 처리.
 - 탈퇴는 7일 소프트 삭제: 즉시 해당 멤버 방문에 `hidden_at`, 선점은 다음 체크인 멤버에게 이전(`ClaimTransferred`). 7일 내 재가입 시 방문 복구(선점은 안 돌아옴), 7일 후 배치가 하드 삭제.
 - Territory와 분리한 이유: 멤버 가입·탈퇴가 방문 250건과 같은 락을 잡을 이유가 없다. 체크인은 멤버 여부만 읽기 참조로 확인.
+- 생성 시 예외: Explorer와 개인 ExpeditionMap(+territory 행)은 한 트랜잭션에서 함께 생성한다(모두 신규 행이라 잠금 경합이 없고, 개인 지도 없는 탐험가를 막기 위한 원자성이 필요). "커맨드 하나가 애그리거트 둘을 수정" 금지 규칙의 유일한 예외.
 
 ## 3. 체크인 이벤트 흐름
 

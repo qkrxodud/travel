@@ -15,6 +15,8 @@ const BOOT_RUN =
 
 export default defineConfig({
   testDir: './tests',
+  // webServer 기동(또는 재사용) 후 /health 의 service==='territory' 를 확인한다(남의 서버 재사용 방지).
+  globalSetup: './global-setup.ts',
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,

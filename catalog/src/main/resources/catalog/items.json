@@ -1,0 +1,3406 @@
+[
+ {
+  "itemId": "region:KR-11010",
+  "regionCode": "KR-11010",
+  "name": "청사초롱 등불",
+  "emoji": "🏮",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "lantern",
+   "primary": "#e63946",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-11020",
+  "regionCode": "KR-11020",
+  "name": "명동 칼국수 키링",
+  "emoji": "🍜",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f4c542",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-11030",
+  "regionCode": "KR-11030",
+  "name": "용산 크래프트 맥주 텀블러",
+  "emoji": "🍺",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "cup",
+   "primary": "#f4c542",
+   "secondary": "#fff6cc"
+  }
+ },
+ {
+  "itemId": "region:KR-11040",
+  "regionCode": "KR-11040",
+  "name": "성수 스니커즈 키링",
+  "emoji": "👟",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#1e88e5",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-11050",
+  "regionCode": "KR-11050",
+  "name": "뚝섬 자전거 키링",
+  "emoji": "🚲",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#2b3542",
+   "secondary": "#9aa7b5"
+  }
+ },
+ {
+  "itemId": "region:KR-11060",
+  "regionCode": "KR-11060",
+  "name": "동대문 원단 키링",
+  "emoji": "🧵",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#5e35b1",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-11070",
+  "regionCode": "KR-11070",
+  "name": "중랑 버블티 텀블러",
+  "emoji": "🧋",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "cup",
+   "primary": "#c9a27e",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-11080",
+  "regionCode": "KR-11080",
+  "name": "성북동 한옥 열쇠",
+  "emoji": "🏯",
+  "slot": "BG",
+  "tier": "COMMON",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-11090",
+  "regionCode": "KR-11090",
+  "name": "강북 버블티 텀블러",
+  "emoji": "🧋",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "cup",
+   "primary": "#c9a27e",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-11100",
+  "regionCode": "KR-11100",
+  "name": "도봉 버블티 텀블러",
+  "emoji": "🧋",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "cup",
+   "primary": "#c9a27e",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-11110",
+  "regionCode": "KR-11110",
+  "name": "노원 천문대 망원경 망원경",
+  "emoji": "🔭",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "telescope",
+   "primary": "#2b3542",
+   "secondary": "#90caf9"
+  }
+ },
+ {
+  "itemId": "region:KR-11120",
+  "regionCode": "KR-11120",
+  "name": "은평 한옥마을 기와",
+  "emoji": "🏘️",
+  "slot": "BG",
+  "tier": "COMMON",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-11130",
+  "regionCode": "KR-11130",
+  "name": "연희동 크루아상 키링",
+  "emoji": "🥐",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e0a458",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-11140",
+  "regionCode": "KR-11140",
+  "name": "마포 갈매기살 키링",
+  "emoji": "🍖",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#b5563a",
+   "secondary": "#e8a87c"
+  }
+ },
+ {
+  "itemId": "region:KR-11150",
+  "regionCode": "KR-11150",
+  "name": "양천 버블티 텀블러",
+  "emoji": "🧋",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "cup",
+   "primary": "#c9a27e",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-11160",
+  "regionCode": "KR-11160",
+  "name": "김포 비행기 연",
+  "emoji": "✈️",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "kite",
+   "primary": "#1e88e5",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-11170",
+  "regionCode": "KR-11170",
+  "name": "G밸리 플로피 키링",
+  "emoji": "💾",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#2b3542",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-11180",
+  "regionCode": "KR-11180",
+  "name": "금천 버블티 텀블러",
+  "emoji": "🧋",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "cup",
+   "primary": "#c9a27e",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-11190",
+  "regionCode": "KR-11190",
+  "name": "여의도 쇼핑백 바구니",
+  "emoji": "🛍️",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "basket",
+   "primary": "#ff8a80",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-11200",
+  "regionCode": "KR-11200",
+  "name": "노량진 회 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-11210",
+  "regionCode": "KR-11210",
+  "name": "관악 전공책 수첩",
+  "emoji": "📘",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "book",
+   "primary": "#1e88e5",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-11220",
+  "regionCode": "KR-11220",
+  "name": "서초 바이올린 우쿨렐레",
+  "emoji": "🎻",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "ukulele",
+   "primary": "#8d5524",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-11230",
+  "regionCode": "KR-11230",
+  "name": "강남 립스틱 키링",
+  "emoji": "💄",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#ffffff"
+  }
+ },
+ {
+  "itemId": "region:KR-11240",
+  "regionCode": "KR-11240",
+  "name": "잠실 야구공 키링",
+  "emoji": "⚾",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-11250",
+  "regionCode": "KR-11250",
+  "name": "암사동 빗살무늬 키링",
+  "emoji": "🍑",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#ff9e80",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-21010",
+  "regionCode": "KR-21010",
+  "name": "자갈치 고등어 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-21020",
+  "regionCode": "KR-21020",
+  "name": "부산 돼지국밥 키링",
+  "emoji": "🍲",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#c0392b",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-21030",
+  "regionCode": "KR-21030",
+  "name": "동 부산 어묵 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-21040",
+  "regionCode": "KR-21040",
+  "name": "영도대교 미니어처",
+  "emoji": "🌉",
+  "slot": "BG",
+  "tier": "COMMON",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-21050",
+  "regionCode": "KR-21050",
+  "name": "부산진 부산 어묵 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-21060",
+  "regionCode": "KR-21060",
+  "name": "사직 야구공 키링",
+  "emoji": "⚾",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-21070",
+  "regionCode": "KR-21070",
+  "name": "남 부산 어묵 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-21080",
+  "regionCode": "KR-21080",
+  "name": "북 부산 어묵 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-21090",
+  "regionCode": "KR-21090",
+  "name": "해운대 파라솔",
+  "emoji": "🏖️",
+  "slot": "PROP",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "parasol",
+   "primary": "#e63946",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-21100",
+  "regionCode": "KR-21100",
+  "name": "사하 부산 어묵 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-21110",
+  "regionCode": "KR-21110",
+  "name": "금정산 등산화",
+  "emoji": "🥾",
+  "slot": "BG",
+  "tier": "COMMON",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-21120",
+  "regionCode": "KR-21120",
+  "name": "강서 부산 어묵 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-21130",
+  "regionCode": "KR-21130",
+  "name": "연제 부산 어묵 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-21140",
+  "regionCode": "KR-21140",
+  "name": "광안리 드론쇼 불꽃",
+  "emoji": "🎆",
+  "slot": "BG",
+  "tier": "COMMON",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-21150",
+  "regionCode": "KR-21150",
+  "name": "사상 부산 어묵 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-21310",
+  "regionCode": "KR-21310",
+  "name": "기장 멸치 떼",
+  "emoji": "🐟",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "dog",
+   "primary": "#d9a05b",
+   "secondary": "#2b3542"
+  }
+ },
+ {
+  "itemId": "region:KR-22010",
+  "regionCode": "KR-22010",
+  "name": "대구 따로국밥 키링",
+  "emoji": "🍜",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f4c542",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-22020",
+  "regionCode": "KR-22020",
+  "name": "동 대구 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-22030",
+  "regionCode": "KR-22030",
+  "name": "서 대구 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-22040",
+  "regionCode": "KR-22040",
+  "name": "남 대구 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-22050",
+  "regionCode": "KR-22050",
+  "name": "북 대구 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-22060",
+  "regionCode": "KR-22060",
+  "name": "대구 야구공 키링",
+  "emoji": "⚾",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-22070",
+  "regionCode": "KR-22070",
+  "name": "달서 대구 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-22310",
+  "regionCode": "KR-22310",
+  "name": "달성 비슬산 참꽃 비니",
+  "emoji": "🌿",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "beanie",
+   "primary": "#2e7d32",
+   "secondary": "#9ccc65"
+  }
+ },
+ {
+  "itemId": "region:KR-23010",
+  "regionCode": "KR-23010",
+  "name": "차이나타운 짜장면 키링",
+  "emoji": "🥡",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#3b2a22",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-23020",
+  "regionCode": "KR-23020",
+  "name": "동 인천 꽃게 지도",
+  "emoji": "🦀",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#e05a5a",
+   "secondary": "#b23a3a"
+  }
+ },
+ {
+  "itemId": "region:KR-23030",
+  "regionCode": "KR-23030",
+  "name": "남 인천 꽃게 지도",
+  "emoji": "🦀",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#e05a5a",
+   "secondary": "#b23a3a"
+  }
+ },
+ {
+  "itemId": "region:KR-23040",
+  "regionCode": "KR-23040",
+  "name": "송도 미니 타워",
+  "emoji": "🏙️",
+  "slot": "BG",
+  "tier": "COMMON",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-23050",
+  "regionCode": "KR-23050",
+  "name": "남동 인천 꽃게 지도",
+  "emoji": "🦀",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#e05a5a",
+   "secondary": "#b23a3a"
+  }
+ },
+ {
+  "itemId": "region:KR-23060",
+  "regionCode": "KR-23060",
+  "name": "부평 인천 꽃게 지도",
+  "emoji": "🦀",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#e05a5a",
+   "secondary": "#b23a3a"
+  }
+ },
+ {
+  "itemId": "region:KR-23070",
+  "regionCode": "KR-23070",
+  "name": "계양 인천 꽃게 지도",
+  "emoji": "🦀",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#e05a5a",
+   "secondary": "#b23a3a"
+  }
+ },
+ {
+  "itemId": "region:KR-23080",
+  "regionCode": "KR-23080",
+  "name": "서 인천 꽃게 지도",
+  "emoji": "🦀",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#e05a5a",
+   "secondary": "#b23a3a"
+  }
+ },
+ {
+  "itemId": "region:KR-23310",
+  "regionCode": "KR-23310",
+  "name": "강화 화문석 캡모자",
+  "emoji": "🧢",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cap",
+   "primary": "#4a7fd6",
+   "secondary": "#2b5aa8"
+  }
+ },
+ {
+  "itemId": "region:KR-23320",
+  "regionCode": "KR-23320",
+  "name": "백령도 물범 바다 풍경",
+  "emoji": "🦭",
+  "slot": "BG",
+  "tier": "LEGEND",
+  "theme": "baengnyeong",
+  "look": null
+ },
+ {
+  "itemId": "region:KR-24010",
+  "regionCode": "KR-24010",
+  "name": "광주 비엔날레 팔레트 수첩",
+  "emoji": "🎨",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "book",
+   "primary": "#f7f3ea",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-24020",
+  "regionCode": "KR-24020",
+  "name": "서 광주 김치 지도",
+  "emoji": "🥬",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#8cbf5a",
+   "secondary": "#5f8f3a"
+  }
+ },
+ {
+  "itemId": "region:KR-24030",
+  "regionCode": "KR-24030",
+  "name": "남 광주 김치 지도",
+  "emoji": "🥬",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#8cbf5a",
+   "secondary": "#5f8f3a"
+  }
+ },
+ {
+  "itemId": "region:KR-24040",
+  "regionCode": "KR-24040",
+  "name": "광주 야구공 키링",
+  "emoji": "⚾",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-24050",
+  "regionCode": "KR-24050",
+  "name": "광산 광주 김치 지도",
+  "emoji": "🥬",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#8cbf5a",
+   "secondary": "#5f8f3a"
+  }
+ },
+ {
+  "itemId": "region:KR-25010",
+  "regionCode": "KR-25010",
+  "name": "동 대전 빵 키링",
+  "emoji": "🥐",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e0a458",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-25020",
+  "regionCode": "KR-25020",
+  "name": "한밭 야구공 키링",
+  "emoji": "⚾",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-25030",
+  "regionCode": "KR-25030",
+  "name": "서 대전 빵 키링",
+  "emoji": "🥐",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e0a458",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-25040",
+  "regionCode": "KR-25040",
+  "name": "대전 튀김소보로 키링",
+  "emoji": "🥐",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e0a458",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-25050",
+  "regionCode": "KR-25050",
+  "name": "대덕 대전 빵 키링",
+  "emoji": "🥐",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e0a458",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-26010",
+  "regionCode": "KR-26010",
+  "name": "중 울산 고래빵 낚싯대",
+  "emoji": "🐋",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#1e88e5",
+   "secondary": "#90caf9"
+  }
+ },
+ {
+  "itemId": "region:KR-26020",
+  "regionCode": "KR-26020",
+  "name": "남 울산 고래빵 낚싯대",
+  "emoji": "🐋",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#1e88e5",
+   "secondary": "#90caf9"
+  }
+ },
+ {
+  "itemId": "region:KR-26030",
+  "regionCode": "KR-26030",
+  "name": "울산 고래 낚싯대",
+  "emoji": "🐋",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#1e88e5",
+   "secondary": "#90caf9"
+  }
+ },
+ {
+  "itemId": "region:KR-26040",
+  "regionCode": "KR-26040",
+  "name": "북 울산 고래빵 낚싯대",
+  "emoji": "🐋",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#1e88e5",
+   "secondary": "#90caf9"
+  }
+ },
+ {
+  "itemId": "region:KR-26310",
+  "regionCode": "KR-26310",
+  "name": "반구대 고래",
+  "emoji": "🐋",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "dog",
+   "primary": "#d9a05b",
+   "secondary": "#2b3542"
+  }
+ },
+ {
+  "itemId": "region:KR-29010",
+  "regionCode": "KR-29010",
+  "name": "세종 정부청사 미니어처",
+  "emoji": "🏛️",
+  "slot": "BG",
+  "tier": "COMMON",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-31011",
+  "regionCode": "KR-31011",
+  "name": "수원시장안 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31012",
+  "regionCode": "KR-31012",
+  "name": "수원시권선 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31013",
+  "regionCode": "KR-31013",
+  "name": "수원 왕갈비통닭 키링",
+  "emoji": "🍗",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#c98a4a",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-31014",
+  "regionCode": "KR-31014",
+  "name": "수원시영통 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31021",
+  "regionCode": "KR-31021",
+  "name": "성남시수정 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31022",
+  "regionCode": "KR-31022",
+  "name": "성남시중원 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31023",
+  "regionCode": "KR-31023",
+  "name": "판교 게임패드 키링",
+  "emoji": "🎮",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#2fc3ad",
+   "secondary": "#2b3542"
+  }
+ },
+ {
+  "itemId": "region:KR-31030",
+  "regionCode": "KR-31030",
+  "name": "의정부 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31041",
+  "regionCode": "KR-31041",
+  "name": "안양시만안 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31042",
+  "regionCode": "KR-31042",
+  "name": "안양시동안 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31050",
+  "regionCode": "KR-31050",
+  "name": "부천 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31060",
+  "regionCode": "KR-31060",
+  "name": "광명 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31070",
+  "regionCode": "KR-31070",
+  "name": "평택 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31080",
+  "regionCode": "KR-31080",
+  "name": "동두천 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31091",
+  "regionCode": "KR-31091",
+  "name": "안산시상록 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31092",
+  "regionCode": "KR-31092",
+  "name": "안산시단원 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31101",
+  "regionCode": "KR-31101",
+  "name": "고양시덕양 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31103",
+  "regionCode": "KR-31103",
+  "name": "고양시일산동 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31104",
+  "regionCode": "KR-31104",
+  "name": "고양시일산서 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31110",
+  "regionCode": "KR-31110",
+  "name": "과천 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31120",
+  "regionCode": "KR-31120",
+  "name": "구리 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31130",
+  "regionCode": "KR-31130",
+  "name": "남양주 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31140",
+  "regionCode": "KR-31140",
+  "name": "오산 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31150",
+  "regionCode": "KR-31150",
+  "name": "시흥 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31160",
+  "regionCode": "KR-31160",
+  "name": "군포 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31170",
+  "regionCode": "KR-31170",
+  "name": "의왕 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31180",
+  "regionCode": "KR-31180",
+  "name": "하남 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31191",
+  "regionCode": "KR-31191",
+  "name": "용인 놀이공원 풍선",
+  "emoji": "🎈",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "balloon",
+   "primary": "#e63946",
+   "secondary": "#ff8a80"
+  }
+ },
+ {
+  "itemId": "region:KR-31192",
+  "regionCode": "KR-31192",
+  "name": "용인시기흥 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31193",
+  "regionCode": "KR-31193",
+  "name": "용인시수지 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31200",
+  "regionCode": "KR-31200",
+  "name": "파주 북시티 책 수첩",
+  "emoji": "📚",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "book",
+   "primary": "#e53935",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-31210",
+  "regionCode": "KR-31210",
+  "name": "이천 쌀밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31220",
+  "regionCode": "KR-31220",
+  "name": "남사당 소고 키링",
+  "emoji": "🥁",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e53935",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-31230",
+  "regionCode": "KR-31230",
+  "name": "김포 금쌀",
+  "emoji": "🌾",
+  "slot": "BG",
+  "tier": "COMMON",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-31240",
+  "regionCode": "KR-31240",
+  "name": "화성 공룡알 키링",
+  "emoji": "🦕",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f3e9dc",
+   "secondary": "#9ccc65"
+  }
+ },
+ {
+  "itemId": "region:KR-31250",
+  "regionCode": "KR-31250",
+  "name": "광주 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31260",
+  "regionCode": "KR-31260",
+  "name": "양주 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31270",
+  "regionCode": "KR-31270",
+  "name": "포천 막걸리 텀블러",
+  "emoji": "🍶",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "cup",
+   "primary": "#f7f3ea",
+   "secondary": "#9ad0c2"
+  }
+ },
+ {
+  "itemId": "region:KR-31280",
+  "regionCode": "KR-31280",
+  "name": "여주 경기미 주먹밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-31350",
+  "regionCode": "KR-31350",
+  "name": "전곡리 주먹도끼 배낭",
+  "emoji": "🪨",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#b3bdc8",
+   "secondary": "#7f8997"
+  }
+ },
+ {
+  "itemId": "region:KR-31370",
+  "regionCode": "KR-31370",
+  "name": "가평 잣 다람쥐",
+  "emoji": "🐿️",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "rodent",
+   "primary": "#8d5524",
+   "secondary": "#f3e9dc"
+  }
+ },
+ {
+  "itemId": "region:KR-31380",
+  "regionCode": "KR-31380",
+  "name": "양평 젖소",
+  "emoji": "🐄",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cow",
+   "primary": "#f7f3ea",
+   "secondary": "#2b3542"
+  }
+ },
+ {
+  "itemId": "region:KR-32010",
+  "regionCode": "KR-32010",
+  "name": "춘천 닭갈비 키링",
+  "emoji": "🍗",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#c98a4a",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-32020",
+  "regionCode": "KR-32020",
+  "name": "원주 감자떡 키링",
+  "emoji": "🥔",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#a1887f",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-32030",
+  "regionCode": "KR-32030",
+  "name": "안목 커피 텀블러",
+  "emoji": "☕",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "cup",
+   "primary": "#5c3b2e",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-32040",
+  "regionCode": "KR-32040",
+  "name": "묵호 대게 지도",
+  "emoji": "🦀",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#e05a5a",
+   "secondary": "#b23a3a"
+  }
+ },
+ {
+  "itemId": "region:KR-32050",
+  "regionCode": "KR-32050",
+  "name": "태백 광부 곡괭이 지팡이",
+  "emoji": "⛏️",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "stick",
+   "primary": "#8d5524",
+   "secondary": "#9aa7b5"
+  }
+ },
+ {
+  "itemId": "region:KR-32060",
+  "regionCode": "KR-32060",
+  "name": "속초 오징어순대 낚싯대",
+  "emoji": "🦑",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#ef9a9a",
+   "secondary": "#b71c1c"
+  }
+ },
+ {
+  "itemId": "region:KR-32070",
+  "regionCode": "KR-32070",
+  "name": "삼척 동굴 램프",
+  "emoji": "🕯️",
+  "slot": "PROP",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "candle",
+   "primary": "#f7f3ea",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-32310",
+  "regionCode": "KR-32310",
+  "name": "홍천 찰옥수수 고양이 귀",
+  "emoji": "🌽",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "ears",
+   "primary": "#f9d342",
+   "secondary": "#ffe9a8"
+  }
+ },
+ {
+  "itemId": "region:KR-32320",
+  "regionCode": "KR-32320",
+  "name": "횡성 한우",
+  "emoji": "🐂",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cow",
+   "primary": "#5c3b2e",
+   "secondary": "#3b2a22"
+  }
+ },
+ {
+  "itemId": "region:KR-32330",
+  "regionCode": "KR-32330",
+  "name": "영월 별마로 달",
+  "emoji": "🌙",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "circlet",
+   "primary": "#f4c542",
+   "secondary": "#90caf9"
+  }
+ },
+ {
+  "itemId": "region:KR-32340",
+  "regionCode": "KR-32340",
+  "name": "대관령 양",
+  "emoji": "🐑",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "sheep",
+   "primary": "#f7f3ea",
+   "secondary": "#2b3542"
+  }
+ },
+ {
+  "itemId": "region:KR-32350",
+  "regionCode": "KR-32350",
+  "name": "정선 레일바이크",
+  "emoji": "🚂",
+  "slot": "PROP",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "railbike",
+   "primary": "#e63946",
+   "secondary": "#2b3542"
+  }
+ },
+ {
+  "itemId": "region:KR-32360",
+  "regionCode": "KR-32360",
+  "name": "철원 두루미",
+  "emoji": "🦢",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bird",
+   "primary": "#f7f3ea",
+   "secondary": "#ff8c00"
+  }
+ },
+ {
+  "itemId": "region:KR-32370",
+  "regionCode": "KR-32370",
+  "name": "화천 얼음 호수 풍경",
+  "emoji": "🧊",
+  "slot": "BG",
+  "tier": "LEGEND",
+  "theme": "icelake",
+  "look": null
+ },
+ {
+  "itemId": "region:KR-32380",
+  "regionCode": "KR-32380",
+  "name": "양구 펀치볼 설경",
+  "emoji": "❄️",
+  "slot": "BG",
+  "tier": "LEGEND",
+  "theme": "punchbowl",
+  "look": null
+ },
+ {
+  "itemId": "region:KR-32390",
+  "regionCode": "KR-32390",
+  "name": "인제 군모 버킷햇",
+  "emoji": "🪖",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bucket",
+   "primary": "#6b7f4a",
+   "secondary": "#4d5c35"
+  }
+ },
+ {
+  "itemId": "region:KR-32400",
+  "regionCode": "KR-32400",
+  "name": "고성 소라 배낭",
+  "emoji": "🐚",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#f3e9dc",
+   "secondary": "#e0b48a"
+  }
+ },
+ {
+  "itemId": "region:KR-32410",
+  "regionCode": "KR-32410",
+  "name": "양양 서핑보드 배낭",
+  "emoji": "🏄",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#63d2c2",
+   "secondary": "#2a9f90"
+  }
+ },
+ {
+  "itemId": "region:KR-33020",
+  "regionCode": "KR-33020",
+  "name": "충주 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-33030",
+  "regionCode": "KR-33030",
+  "name": "제천 약초 꽃다발",
+  "emoji": "🌿",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "bouquet",
+   "primary": "#2e7d32",
+   "secondary": "#9ccc65"
+  }
+ },
+ {
+  "itemId": "region:KR-33041",
+  "regionCode": "KR-33041",
+  "name": "청주시상당 충북 밤 키링",
+  "emoji": "🌰",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#6d4c41",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-33042",
+  "regionCode": "KR-33042",
+  "name": "청주시서원 충북 밤 키링",
+  "emoji": "🌰",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#6d4c41",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-33043",
+  "regionCode": "KR-33043",
+  "name": "청주시흥덕 충북 밤 키링",
+  "emoji": "🌰",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#6d4c41",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-33044",
+  "regionCode": "KR-33044",
+  "name": "청주시청원 충북 밤 키링",
+  "emoji": "🌰",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#6d4c41",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-33320",
+  "regionCode": "KR-33320",
+  "name": "보은 대추 배낭",
+  "emoji": "🌰",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#927971",
+   "secondary": "#5b403a"
+  }
+ },
+ {
+  "itemId": "region:KR-33330",
+  "regionCode": "KR-33330",
+  "name": "옥천 정지용 시집 배낭",
+  "emoji": "📜",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#e9c46a",
+   "secondary": "#c47a3a"
+  }
+ },
+ {
+  "itemId": "region:KR-33340",
+  "regionCode": "KR-33340",
+  "name": "영동 포도 헤드폰",
+  "emoji": "🍇",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "headphones",
+   "primary": "#8e6bc9",
+   "secondary": "#ffd166"
+  }
+ },
+ {
+  "itemId": "region:KR-33350",
+  "regionCode": "KR-33350",
+  "name": "진천 밀짚 선햇",
+  "emoji": "👒",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "sunhat",
+   "primary": "#f0c86a",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-33360",
+  "regionCode": "KR-33360",
+  "name": "괴산 절임배추 배낭",
+  "emoji": "🥬",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#a9cf83",
+   "secondary": "#749c4e"
+  }
+ },
+ {
+  "itemId": "region:KR-33370",
+  "regionCode": "KR-33370",
+  "name": "음성 농협 캡모자",
+  "emoji": "🧢",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cap",
+   "primary": "#4a7fd6",
+   "secondary": "#2b5aa8"
+  }
+ },
+ {
+  "itemId": "region:KR-33380",
+  "regionCode": "KR-33380",
+  "name": "단양 마늘 두건",
+  "emoji": "🧄",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bandana",
+   "primary": "#f3e9dc",
+   "secondary": "#9ccc65"
+  }
+ },
+ {
+  "itemId": "region:KR-33390",
+  "regionCode": "KR-33390",
+  "name": "증평 토종닭",
+  "emoji": "🐓",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bird",
+   "primary": "#d9a05b",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-34011",
+  "regionCode": "KR-34011",
+  "name": "천안 호두과자 키링",
+  "emoji": "🍘",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#8d6e63",
+   "secondary": "#d7ccc8"
+  }
+ },
+ {
+  "itemId": "region:KR-34012",
+  "regionCode": "KR-34012",
+  "name": "천안시서북 충남 딸기 키링",
+  "emoji": "🍓",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e53935",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-34020",
+  "regionCode": "KR-34020",
+  "name": "공주 알밤 키링",
+  "emoji": "🌰",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#6d4c41",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-34030",
+  "regionCode": "KR-34030",
+  "name": "보령 머드팩 키링",
+  "emoji": "🧖",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#8d6e63",
+   "secondary": "#d7ccc8"
+  }
+ },
+ {
+  "itemId": "region:KR-34040",
+  "regionCode": "KR-34040",
+  "name": "아산 충남 딸기 키링",
+  "emoji": "🍓",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e53935",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-34050",
+  "regionCode": "KR-34050",
+  "name": "서산 간장게장 낚싯대",
+  "emoji": "🐙",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#ab47bc",
+   "secondary": "#6a1b9a"
+  }
+ },
+ {
+  "itemId": "region:KR-34060",
+  "regionCode": "KR-34060",
+  "name": "논산 딸기 키링",
+  "emoji": "🍓",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e53935",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-34070",
+  "regionCode": "KR-34070",
+  "name": "계룡 충남 딸기 키링",
+  "emoji": "🍓",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e53935",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-34080",
+  "regionCode": "KR-34080",
+  "name": "당진 충남 딸기 키링",
+  "emoji": "🍓",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e53935",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-34310",
+  "regionCode": "KR-34310",
+  "name": "금산 인삼 배낭",
+  "emoji": "🌱",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#7fae5a",
+   "secondary": "#5f8f3a"
+  }
+ },
+ {
+  "itemId": "region:KR-34330",
+  "regionCode": "KR-34330",
+  "name": "부여 연꽃 화관",
+  "emoji": "🪷",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "flower",
+   "primary": "#f48fb1",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-34340",
+  "regionCode": "KR-34340",
+  "name": "서천 농협 캡모자",
+  "emoji": "🧢",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cap",
+   "primary": "#4a7fd6",
+   "secondary": "#2b5aa8"
+  }
+ },
+ {
+  "itemId": "region:KR-34350",
+  "regionCode": "KR-34350",
+  "name": "청양 농협 캡모자",
+  "emoji": "🧢",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cap",
+   "primary": "#4a7fd6",
+   "secondary": "#2b5aa8"
+  }
+ },
+ {
+  "itemId": "region:KR-34360",
+  "regionCode": "KR-34360",
+  "name": "홍성 농협 캡모자",
+  "emoji": "🧢",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cap",
+   "primary": "#4a7fd6",
+   "secondary": "#2b5aa8"
+  }
+ },
+ {
+  "itemId": "region:KR-34370",
+  "regionCode": "KR-34370",
+  "name": "예산 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-34380",
+  "regionCode": "KR-34380",
+  "name": "태안 노을 배낭",
+  "emoji": "🌅",
+  "slot": "BG",
+  "tier": "RARE",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-35011",
+  "regionCode": "KR-35011",
+  "name": "전주 비빔밥 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-35012",
+  "regionCode": "KR-35012",
+  "name": "전주시덕진 전북 쌀떡 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-35020",
+  "regionCode": "KR-35020",
+  "name": "군산 단팥빵 키링",
+  "emoji": "🍞",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#d9a05b",
+   "secondary": "#f3dcb5"
+  }
+ },
+ {
+  "itemId": "region:KR-35030",
+  "regionCode": "KR-35030",
+  "name": "익산 전북 쌀떡 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-35040",
+  "regionCode": "KR-35040",
+  "name": "정읍 전북 쌀떡 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-35050",
+  "regionCode": "KR-35050",
+  "name": "춘향 부채 부채",
+  "emoji": "🪭",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "fan",
+   "primary": "#e63946",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-35060",
+  "regionCode": "KR-35060",
+  "name": "김제 전북 쌀떡 키링",
+  "emoji": "🍚",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f7f3ea",
+   "secondary": "#2c3747"
+  }
+ },
+ {
+  "itemId": "region:KR-35310",
+  "regionCode": "KR-35310",
+  "name": "완주 흑염소",
+  "emoji": "🐐",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cow",
+   "primary": "#2b3542",
+   "secondary": "#9aa7b5"
+  }
+ },
+ {
+  "itemId": "region:KR-35320",
+  "regionCode": "KR-35320",
+  "name": "진안 농협 캡모자",
+  "emoji": "🧢",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cap",
+   "primary": "#4a7fd6",
+   "secondary": "#2b5aa8"
+  }
+ },
+ {
+  "itemId": "region:KR-35330",
+  "regionCode": "KR-35330",
+  "name": "무주 스키 배낭",
+  "emoji": "⛷️",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#56a6ec",
+   "secondary": "#1c70bd"
+  }
+ },
+ {
+  "itemId": "region:KR-35340",
+  "regionCode": "KR-35340",
+  "name": "장수 밀짚 선햇",
+  "emoji": "👒",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "sunhat",
+   "primary": "#f0c86a",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-35350",
+  "regionCode": "KR-35350",
+  "name": "임실 치즈 생쥐",
+  "emoji": "🐭",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "rodent",
+   "primary": "#f9d342",
+   "secondary": "#f7f3ea"
+  }
+ },
+ {
+  "itemId": "region:KR-35360",
+  "regionCode": "KR-35360",
+  "name": "순창 고추장 리본",
+  "emoji": "🌶️",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bow",
+   "primary": "#e05a5a",
+   "secondary": "#ffd166"
+  }
+ },
+ {
+  "itemId": "region:KR-35370",
+  "regionCode": "KR-35370",
+  "name": "고창 수박 별 핀",
+  "emoji": "🍉",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "star",
+   "primary": "#f4c542",
+   "secondary": "#ffe9a8"
+  }
+ },
+ {
+  "itemId": "region:KR-35380",
+  "regionCode": "KR-35380",
+  "name": "부안 젓갈 항아리 배낭",
+  "emoji": "🦐",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#ffa78c",
+   "secondary": "#d07257"
+  }
+ },
+ {
+  "itemId": "region:KR-36010",
+  "regionCode": "KR-36010",
+  "name": "목포 홍어 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-36020",
+  "regionCode": "KR-36020",
+  "name": "여수 갓김치 텀블러",
+  "emoji": "🫙",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "cup",
+   "primary": "#7cb342",
+   "secondary": "#d7ccc8"
+  }
+ },
+ {
+  "itemId": "region:KR-36030",
+  "regionCode": "KR-36030",
+  "name": "순천만 갈대",
+  "emoji": "🌾",
+  "slot": "BG",
+  "tier": "COMMON",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-36040",
+  "regionCode": "KR-36040",
+  "name": "나주 배 키링",
+  "emoji": "🍐",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#c5d86d",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-36060",
+  "regionCode": "KR-36060",
+  "name": "광양 불고기 키링",
+  "emoji": "🍖",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#b5563a",
+   "secondary": "#e8a87c"
+  }
+ },
+ {
+  "itemId": "region:KR-36310",
+  "regionCode": "KR-36310",
+  "name": "담양 대나무 지팡이",
+  "emoji": "🎋",
+  "slot": "PROP",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bamboo",
+   "primary": "#2e7d32",
+   "secondary": "#9ccc65"
+  }
+ },
+ {
+  "itemId": "region:KR-36320",
+  "regionCode": "KR-36320",
+  "name": "곡성 농촌 배낭",
+  "emoji": "🎒",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#c9a24c",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-36330",
+  "regionCode": "KR-36330",
+  "name": "구례 산수유 비니",
+  "emoji": "🌸",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "beanie",
+   "primary": "#f48fb1",
+   "secondary": "#ffffff"
+  }
+ },
+ {
+  "itemId": "region:KR-36350",
+  "regionCode": "KR-36350",
+  "name": "고흥 농협 캡모자",
+  "emoji": "🧢",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cap",
+   "primary": "#4a7fd6",
+   "secondary": "#2b5aa8"
+  }
+ },
+ {
+  "itemId": "region:KR-36360",
+  "regionCode": "KR-36360",
+  "name": "보성 녹차 삿갓",
+  "emoji": "🍵",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "conical",
+   "primary": "#8d6e63",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-36370",
+  "regionCode": "KR-36370",
+  "name": "화순 밀짚 선햇",
+  "emoji": "👒",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "sunhat",
+   "primary": "#f0c86a",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-36380",
+  "regionCode": "KR-36380",
+  "name": "장흥 토종닭",
+  "emoji": "🐓",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bird",
+   "primary": "#d9a05b",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-36390",
+  "regionCode": "KR-36390",
+  "name": "강진 청자",
+  "emoji": "🏺",
+  "slot": "PROP",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "vase",
+   "primary": "#2fc3ad",
+   "secondary": "#0b6b5f"
+  }
+ },
+ {
+  "itemId": "region:KR-36400",
+  "regionCode": "KR-36400",
+  "name": "해남 배추 버킷햇",
+  "emoji": "🥬",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bucket",
+   "primary": "#8cbf5a",
+   "secondary": "#5f8f3a"
+  }
+ },
+ {
+  "itemId": "region:KR-36410",
+  "regionCode": "KR-36410",
+  "name": "영암 볏단 배낭",
+  "emoji": "🌾",
+  "slot": "BG",
+  "tier": "RARE",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-36420",
+  "regionCode": "KR-36420",
+  "name": "무안 밀짚 선햇",
+  "emoji": "👒",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "sunhat",
+   "primary": "#f0c86a",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-36430",
+  "regionCode": "KR-36430",
+  "name": "함평 볏단 배낭",
+  "emoji": "🌾",
+  "slot": "BG",
+  "tier": "RARE",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-36440",
+  "regionCode": "KR-36440",
+  "name": "영광 굴비 배낭",
+  "emoji": "🐟",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#7bd2f9",
+   "secondary": "#439fcc"
+  }
+ },
+ {
+  "itemId": "region:KR-36450",
+  "regionCode": "KR-36450",
+  "name": "장성 농촌 배낭",
+  "emoji": "🎒",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#c9a24c",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-36460",
+  "regionCode": "KR-36460",
+  "name": "완도 전복 배낭",
+  "emoji": "🪸",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#f28c8c",
+   "secondary": "#e05a5a"
+  }
+ },
+ {
+  "itemId": "region:KR-36470",
+  "regionCode": "KR-36470",
+  "name": "진도 신비의 바닷길 풍경",
+  "emoji": "🐕",
+  "slot": "BG",
+  "tier": "LEGEND",
+  "theme": "jindo",
+  "look": null
+ },
+ {
+  "itemId": "region:KR-36480",
+  "regionCode": "KR-36480",
+  "name": "신안 염전 노을 풍경",
+  "emoji": "🧂",
+  "slot": "BG",
+  "tier": "LEGEND",
+  "theme": "saltfield",
+  "look": null
+ },
+ {
+  "itemId": "region:KR-37011",
+  "regionCode": "KR-37011",
+  "name": "포항시남 경북 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-37012",
+  "regionCode": "KR-37012",
+  "name": "포항 과메기 낚싯대",
+  "emoji": "🐟",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "rod",
+   "primary": "#4fc3f7",
+   "secondary": "#01579b"
+  }
+ },
+ {
+  "itemId": "region:KR-37020",
+  "regionCode": "KR-37020",
+  "name": "경주 팥빵 키링",
+  "emoji": "🍞",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#d9a05b",
+   "secondary": "#f3dcb5"
+  }
+ },
+ {
+  "itemId": "region:KR-37030",
+  "regionCode": "KR-37030",
+  "name": "김천 경북 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-37040",
+  "regionCode": "KR-37040",
+  "name": "안동 하회탈 탈",
+  "emoji": "🎭",
+  "slot": "HAT",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "mask",
+   "primary": "#e9c46a",
+   "secondary": "#3b2a22"
+  }
+ },
+ {
+  "itemId": "region:KR-37050",
+  "regionCode": "KR-37050",
+  "name": "구미 경북 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-37060",
+  "regionCode": "KR-37060",
+  "name": "영주 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-37070",
+  "regionCode": "KR-37070",
+  "name": "영천 경북 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-37080",
+  "regionCode": "KR-37080",
+  "name": "상주 곶감 키링",
+  "emoji": "🍑",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#ff9e80",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-37090",
+  "regionCode": "KR-37090",
+  "name": "문경 찻사발 지도",
+  "emoji": "🍵",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "map",
+   "primary": "#8d6e63",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-37100",
+  "regionCode": "KR-37100",
+  "name": "경산 경북 사과 키링",
+  "emoji": "🍎",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#e63946",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-37310",
+  "regionCode": "KR-37310",
+  "name": "군위 삼국유사 나무",
+  "emoji": "🌳",
+  "slot": "PROP",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "tree",
+   "primary": "#2e7d32",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-37320",
+  "regionCode": "KR-37320",
+  "name": "의성 마늘 두건",
+  "emoji": "🧄",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bandana",
+   "primary": "#f3e9dc",
+   "secondary": "#9ccc65"
+  }
+ },
+ {
+  "itemId": "region:KR-37330",
+  "regionCode": "KR-37330",
+  "name": "청송 사과밭 풍경",
+  "emoji": "🍏",
+  "slot": "BG",
+  "tier": "LEGEND",
+  "theme": "orchard",
+  "look": null
+ },
+ {
+  "itemId": "region:KR-37340",
+  "regionCode": "KR-37340",
+  "name": "영양 반딧불 숲 풍경",
+  "emoji": "✨",
+  "slot": "BG",
+  "tier": "LEGEND",
+  "theme": "firefly",
+  "look": null
+ },
+ {
+  "itemId": "region:KR-37350",
+  "regionCode": "KR-37350",
+  "name": "영덕 대게 배낭",
+  "emoji": "🦀",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#e05a5a",
+   "secondary": "#b23a3a"
+  }
+ },
+ {
+  "itemId": "region:KR-37360",
+  "regionCode": "KR-37360",
+  "name": "청도 싸움소",
+  "emoji": "🐂",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "cow",
+   "primary": "#5c3b2e",
+   "secondary": "#3b2a22"
+  }
+ },
+ {
+  "itemId": "region:KR-37370",
+  "regionCode": "KR-37370",
+  "name": "대가야 토기",
+  "emoji": "🏺",
+  "slot": "PROP",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "vase",
+   "primary": "#2fc3ad",
+   "secondary": "#0b6b5f"
+  }
+ },
+ {
+  "itemId": "region:KR-37380",
+  "regionCode": "KR-37380",
+  "name": "성주 참외 베레모",
+  "emoji": "🍈",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "beret",
+   "primary": "#e9c46a",
+   "secondary": "#c9a24c"
+  }
+ },
+ {
+  "itemId": "region:KR-37390",
+  "regionCode": "KR-37390",
+  "name": "칠곡 참외 배낭",
+  "emoji": "🍈",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#efd38f",
+   "secondary": "#bea05b"
+  }
+ },
+ {
+  "itemId": "region:KR-37400",
+  "regionCode": "KR-37400",
+  "name": "예천 활 배낭",
+  "emoji": "🏹",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#aa805b",
+   "secondary": "#754723"
+  }
+ },
+ {
+  "itemId": "region:KR-37410",
+  "regionCode": "KR-37410",
+  "name": "봉화 금강송 숲 풍경",
+  "emoji": "🌲",
+  "slot": "BG",
+  "tier": "LEGEND",
+  "theme": "pine",
+  "look": null
+ },
+ {
+  "itemId": "region:KR-37420",
+  "regionCode": "KR-37420",
+  "name": "울진 대게 배낭",
+  "emoji": "🦀",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#e05a5a",
+   "secondary": "#b23a3a"
+  }
+ },
+ {
+  "itemId": "region:KR-37430",
+  "regionCode": "KR-37430",
+  "name": "울릉 독도 바다 풍경",
+  "emoji": "🌊",
+  "slot": "BG",
+  "tier": "LEGEND",
+  "theme": "dokdo",
+  "look": null
+ },
+ {
+  "itemId": "region:KR-38030",
+  "regionCode": "KR-38030",
+  "name": "진주 유등 등불",
+  "emoji": "🏮",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "lantern",
+   "primary": "#e63946",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-38050",
+  "regionCode": "KR-38050",
+  "name": "통영 꿀빵 텀블러",
+  "emoji": "🍯",
+  "slot": "HAND",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "cup",
+   "primary": "#f4b400",
+   "secondary": "#8d6e63"
+  }
+ },
+ {
+  "itemId": "region:KR-38060",
+  "regionCode": "KR-38060",
+  "name": "사천 경남 유자 키링",
+  "emoji": "🍋",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#fdd835",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-38070",
+  "regionCode": "KR-38070",
+  "name": "가야 금관 왕관",
+  "emoji": "👑",
+  "slot": "HAT",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "crown",
+   "primary": "#f4c542",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-38080",
+  "regionCode": "KR-38080",
+  "name": "밀양 돼지국밥 키링",
+  "emoji": "🍲",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#c0392b",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-38090",
+  "regionCode": "KR-38090",
+  "name": "거제 조선소 배 모형",
+  "emoji": "⛴️",
+  "slot": "BG",
+  "tier": "COMMON",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-38100",
+  "regionCode": "KR-38100",
+  "name": "양산 경남 유자 키링",
+  "emoji": "🍋",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#fdd835",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-38111",
+  "regionCode": "KR-38111",
+  "name": "창원시의창 경남 유자 키링",
+  "emoji": "🍋",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#fdd835",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-38112",
+  "regionCode": "KR-38112",
+  "name": "창원시성산 경남 유자 키링",
+  "emoji": "🍋",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#fdd835",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-38113",
+  "regionCode": "KR-38113",
+  "name": "창원시마산합포 경남 유자 키링",
+  "emoji": "🍋",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#fdd835",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-38114",
+  "regionCode": "KR-38114",
+  "name": "창원시마산회원 경남 유자 키링",
+  "emoji": "🍋",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#fdd835",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-38115",
+  "regionCode": "KR-38115",
+  "name": "진해 벚꽃 키링",
+  "emoji": "🌸",
+  "slot": "BADGE",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "keyring",
+   "primary": "#f48fb1",
+   "secondary": "#ffffff"
+  }
+ },
+ {
+  "itemId": "region:KR-38310",
+  "regionCode": "KR-38310",
+  "name": "의령 솥바위 강 풍경",
+  "emoji": "🍀",
+  "slot": "BG",
+  "tier": "LEGEND",
+  "theme": "river",
+  "look": null
+ },
+ {
+  "itemId": "region:KR-38320",
+  "regionCode": "KR-38320",
+  "name": "함안 아라홍련 화관",
+  "emoji": "🪷",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "flower",
+   "primary": "#f48fb1",
+   "secondary": "#2e7d32"
+  }
+ },
+ {
+  "itemId": "region:KR-38330",
+  "regionCode": "KR-38330",
+  "name": "창녕 볏단 배낭",
+  "emoji": "🌾",
+  "slot": "BG",
+  "tier": "RARE",
+  "theme": null,
+  "look": null
+ },
+ {
+  "itemId": "region:KR-38340",
+  "regionCode": "KR-38340",
+  "name": "고성 공룡",
+  "emoji": "🦖",
+  "slot": "PET",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "dino",
+   "primary": "#43a047",
+   "secondary": "#f4c542"
+  }
+ },
+ {
+  "itemId": "region:KR-38350",
+  "regionCode": "KR-38350",
+  "name": "남해 마늘 두건",
+  "emoji": "🧄",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bandana",
+   "primary": "#f3e9dc",
+   "secondary": "#9ccc65"
+  }
+ },
+ {
+  "itemId": "region:KR-38360",
+  "regionCode": "KR-38360",
+  "name": "하동 녹차 삿갓",
+  "emoji": "🍵",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "conical",
+   "primary": "#8d6e63",
+   "secondary": "#5c3b2e"
+  }
+ },
+ {
+  "itemId": "region:KR-38370",
+  "regionCode": "KR-38370",
+  "name": "산청 약초 배낭",
+  "emoji": "🌿",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#629e65",
+   "secondary": "#29672e"
+  }
+ },
+ {
+  "itemId": "region:KR-38380",
+  "regionCode": "KR-38380",
+  "name": "함양 상림 나무",
+  "emoji": "🌳",
+  "slot": "PROP",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "tree",
+   "primary": "#2e7d32",
+   "secondary": "#8d5524"
+  }
+ },
+ {
+  "itemId": "region:KR-38390",
+  "regionCode": "KR-38390",
+  "name": "거창 사과 배낭",
+  "emoji": "🍎",
+  "slot": "BAG",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "bag",
+   "primary": "#ec6b74",
+   "secondary": "#bc313e"
+  }
+ },
+ {
+  "itemId": "region:KR-38400",
+  "regionCode": "KR-38400",
+  "name": "합천 밀짚 선햇",
+  "emoji": "👒",
+  "slot": "HAT",
+  "tier": "RARE",
+  "theme": null,
+  "look": {
+   "type": "sunhat",
+   "primary": "#f0c86a",
+   "secondary": "#e63946"
+  }
+ },
+ {
+  "itemId": "region:KR-39010",
+  "regionCode": "KR-39010",
+  "name": "돌하르방",
+  "emoji": "🗿",
+  "slot": "PROP",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "statue",
+   "primary": "#6b7280",
+   "secondary": "#4b5563"
+  }
+ },
+ {
+  "itemId": "region:KR-39020",
+  "regionCode": "KR-39020",
+  "name": "서귀포 한라봉 중절모",
+  "emoji": "🍊",
+  "slot": "HAT",
+  "tier": "COMMON",
+  "theme": null,
+  "look": {
+   "type": "fedora",
+   "primary": "#c47a3a",
+   "secondary": "#8d5524"
+  }
+ }
+]

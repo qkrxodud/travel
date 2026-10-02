@@ -1,5 +1,6 @@
 ### 0단계 뼈대 수동 확인 (IntelliJ HTTP Client / VS Code REST Client)
 ### 먼저 ./gradlew :app-api:bootRun 으로 서버를 띄운다 (local 프로파일, H2).
+# 8080이 점유돼 있으면 18080 등으로 띄우고 이 값을 바꾼다(--args='--server.port=18080').
 @host = http://localhost:8080
 
 ### 애플리케이션 헬스 + 설정값 노출 → {"status":"UP","dailyCap":5,"leaveGraceDays":7,"service":"territory"}

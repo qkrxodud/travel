@@ -6,8 +6,11 @@ spring:
     password:
   jpa:
     hibernate:
-      ddl-auto: create-drop
-    show-sql: true
+      # 1단계부터 local도 Flyway 마이그레이션으로 스키마를 만들고 엔티티는 검증만 한다(create-drop 금지).
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
   h2:
     console:
       enabled: true

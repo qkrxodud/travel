@@ -30,9 +30,10 @@ class DevControllerLocalProfileTest {
     }
 
     @Test
-    void dev_reset_과_seed_는_204() throws Exception {
+    void dev_reset_은_204_seed_는_탐험가_헤더가_필요하다() throws Exception {
         mvc.perform(delete("/dev/reset")).andExpect(status().isNoContent());
-        mvc.perform(post("/dev/seed")).andExpect(status().isNoContent());
+        mvc.perform(post("/dev/seed")).andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("EXPLORER_ID_REQUIRED"));
     }
 
     @Test

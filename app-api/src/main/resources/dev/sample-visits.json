@@ -1,0 +1,272 @@
+[
+ {
+  "regionCode": "KR-11010",
+  "monthOffset": -19,
+  "day": 2,
+  "memo": "경복궁 야간개장"
+ },
+ {
+  "regionCode": "KR-11020",
+  "monthOffset": -19,
+  "day": 2,
+  "memo": ""
+ },
+ {
+  "regionCode": "KR-11030",
+  "monthOffset": -17,
+  "day": 18,
+  "memo": "리움"
+ },
+ {
+  "regionCode": "KR-11140",
+  "monthOffset": -16,
+  "day": 1,
+  "memo": "망원시장 투어"
+ },
+ {
+  "regionCode": "KR-11040",
+  "monthOffset": -15,
+  "day": 13,
+  "memo": "성수 팝업 순회"
+ },
+ {
+  "regionCode": "KR-11240",
+  "monthOffset": -14,
+  "day": 24,
+  "memo": "야구 직관"
+ },
+ {
+  "regionCode": "KR-11230",
+  "monthOffset": -13,
+  "day": 7,
+  "memo": ""
+ },
+ {
+  "regionCode": "KR-11190",
+  "monthOffset": -12,
+  "day": 12,
+  "memo": "여의도 백화점"
+ },
+ {
+  "regionCode": "KR-11220",
+  "monthOffset": -11,
+  "day": 3,
+  "memo": ""
+ },
+ {
+  "regionCode": "KR-31013",
+  "monthOffset": -18,
+  "day": 14,
+  "memo": "수원 화성 한 바퀴"
+ },
+ {
+  "regionCode": "KR-31023",
+  "monthOffset": -17,
+  "day": 5,
+  "memo": ""
+ },
+ {
+  "regionCode": "KR-31370",
+  "monthOffset": -14,
+  "day": 10,
+  "memo": "프랑스 마을"
+ },
+ {
+  "regionCode": "KR-31200",
+  "monthOffset": -12,
+  "day": 26,
+  "memo": "출판도시"
+ },
+ {
+  "regionCode": "KR-31191",
+  "monthOffset": -8,
+  "day": 1,
+  "memo": "놀이공원"
+ },
+ {
+  "regionCode": "KR-23010",
+  "monthOffset": -16,
+  "day": 15,
+  "memo": "차이나타운 짜장면"
+ },
+ {
+  "regionCode": "KR-23040",
+  "monthOffset": -16,
+  "day": 15,
+  "memo": "송도 센트럴파크"
+ },
+ {
+  "regionCode": "KR-32030",
+  "monthOffset": -15,
+  "day": 27,
+  "memo": "안목해변 커피"
+ },
+ {
+  "regionCode": "KR-32060",
+  "monthOffset": -15,
+  "day": 28,
+  "memo": "물회"
+ },
+ {
+  "regionCode": "KR-32410",
+  "monthOffset": -15,
+  "day": 28,
+  "memo": "서핑 첫 도전"
+ },
+ {
+  "regionCode": "KR-32010",
+  "monthOffset": -7,
+  "day": 15,
+  "memo": "닭갈비"
+ },
+ {
+  "regionCode": "KR-34020",
+  "monthOffset": -11,
+  "day": 16,
+  "memo": "공산성"
+ },
+ {
+  "regionCode": "KR-25040",
+  "monthOffset": -11,
+  "day": 16,
+  "memo": "튀김소보로 줄서기"
+ },
+ {
+  "regionCode": "KR-33380",
+  "monthOffset": -6,
+  "day": 5,
+  "memo": "만천하 스카이워크"
+ },
+ {
+  "regionCode": "KR-35011",
+  "monthOffset": -10,
+  "day": 21,
+  "memo": "한옥마을 1박"
+ },
+ {
+  "regionCode": "KR-36020",
+  "monthOffset": -5,
+  "day": 3,
+  "memo": "밤바다"
+ },
+ {
+  "regionCode": "KR-36030",
+  "monthOffset": -5,
+  "day": 4,
+  "memo": "순천만"
+ },
+ {
+  "regionCode": "KR-24010",
+  "monthOffset": -5,
+  "day": 4,
+  "memo": ""
+ },
+ {
+  "regionCode": "KR-37020",
+  "monthOffset": -13,
+  "day": 21,
+  "memo": "황리단길"
+ },
+ {
+  "regionCode": "KR-37012",
+  "monthOffset": -13,
+  "day": 22,
+  "memo": "호미곶"
+ },
+ {
+  "regionCode": "KR-37040",
+  "monthOffset": -4,
+  "day": 7,
+  "memo": "하회마을"
+ },
+ {
+  "regionCode": "KR-22010",
+  "monthOffset": -4,
+  "day": 8,
+  "memo": "근대골목"
+ },
+ {
+  "regionCode": "KR-21090",
+  "monthOffset": -14,
+  "day": 3,
+  "memo": "해운대"
+ },
+ {
+  "regionCode": "KR-21140",
+  "monthOffset": -14,
+  "day": 3,
+  "memo": "광안리 드론쇼"
+ },
+ {
+  "regionCode": "KR-21010",
+  "monthOffset": -14,
+  "day": 4,
+  "memo": "자갈치"
+ },
+ {
+  "regionCode": "KR-21040",
+  "monthOffset": -14,
+  "day": 4,
+  "memo": "흰여울"
+ },
+ {
+  "regionCode": "KR-38050",
+  "monthOffset": -3,
+  "day": 19,
+  "memo": "케이블카"
+ },
+ {
+  "regionCode": "KR-38090",
+  "monthOffset": -3,
+  "day": 20,
+  "memo": "바람의언덕"
+ },
+ {
+  "regionCode": "KR-26030",
+  "monthOffset": -3,
+  "day": 18,
+  "memo": "대왕암"
+ },
+ {
+  "regionCode": "KR-39010",
+  "monthOffset": -9,
+  "day": 10,
+  "memo": "신혼여행"
+ },
+ {
+  "regionCode": "KR-39020",
+  "monthOffset": -9,
+  "day": 12,
+  "memo": "섭지코지"
+ },
+ {
+  "regionCode": "KR-29010",
+  "monthOffset": -11,
+  "day": 17,
+  "memo": ""
+ },
+ {
+  "regionCode": "KR-32040",
+  "monthOffset": -2,
+  "day": 9,
+  "memo": "묵호 논골담길"
+ },
+ {
+  "regionCode": "KR-32070",
+  "monthOffset": -2,
+  "day": 10,
+  "memo": "해상케이블카"
+ },
+ {
+  "regionCode": "KR-31380",
+  "monthOffset": -1,
+  "day": 22,
+  "memo": "두물머리"
+ },
+ {
+  "regionCode": "KR-11050",
+  "monthOffset": 0,
+  "day": 1,
+  "memo": "뚝섬 한강"
+ }
+]

@@ -1,0 +1,10 @@
+{
+ "xpByRarity": {
+  "COMMON": 10,
+  "RARE": 20,
+  "LEGEND": 50
+ },
+ "provinceFirstBonus": 15,
+ "setCompleteBonus": 100,
+ "claimBonus": 10
+}

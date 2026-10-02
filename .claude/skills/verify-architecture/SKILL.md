@@ -38,6 +38,7 @@ curl localhost:8080/actuator/health
 `.claude/skills/implement-context/references/domain-model.md`의 해당 애그리거트 섹션과 코드를 대조한다:
 
 - 불변식이 애그리거트 메서드 안에서 지켜지는가(서비스 레이어에서만 막고 있으면 규칙 위반).
+- **application 서비스가 얇은가**: 서비스는 조회·저장·잠금·outbox·정책 VO 조립과 호출 순서만 가진다. 판단·계산·검증·분기(if/반복문으로 된 비즈니스 규칙)가 서비스에 있으면 P2 — 애그리거트·VO·도메인 서비스·일급 컬렉션으로 옮겨야 한다(implement-context 레이어 규칙).
 - domain 패키지에 Spring·JPA 어노테이션이 없는가 (ArchUnit이 잡지만 `jakarta.persistence` 규칙을 빼고 시작했을 수 있으니 grep으로도 확인).
 - 모든 이벤트 핸들러가 멱등한가 — refId/유니크 키 없이 insert하는 핸들러는 결함.
 - 트랜잭션 경계: 커맨드가 애그리거트 두 개를 한 트랜잭션에서 수정하면 결함(outbox 적재는 예외).
