@@ -32,6 +32,8 @@ interface TerritoryJpaRepository extends JpaRepository<TerritoryJpaEntity, Strin
 
 interface MapMemberJpaRepository extends JpaRepository<MapMemberJpaEntity, MapMemberJpaEntity.Key> {
     List<MapMemberJpaEntity> findByMapId(String mapId);
+
+    List<MapMemberJpaEntity> findByExplorerId(String explorerId);
 }
 
 interface VisitJpaRepository extends JpaRepository<VisitJpaEntity, Long> {

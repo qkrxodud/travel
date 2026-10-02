@@ -36,7 +36,7 @@ class CatalogCollectionsTest {
     void Regions는_코드_중복을_거부하고_현행_지역과_시도별_수를_준다() {
         Regions regions = Regions.of(List.of(region("KR-11010", "KR-11", null), region("KR-11020", "KR-11", null),
             region("KR-37310", "KR-37", LocalDate.of(2023, 7, 1))));
-        assertThat(regions.active()).extracting(r -> r.code().value()).containsExactly("KR-11010", "KR-11020");
+        assertThat(regions.active()).extracting(region -> region.code().value()).containsExactly("KR-11010", "KR-11020");
         assertThat(regions.activeCountByProvince()).containsExactly(Map.entry("KR-11", 2));
         assertThat(regions.find(RegionCode.of("KR-37310"))).get().extracting(Region::active).isEqualTo(false);
         assertThatThrownBy(() -> Regions.of(List.of(region("KR-11010", "KR-11", null), region("KR-11010", "KR-11", null))))

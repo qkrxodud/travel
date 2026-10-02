@@ -45,7 +45,7 @@ class ExpeditionMapTest {
     void 멤버가_아니면_거부한다() {
         assertThat(personal().requireMember(ME).joinedAt()).isEqualTo(NOON);
         assertThatThrownBy(() -> personal().requireMember(FRIEND))
-            .satisfies(e -> assertThat(((ExplorationException) e).error()).isEqualTo(ExplorationError.NOT_A_MEMBER));
+            .satisfies(exception -> assertThat(((ExplorationException) exception).error()).isEqualTo(ExplorationError.NOT_A_MEMBER));
     }
 
     @Test
@@ -55,7 +55,7 @@ class ExpeditionMapTest {
         for (int i = 0; i < 4; i++) five.add(new Member(ExplorerId.newId(), MemberRole.MEMBER, NOON));
         assertThatThrownBy(() -> ExpeditionMap.restore(MAP, "공유", CountryCode.KR, CODE, ME, MapKind.SHARED,
             MapSettings.defaults(5), NOON, five))
-            .satisfies(e -> assertThat(((ExplorationException) e).error()).isEqualTo(ExplorationError.MAP_FULL));
+            .satisfies(exception -> assertThat(((ExplorationException) exception).error()).isEqualTo(ExplorationError.MAP_FULL));
         ExpeditionMap four = ExpeditionMap.restore(MAP, "공유", CountryCode.KR, CODE, ME, MapKind.SHARED,
             MapSettings.defaults(5), NOON, five.subList(0, 4));
         assertThat(four.members()).hasSize(4);
@@ -69,7 +69,7 @@ class ExpeditionMapTest {
         var dup = List.of(new Member(ME, MemberRole.OWNER, NOON), new Member(ME, MemberRole.MEMBER, NOON));
         assertThatThrownBy(() -> ExpeditionMap.restore(MAP, "공유", CountryCode.KR, CODE, ME, MapKind.SHARED,
             MapSettings.defaults(5), NOON, dup))
-            .satisfies(e -> assertThat(((ExplorationException) e).error()).isEqualTo(ExplorationError.ALREADY_MEMBER));
+            .satisfies(exception -> assertThat(((ExplorationException) exception).error()).isEqualTo(ExplorationError.ALREADY_MEMBER));
     }
 
     @Test

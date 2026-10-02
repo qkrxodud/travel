@@ -14,8 +14,8 @@ public final class ItemDefinitions {
 
     private ItemDefinitions(List<ItemDefinition> items) {
         Map<String, ItemDefinition> map = new LinkedHashMap<>();
-        for (ItemDefinition i : items) {
-            if (map.put(i.itemId(), i) != null) throw new IllegalStateException("아이템 중복: " + i.itemId());
+        for (ItemDefinition item : items) {
+            if (map.put(item.itemId(), item) != null) throw new IllegalStateException("아이템 중복: " + item.itemId());
         }
         this.items = List.copyOf(items);
         this.byId = map;
@@ -34,8 +34,8 @@ public final class ItemDefinitions {
     }
 
     public void requireCoverage(Regions regions) {
-        regions.all().forEach(r -> regionItem(r.code())
-            .orElseThrow(() -> new IllegalStateException("지역 아이템 누락: " + r.code())));
+        regions.all().forEach(region -> regionItem(region.code())
+            .orElseThrow(() -> new IllegalStateException("지역 아이템 누락: " + region.code())));
     }
 
     public List<ItemDefinition> all() {

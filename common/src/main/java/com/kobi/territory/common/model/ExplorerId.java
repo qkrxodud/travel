@@ -10,7 +10,7 @@ public record ExplorerId(String value) {
         Objects.requireNonNull(value, "explorerId");
         try {
             value = UUID.fromString(value).toString();
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("explorerId 형식이 아닙니다: " + value);
         }
     }

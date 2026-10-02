@@ -1,0 +1,140 @@
+[
+ {
+  "id": "first",
+  "ico": "1",
+  "name": "첫 발자국",
+  "desc": "첫 지역을 칠했다",
+  "condition": {
+   "type": "REGION_COUNT",
+   "min": 1
+  }
+ },
+ {
+  "id": "ten",
+  "ico": "10",
+  "name": "발 넓은 사람",
+  "desc": "10개 지역 탐험",
+  "condition": {
+   "type": "REGION_COUNT",
+   "min": 10
+  }
+ },
+ {
+  "id": "fifty",
+  "ico": "50",
+  "name": "유랑객",
+  "desc": "50개 지역 탐험",
+  "condition": {
+   "type": "REGION_COUNT",
+   "min": 50
+  }
+ },
+ {
+  "id": "hundred",
+  "ico": "백",
+  "name": "백 개의 땅",
+  "desc": "100개 지역 탐험",
+  "condition": {
+   "type": "REGION_COUNT",
+   "min": 100
+  }
+ },
+ {
+  "id": "seoul",
+  "ico": "서",
+  "name": "서울 완전 정복",
+  "desc": "서울 25개 구 전부",
+  "condition": {
+   "type": "PROVINCES_COMPLETE",
+   "provinces": [
+    "KR-11"
+   ]
+  }
+ },
+ {
+  "id": "capital",
+  "ico": "수",
+  "name": "수도권 마스터",
+  "desc": "서울·경기·인천 100%",
+  "condition": {
+   "type": "PROVINCES_COMPLETE",
+   "provinces": [
+    "KR-11",
+    "KR-31",
+    "KR-23"
+   ]
+  }
+ },
+ {
+  "id": "samnam",
+  "ico": "삼",
+  "name": "삼남 순례",
+  "desc": "충청·전라·경상 각 1곳 이상",
+  "condition": {
+   "type": "PROVINCE_GROUPS_TOUCHED",
+   "groups": [
+    [
+     "KR-33",
+     "KR-34"
+    ],
+    [
+     "KR-35",
+     "KR-36"
+    ],
+    [
+     "KR-37",
+     "KR-38"
+    ]
+   ]
+  }
+ },
+ {
+  "id": "legend",
+  "ico": "★",
+  "name": "전설의 발견",
+  "desc": "전설 지역 1곳 방문",
+  "condition": {
+   "type": "LEGEND_COUNT",
+   "min": 1
+  }
+ },
+ {
+  "id": "allprov",
+  "ico": "八",
+  "name": "팔도 유람",
+  "desc": "17개 시·도 모두 발 도장",
+  "condition": {
+   "type": "ALL_PROVINCES_TOUCHED"
+  }
+ },
+ {
+  "id": "set1",
+  "ico": "集",
+  "name": "첫 세트",
+  "desc": "도감 세트 1개 완성",
+  "condition": {
+   "type": "SETS_COMPLETED",
+   "min": 1
+  }
+ },
+ {
+  "id": "streak3",
+  "ico": "3",
+  "name": "꾸준한 발",
+  "desc": "3개월 연속 탐험",
+  "condition": {
+   "type": "STREAK_MONTHS",
+   "min": 3
+  }
+ },
+ {
+  "id": "half",
+  "ico": "½",
+  "name": "반도의 절반",
+  "desc": "전국 정복률 50%",
+  "condition": {
+   "type": "CONQUEST_RATIO",
+   "ratio": 0.5
+  }
+ }
+]

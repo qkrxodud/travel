@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kobi.territory.catalog.api.ItemView;
-import com.kobi.territory.catalog.api.RegionView;
+import com.kobi.territory.catalog.api.query.ItemView;
+import com.kobi.territory.catalog.api.query.RegionView;
 import com.kobi.territory.catalog.application.CatalogService;
 import com.kobi.territory.catalog.domain.Catalog;
 import com.kobi.territory.catalog.domain.ItemSlot;
@@ -28,61 +28,61 @@ class CatalogDataTest {
     void 지역_250개_시도_17개() {
         assertThat(DATA.regions().all()).hasSize(250);
         assertThat(DATA.provinces().inDisplayOrder()).hasSize(17);
-        assertThat(DATA.provinces().inDisplayOrder().stream().mapToInt(p -> p.regionCount()).sum()).isEqualTo(250);
+        assertThat(DATA.provinces().inDisplayOrder().stream().mapToInt(province -> province.regionCount()).sum()).isEqualTo(250);
         assertThat(CATALOG.activeRegions()).hasSize(250);
-        assertThat(CATALOG.provinces()).extracting(p -> p.name())
+        assertThat(CATALOG.provinces()).extracting(province -> province.name())
             .containsExactly("서울", "경기", "인천", "강원", "충북", "충남", "대전", "세종", "전북", "전남", "광주",
                 "경북", "경남", "대구", "부산", "울산", "제주");
     }
 
     @Test
     void 지역은_KR_코드_국가_버전_대체코드_폐지일을_가진다() {
-        for (Region r : DATA.regions().all()) {
-            assertThat(r.code().value()).matches("KR-\\d{5}");
-            assertThat(r.countryCode()).isEqualTo("KR");
-            assertThat(r.version()).isEqualTo(1);
-            assertThat(r.replacedBy()).isNull();
-            assertThat(r.retiredAt()).isNull();
-            assertThat(r.provinceCode()).isEqualTo("KR-" + r.code().value().substring(3, 5));
+        for (Region region : DATA.regions().all()) {
+            assertThat(region.code().value()).matches("KR-\\d{5}");
+            assertThat(region.countryCode()).isEqualTo("KR");
+            assertThat(region.version()).isEqualTo(1);
+            assertThat(region.replacedBy()).isNull();
+            assertThat(region.retiredAt()).isNull();
+            assertThat(region.provinceCode()).isEqualTo("KR-" + region.code().value().substring(3, 5));
         }
     }
 
     @Test
     void 희귀도는_전설_지정10곳_군은_희귀_시구는_일반() {
-        List<RegionView> legends = CATALOG.activeRegions().stream().filter(r -> r.rarity() == Rarity.LEGEND).toList();
-        assertThat(legends).extracting(r -> r.provinceName() + " " + r.name()).containsExactlyInAnyOrder(
+        List<RegionView> legends = CATALOG.activeRegions().stream().filter(region -> region.rarity() == Rarity.LEGEND).toList();
+        assertThat(legends).extracting(region -> region.provinceName() + " " + region.name()).containsExactlyInAnyOrder(
             "경북 울릉군", "경북 영양군", "인천 옹진군", "전남 신안군", "경북 청송군", "경북 봉화군", "강원 양구군",
             "전남 진도군", "강원 화천군", "경남 의령군");
-        for (RegionView r : CATALOG.activeRegions()) {
-            if (r.rarity() == Rarity.LEGEND) continue;
-            assertThat(r.rarity()).as(r.name()).isEqualTo(r.name().endsWith("군") ? Rarity.RARE : Rarity.COMMON);
+        for (RegionView region : CATALOG.activeRegions()) {
+            if (region.rarity() == Rarity.LEGEND) continue;
+            assertThat(region.rarity()).as(region.name()).isEqualTo(region.name().endsWith("군") ? Rarity.RARE : Rarity.COMMON);
         }
-        assertThat(CATALOG.activeRegions().stream().filter(r -> r.rarity() == Rarity.RARE)).hasSize(72);
+        assertThat(CATALOG.activeRegions().stream().filter(region -> region.rarity() == Rarity.RARE)).hasSize(72);
     }
 
     @Test
     void 지역마다_특산물_아이템이_하나씩_있고_티어는_지역_희귀도와_같다() {
         assertThat(DATA.items().all()).hasSize(250);
-        for (RegionView r : CATALOG.activeRegions()) {
-            ItemView item = CATALOG.regionItem(RegionCode.of(r.code())).orElseThrow();
-            assertThat(item.itemId()).isEqualTo("region:" + r.code());
-            assertThat(item.tier()).isEqualTo(r.rarity());
+        for (RegionView region : CATALOG.activeRegions()) {
+            ItemView item = CATALOG.regionItem(RegionCode.of(region.code())).orElseThrow();
+            assertThat(item.itemId()).isEqualTo("region:" + region.code());
+            assertThat(item.tier()).isEqualTo(region.rarity());
             assertThat(item.name()).isNotBlank();
             assertThat(ItemSlot.valueOf(item.slot())).isNotNull();
         }
         // 전설 지역 아이템은 배경(전설 풍경)
-        assertThat(DATA.items().all().stream().filter(i -> i.tier() == Rarity.LEGEND))
-            .allSatisfy(i -> assertThat(i.slot()).isEqualTo(ItemSlot.BG));
+        assertThat(DATA.items().all().stream().filter(item -> item.tier() == Rarity.LEGEND))
+            .allSatisfy(item -> assertThat(item.slot()).isEqualTo(ItemSlot.BG));
     }
 
     @Test
     void 상호_브랜드명은_일반명사화되어_있다() {
-        Set<String> names = DATA.items().all().stream().map(i -> i.name()).collect(Collectors.toSet());
+        Set<String> names = DATA.items().all().stream().map(item -> item.name()).collect(Collectors.toSet());
         for (String brand : List.of("성심당", "이성당", "에버랜드", "라이온즈파크", "챔피언스필드", "황남빵", "예술의전당")) {
-            assertThat(names).noneMatch(n -> n.contains(brand));
+            assertThat(names).noneMatch(name -> name.contains(brand));
         }
         assertThat(CATALOG.regionItem(RegionCode.of("KR-25040")).orElseThrow().name()).startsWith("대전 튀김소보로");
-        assertThat(names).anyMatch(n -> n.startsWith("군산 단팥빵"));
+        assertThat(names).anyMatch(name -> name.startsWith("군산 단팥빵"));
     }
 
     @Test

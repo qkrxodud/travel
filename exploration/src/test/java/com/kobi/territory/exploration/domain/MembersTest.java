@@ -14,16 +14,16 @@ import org.junit.jupiter.api.Test;
 /** 일급 컬렉션 Members — Spring 없음. */
 class MembersTest {
 
-    static ExplorationError errorOf(Throwable t) {
-        return ((ExplorationException) t).error();
+    static ExplorationError errorOf(Throwable thrown) {
+        return ((ExplorationException) thrown).error();
     }
 
     @Test
     void 멤버십_판정() {
-        Members m = Members.ownerOnly(new Member(ME, MemberRole.OWNER, NOON));
-        assertThat(m.require(ME).role()).isEqualTo(MemberRole.OWNER);
-        assertThat(m.owner().explorerId()).isEqualTo(ME);
-        assertThatThrownBy(() -> m.require(FRIEND)).satisfies(e -> assertThat(errorOf(e)).isEqualTo(ExplorationError.NOT_A_MEMBER));
+        Members members = Members.ownerOnly(new Member(ME, MemberRole.OWNER, NOON));
+        assertThat(members.require(ME).role()).isEqualTo(MemberRole.OWNER);
+        assertThat(members.owner().explorerId()).isEqualTo(ME);
+        assertThatThrownBy(() -> members.require(FRIEND)).satisfies(exception -> assertThat(errorOf(exception)).isEqualTo(ExplorationError.NOT_A_MEMBER));
     }
 
     @Test
@@ -32,16 +32,16 @@ class MembersTest {
         for (int i = 0; i < 3; i++) list.add(new Member(ExplorerId.newId(), MemberRole.MEMBER, NOON));
         assertThat(Members.of(list).size()).isEqualTo(4);
         list.add(new Member(ExplorerId.newId(), MemberRole.MEMBER, NOON));
-        assertThatThrownBy(() -> Members.of(list)).satisfies(e -> assertThat(errorOf(e)).isEqualTo(ExplorationError.MAP_FULL));
+        assertThatThrownBy(() -> Members.of(list)).satisfies(exception -> assertThat(errorOf(exception)).isEqualTo(ExplorationError.MAP_FULL));
     }
 
     @Test
     void OWNER는_정확히_1명_중복_가입_불가() {
         assertThatThrownBy(() -> Members.of(List.of(new Member(ME, MemberRole.MEMBER, NOON))))
-            .satisfies(e -> assertThat(errorOf(e)).isEqualTo(ExplorationError.INVALID_MAP));
+            .satisfies(exception -> assertThat(errorOf(exception)).isEqualTo(ExplorationError.INVALID_MAP));
         assertThatThrownBy(() -> Members.of(List.of(new Member(ME, MemberRole.OWNER, NOON), new Member(FRIEND, MemberRole.OWNER, NOON))))
-            .satisfies(e -> assertThat(errorOf(e)).isEqualTo(ExplorationError.INVALID_MAP));
+            .satisfies(exception -> assertThat(errorOf(exception)).isEqualTo(ExplorationError.INVALID_MAP));
         assertThatThrownBy(() -> Members.of(List.of(new Member(ME, MemberRole.OWNER, NOON), new Member(ME, MemberRole.MEMBER, NOON))))
-            .satisfies(e -> assertThat(errorOf(e)).isEqualTo(ExplorationError.ALREADY_MEMBER));
+            .satisfies(exception -> assertThat(errorOf(exception)).isEqualTo(ExplorationError.ALREADY_MEMBER));
     }
 }

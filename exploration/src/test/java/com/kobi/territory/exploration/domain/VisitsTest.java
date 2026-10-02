@@ -20,8 +20,8 @@ import org.junit.jupiter.api.Test;
 /** 일급 컬렉션 Visits — Spring 없음. */
 class VisitsTest {
 
-    static Visit visit(RegionSnapshot r, ExplorerId who, int daysAgoDate, Instant at) {
-        return new Visit(r, who, VisitDate.of(TODAY.minusDays(daysAgoDate)), Memo.EMPTY, null, Verification.NONE, at);
+    static Visit visit(RegionSnapshot region, ExplorerId who, int daysAgoDate, Instant at) {
+        return new Visit(region, who, VisitDate.of(TODAY.minusDays(daysAgoDate)), Memo.EMPTY, null, Verification.NONE, at);
     }
 
     @Test
@@ -30,14 +30,14 @@ class VisitsTest {
         assertThat(vs.contains(JONGNO.code(), ME)).isTrue();
         assertThat(vs.contains(JONGNO.code(), FRIEND)).isFalse();
         assertThatThrownBy(() -> vs.require(JUNG.code(), ME))
-            .satisfies(e -> assertThat(((ExplorationException) e).error()).isEqualTo(ExplorationError.VISIT_NOT_FOUND));
+            .satisfies(exception -> assertThat(((ExplorationException) exception).error()).isEqualTo(ExplorationError.VISIT_NOT_FOUND));
     }
 
     @Test
     void 같은_지역_멤버_추가와_복원은_거부한다() {
         Visits vs = Visits.of(List.of(visit(JONGNO, ME, 0, NOON)));
         assertThatThrownBy(() -> vs.add(visit(JONGNO, ME, 1, NOON)))
-            .satisfies(e -> assertThat(((ExplorationException) e).error()).isEqualTo(ExplorationError.DUPLICATE_VISIT));
+            .satisfies(exception -> assertThat(((ExplorationException) exception).error()).isEqualTo(ExplorationError.DUPLICATE_VISIT));
         assertThatThrownBy(() -> Visits.of(List.of(visit(JONGNO, ME, 0, NOON), visit(JONGNO, ME, 2, NOON))))
             .isInstanceOf(IllegalStateException.class);
         vs.add(visit(JONGNO, FRIEND, 0, NOON)); // 다른 멤버는 같은 지역 가능
@@ -68,9 +68,9 @@ class VisitsTest {
 
     @Test
     void 최근순은_방문일_내림차순_같으면_처리시각_내림차순() {
-        Visit a = visit(JONGNO, ME, 3, NOON);
-        Visit b = visit(JUNG, ME, 0, NOON);
-        Visit c = visit(GAPYEONG, ME, 0, NOON.plus(Duration.ofMinutes(1)));
-        assertThat(Visits.of(List.of(a, b, c)).recentFirst()).containsExactly(c, b, a);
+        Visit threeDaysAgo = visit(JONGNO, ME, 3, NOON);
+        Visit todayNoon = visit(JUNG, ME, 0, NOON);
+        Visit todayLater = visit(GAPYEONG, ME, 0, NOON.plus(Duration.ofMinutes(1)));
+        assertThat(Visits.of(List.of(threeDaysAgo, todayNoon, todayLater)).recentFirst()).containsExactly(todayLater, todayNoon, threeDaysAgo);
     }
 }

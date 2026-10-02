@@ -1,40 +1,114 @@
 package com.kobi.territory.catalog.application;
 
-import com.kobi.territory.catalog.api.ItemView;
-import com.kobi.territory.catalog.api.ProvinceView;
-import com.kobi.territory.catalog.api.RegionCatalog;
-import com.kobi.territory.catalog.api.RegionView;
-import com.kobi.territory.catalog.api.RewardRulesView;
+import com.kobi.territory.catalog.api.query.ItemView;
+import com.kobi.territory.catalog.api.query.ProgressionRules;
+import com.kobi.territory.catalog.api.query.RewardCalculator;
+import com.kobi.territory.catalog.api.query.RewardLineView;
+import com.kobi.territory.catalog.api.query.ProvinceView;
+import com.kobi.territory.catalog.api.query.RegionCatalog;
+import com.kobi.territory.catalog.api.query.RegionView;
+import com.kobi.territory.catalog.api.query.RewardRulesView;
 import com.kobi.territory.catalog.domain.Catalog;
 import com.kobi.territory.catalog.domain.CatalogRepository;
 import com.kobi.territory.catalog.domain.ItemDefinition;
 import com.kobi.territory.catalog.domain.Province;
+import com.kobi.territory.catalog.domain.ProgressionDefinitions;
 import com.kobi.territory.catalog.domain.Region;
+import com.kobi.territory.catalog.domain.RewardRules;
+import com.kobi.territory.catalog.domain.RewardLine;
+import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 /**
- * {@link RegionCatalog} 구현 — 저장소에서 Catalog를 불러와 도메인 컬렉션에 묻고 view로 매핑만 한다.
- * 필터·정렬·검증은 Regions·Provinces·ItemDefinitions·Catalog(도메인)가 한다.
+ * {@link RegionCatalog}·{@link RewardCalculator}·{@link ProgressionRules} 구현 — 저장소에서 Catalog를 불러와
+ * 도메인에 묻고 view로 매핑만 한다. 필터·정렬·검증·보상 계산은 Regions·Provinces·ItemDefinitions·RewardRules·
+ * ProgressionDefinitions(도메인)가 한다.
  */
 @Service
-public class CatalogService implements RegionCatalog {
+public class CatalogService implements RegionCatalog, RewardCalculator, ProgressionRules {
 
     private final Catalog catalog;
     private final List<RegionView> activeRegions;
     private final List<ProvinceView> provinces;
     private final List<ItemView> items;
     private final RewardRulesView rewardRules;
+    private final List<SetView> sets;
+    private final List<BadgeView> badges;
+    private final List<QuestView> quests;
+    private final List<TitleView> titles;
+    private final List<LevelTitleView> levelTitles;
 
     public CatalogService(CatalogRepository repository) {
         this.catalog = repository.load();
         this.activeRegions = catalog.regions().active().stream().map(this::toView).toList();
         this.provinces = catalog.provinces().inDisplayOrder().stream().map(CatalogService::toView).toList();
         this.items = catalog.items().all().stream().map(CatalogService::toView).toList();
-        var rr = catalog.rewardRules();
-        this.rewardRules = new RewardRulesView(rr.xpByRarity(), rr.provinceFirstBonus(), rr.setCompleteBonus(), rr.claimBonus());
+        RewardRules rules = catalog.rewardRules();
+        this.rewardRules = new RewardRulesView(rules.xpByRarity(), rules.provinceFirstBonus(), rules.setCompleteBonus(),
+            rules.claimBonus());
+        ProgressionDefinitions definitions = catalog.progression();
+        this.levelTitles = definitions.levels().titles().stream().map(levelTitle -> new LevelTitleView(levelTitle.level(), levelTitle.name())).toList();
+        this.sets = definitions.sets().stream().map(set -> new SetView(set.id(), set.name(), set.desc(), set.title(),
+            set.regions().stream().map(RegionCode::value).toList(),
+            set.background() == null ? null : set.background().name())).toList();
+        this.badges = definitions.badges().stream().map(badge -> new BadgeView(badge.id(), badge.ico(), badge.name(), badge.desc(),
+            new BadgeConditionView(badge.condition().type().name(), badge.condition().min(), badge.condition().provinces(),
+                badge.condition().groups(), badge.condition().ratio()))).toList();
+        this.quests = definitions.quests().stream().map(quest -> new QuestView(quest.id(), quest.scope().name(), quest.ico(), quest.name(), quest.desc(),
+            quest.metric().name(), quest.param(), quest.target(), quest.xp(), quest.title())).toList();
+        this.titles = catalog.titles().stream()
+            .map(title -> new TitleView(title.id(), title.name(), title.how(), title.source().name(), title.ref())).toList();
+    }
+
+    // ---- RewardCalculator (D1: 탐험·진행이 같은 순수 함수를 호출) ----
+
+    @Override
+    public List<RewardLineView> checkIn(Rarity rarity, boolean firstInProvince, boolean firstClaim) {
+        return catalog.rewardRules().checkIn(rarity, firstInProvince, firstClaim).stream().map(CatalogService::toView).toList();
+    }
+
+    @Override
+    public RewardLineView setComplete() {
+        return toView(catalog.rewardRules().setComplete());
+    }
+
+    // ---- ProgressionRules ----
+
+    @Override
+    public int levelDivisor() {
+        return catalog.progression().levels().divisor();
+    }
+
+    @Override
+    public List<LevelTitleView> levelTitles() {
+        return levelTitles;
+    }
+
+    @Override
+    public List<SetView> sets() {
+        return sets;
+    }
+
+    @Override
+    public List<BadgeView> badges() {
+        return badges;
+    }
+
+    @Override
+    public List<QuestView> quests() {
+        return quests;
+    }
+
+    @Override
+    public List<TitleView> titles() {
+        return titles;
+    }
+
+    private static RewardLineView toView(RewardLine line) {
+        return new RewardLineView(line.source().name(), line.amount());
     }
 
     @Override
@@ -77,19 +151,19 @@ public class CatalogService implements RegionCatalog {
         return catalog.regionsGeoJson();
     }
 
-    private RegionView toView(Region r) {
-        Province p = catalog.provinces().require(r.provinceCode());
-        return new RegionView(r.code().value(), r.name(), r.provinceCode(), p.name(), r.rarity(), r.countryCode(),
-            r.version(), r.replacedBy() == null ? null : r.replacedBy().value(), r.retiredAt());
+    private RegionView toView(Region region) {
+        Province province = catalog.provinces().require(region.provinceCode());
+        return new RegionView(region.code().value(), region.name(), region.provinceCode(), province.name(), region.rarity(), region.countryCode(),
+            region.version(), region.replacedBy() == null ? null : region.replacedBy().value(), region.retiredAt());
     }
 
-    private static ProvinceView toView(Province p) {
-        return new ProvinceView(p.code(), p.name(), p.fullName(), p.displayOrder(), p.regionCount());
+    private static ProvinceView toView(Province province) {
+        return new ProvinceView(province.code(), province.name(), province.fullName(), province.displayOrder(), province.regionCount());
     }
 
-    private static ItemView toView(ItemDefinition i) {
-        return new ItemView(i.itemId(), i.regionCode() == null ? null : i.regionCode().value(), i.name(), i.emoji(),
-            i.slot().name(), i.tier(), i.theme(),
-            i.look() == null ? null : new ItemView.Look(i.look().type(), i.look().primary(), i.look().secondary()));
+    private static ItemView toView(ItemDefinition item) {
+        return new ItemView(item.itemId(), item.regionCode() == null ? null : item.regionCode().value(), item.name(), item.emoji(),
+            item.slot().name(), item.tier(), item.theme(),
+            item.look() == null ? null : new ItemView.Look(item.look().type(), item.look().primary(), item.look().secondary()));
     }
 }

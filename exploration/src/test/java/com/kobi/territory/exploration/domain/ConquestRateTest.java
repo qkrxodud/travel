@@ -19,21 +19,21 @@ class ConquestRateTest {
         totals.put("KR-11", 2);
         totals.put("KR-31", 42);
         totals.put("KR-39", 2);
-        ConquestRate r = ConquestRate.of(List.of(JONGNO, JUNG, GAPYEONG), totals);
-        assertThat(r.visited()).isEqualTo(3);
-        assertThat(r.total()).isEqualTo(46);
-        assertThat(r.percent()).isEqualTo(7);
-        assertThat(r.provinces()).containsExactly(
+        ConquestRate rate = ConquestRate.of(List.of(JONGNO, JUNG, GAPYEONG), totals);
+        assertThat(rate.visited()).isEqualTo(3);
+        assertThat(rate.total()).isEqualTo(46);
+        assertThat(rate.percent()).isEqualTo(7);
+        assertThat(rate.provinces()).containsExactly(
             new ProvinceRate("KR-11", 2, 2), new ProvinceRate("KR-31", 1, 42), new ProvinceRate("KR-39", 0, 2));
-        assertThat(r.provinces().get(0).conquered()).isTrue();
-        assertThat(r.provinces().get(0).percent()).isEqualTo(100);
-        assertThat(r.provinces().get(1).percent()).isEqualTo(2);
+        assertThat(rate.provinces().get(0).conquered()).isTrue();
+        assertThat(rate.provinces().get(0).percent()).isEqualTo(100);
+        assertThat(rate.provinces().get(1).percent()).isEqualTo(2);
     }
 
     @Test
     void 빈_영토는_0퍼센트() {
-        ConquestRate r = ConquestRate.of(List.of(), Map.of("KR-11", 25));
-        assertThat(r.percent()).isZero();
-        assertThat(r.provinces().get(0).conquered()).isFalse();
+        ConquestRate rate = ConquestRate.of(List.of(), Map.of("KR-11", 25));
+        assertThat(rate.percent()).isZero();
+        assertThat(rate.provinces().get(0).conquered()).isFalse();
     }
 }

@@ -5,29 +5,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.sql.SQLIntegrityConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
     @Test
-    void visit_UNIQUE_위반은_DUPLICATE_VISIT_409() {
+    void 무결성_위반은_제약_이름과_무관하게_범용_CONFLICT_도메인_번역은_컨텍스트_infra_몫() {
+        // visit UNIQUE → DUPLICATE_VISIT 번역은 exploration infra(JpaTerritoryRepository)로 옮겼다(QA N3)
         var mysql = new DataIntegrityViolationException("x", new SQLIntegrityConstraintViolationException(
             "Duplicate entry 'm-KR-11010-e' for key 'visit.uq_visit_map_region_member'"));
-        var res = handler.handle(mysql);
-        assertThat(res.getStatusCode().value()).isEqualTo(409);
-        assertThat(res.getBody().code()).isEqualTo("DUPLICATE_VISIT");
-
-        var h2 = new DataIntegrityViolationException("x", new RuntimeException(
-            "Unique index or primary key violation: \"PUBLIC.UQ_VISIT_MAP_REGION_MEMBER_INDEX_4 ON PUBLIC.VISIT\""));
-        assertThat(handler.handle(h2).getBody().code()).isEqualTo("DUPLICATE_VISIT");
-    }
-
-    @Test
-    void 그_밖의_무결성_위반은_범용_CONFLICT() {
+        assertThat(handler.handle(mysql).getBody().code()).isEqualTo("CONFLICT");
         var other = new DataIntegrityViolationException("x", new RuntimeException("uq_explorer_handle"));
         var res = handler.handle(other);
         assertThat(res.getStatusCode().value()).isEqualTo(409);
         assertThat(res.getBody().code()).isEqualTo("CONFLICT");
+    }
+
+    @Test
+    void 낙관적_락_충돌은_409_CONCURRENT_UPDATE() {
+        var res = handler.handle(new ObjectOptimisticLockingFailureException("QuestRow", "k"));
+        assertThat(res.getStatusCode().value()).isEqualTo(409);
+        assertThat(res.getBody().code()).isEqualTo("CONCURRENT_UPDATE");
     }
 }

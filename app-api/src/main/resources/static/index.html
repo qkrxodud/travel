@@ -591,26 +591,8 @@ const SETS = [
 const SET_BG = { east:['🌅','동해 일출','sunrise'], sea:['⚓','항구의 밤','harbor'], old:['🏯','궁궐 뜰','palace'], island:['🏝️','푸른 섬바다','islands'], ball:['🏟️','야간 경기장','stadium'], soup:['🍲','밤 시장 골목','market'], dmz:['🕊️','접경의 새벽','dmz'], jiri:['⛰️','지리산 능선','ridge'], han:['🌉','한강 야경','hanriver'] };
 const SET_OF = new Map(); SETS.forEach(s => s.codes.forEach(c => { if (!SET_OF.has(c)) SET_OF.set(c, []); SET_OF.get(c).push(s); }));
 
-const BADGES = [
-  { id:'first',   ico:'1',  name:'첫 발자국',     desc:'첫 지역을 칠했다',            test:c => c.n >= 1 },
-  { id:'ten',     ico:'10', name:'발 넓은 사람',  desc:'10개 지역 탐험',             test:c => c.n >= 10 },
-  { id:'fifty',   ico:'50', name:'유랑객',        desc:'50개 지역 탐험',             test:c => c.n >= 50 },
-  { id:'hundred', ico:'백', name:'백 개의 땅',    desc:'100개 지역 탐험',            test:c => c.n >= 100 },
-  { id:'seoul',   ico:'서', name:'서울 완전 정복', desc:'서울 25개 구 전부',          test:c => c.full('서울') },
-  { id:'capital', ico:'수', name:'수도권 마스터', desc:'서울·경기·인천 100%',        test:c => c.full('서울') && c.full('경기') && c.full('인천') },
-  { id:'samnam',  ico:'삼', name:'삼남 순례',     desc:'충청·전라·경상 각 1곳 이상', test:c => (c.p('충북')+c.p('충남')>0) && (c.p('전북')+c.p('전남')>0) && (c.p('경북')+c.p('경남')>0) },
-  { id:'legend',  ico:'★',  name:'전설의 발견',   desc:'전설 지역 1곳 방문',         test:c => c.legend >= 1 },
-  { id:'allprov', ico:'八', name:'팔도 유람',     desc:'17개 시·도 모두 발 도장',    test:c => PROVS.every(p => c.p(p) > 0) },
-  { id:'set1',    ico:'集', name:'첫 세트',       desc:'도감 세트 1개 완성',         test:c => c.setsDone >= 1 },
-  { id:'streak3', ico:'3',  name:'꾸준한 발',     desc:'3개월 연속 탐험',            test:c => c.streak >= 3 },
-  { id:'half',    ico:'½',  name:'반도의 절반',   desc:'전국 정복률 50%',            test:c => c.n / FEATURES.length >= .5 },
-];
+/* 뱃지 12·퀘스트(월간·상시)·칭호 정의와 판정은 서버(카탈로그 정의 + 진행 컨텍스트)로 옮겼다(2단계) — GET /progress·/quests */
 
-const LONG = [
-  { id:'leg5',  ico:'★', name:'전설 사냥', desc:'전설 지역 5곳', xp:150, title:'전설 사냥꾼', cur:c => c.legend, max:5 },
-  { id:'gun30', ico:'郡', name:'시골길',   desc:'군 단위 지역 30곳', xp:150, title:'시골길 전문가', cur:c => c.gun, max:30 },
-  { id:'p3',    ico:'八', name:'팔도 전문가', desc:'17개 시·도 각 3곳 이상', xp:200, title:'팔도 전문가', cur:c => PROVS.filter(p => c.p(p) >= 3).length, max:17 },
-];
 
 /* 예시 데이터: 오늘 기준 n개월 전으로 날짜를 잡아 스트릭·월간 퀘스트가 살아 있게 함 */
 const SAMPLE = [
@@ -697,6 +679,12 @@ const api = (() => {
     cancel: code => call('DELETE', '/visits/' + toServer(code)),
     seed: () => call('POST', '/dev/seed'),      // local 전용: 현재 탐험가에 프로토타입 SAMPLE 시드
     clear: () => call('DELETE', '/dev/visits'), // local 전용: 현재 탐험가 방문 전부 취소
+    // 2단계(진행): XP·레벨·칭호·스트릭·뱃지·도감·퀘스트의 진실 원천도 서버. 체크인 후 이벤트로 비동기 반영된다.
+    progress: () => call('GET', '/progress'),
+    collection: () => call('GET', '/collection'),
+    quests: () => call('GET', '/quests'),
+    claim: questId => call('POST', '/quests/' + encodeURIComponent(questId) + '/claim'),
+    selectTitle: titleId => call('PUT', '/progress/title', { titleId }),
   };
 })();
 let server = null; // 마지막 GET /territory 응답(정복률·시도별·일지의 기준)
@@ -708,7 +696,29 @@ function applyTerritory(t){
   document.documentElement.dataset.territory = 'ready';
 }
 async function refresh(){ applyTerritory(await api.territory()); }
-const ERR_TITLE = { DAILY_CAP_EXCEEDED:'오늘은 여기까지', FUTURE_VISIT_DATE:'날짜를 확인해 주세요', MEMO_TOO_LONG:'메모가 길어요', DUPLICATE_VISIT:'이미 칠한 곳' };
+
+/* ---------- 진행(2단계): 서버 값 + 짧은 재조회 ----------
+   체크인·취소는 outbox 릴레이로 비동기 반영되므로(로컬 300ms 주기) 변경 직후 몇 번 다시 조회해 화면을 맞춘다. */
+let prog = null, dex = null, qs = null; // GET /progress, /collection, /quests 마지막 응답
+let progRev = 0, pollTimers = [];
+async function refreshProgress(announce){
+  const [p, d, q] = await Promise.all([api.progress(), api.collection(), api.quests()]);
+  const had = prog ? new Set(prog.badges.filter(b => b.earned).map(b => b.id)) : null;
+  const lvBefore = prog ? prog.level : null;
+  prog = p; dex = d; qs = q;
+  if (announce && had) {
+    p.badges.filter(b => b.earned && !had.has(b.id)).forEach(b => toast(b.ico, `뱃지 획득 · ${b.name}`, b.desc));
+    if (lvBefore !== null && p.level > lvBefore) toast('▲', `레벨 업 · Lv.${p.level}`, p.levelTitle);
+  }
+  document.documentElement.dataset.progress = String(++progRev);
+  render();
+}
+function pollProgress(){
+  pollTimers.forEach(clearTimeout);
+  pollTimers = [300, 800, 1500, 2500, 4000].map(ms => setTimeout(() => refreshProgress(!sampleMode).catch(() => {}), ms));
+}
+const ERR_TITLE = { DAILY_CAP_EXCEEDED:'오늘은 여기까지', FUTURE_VISIT_DATE:'날짜를 확인해 주세요', MEMO_TOO_LONG:'메모가 길어요', DUPLICATE_VISIT:'이미 칠한 곳',
+  QUEST_ALREADY_CLAIMED:'이미 받은 보상', QUEST_NOT_COMPLETED:'아직 달성 전', TITLE_NOT_EARNED:'아직 못 얻은 칭호' };
 function toastError(e){ toast('!', ERR_TITLE[e.code] || '요청 실패', e.message || String(e)); }
 const ym = d => d.slice(0,7);
 const CUR_YM = today.toISOString().slice(0,7);
@@ -1152,45 +1162,18 @@ function drawItem(x, it, ox, oy, size){ x.imageSmoothingEnabled = false; x.drawI
 
 
 /* ---------- derived ---------- */
-function monthQuests(c){
-  const inMonth = c.list.filter(v => ym(v.date||'') === CUR_YM);
-  const firstProvThisMonth = PROVS.filter(p => { const vs = c.list.filter(v => v.f.properties.prov===p); return vs.length && vs.every(v => ym(v.date||'') === CUR_YM); }).length;
-  return [
-    { id:'m3',   ico:'3',  name:'새 영토 3곳',        desc:'이번 달 새 지역 3곳 칠하기',            cur:Math.min(3, inMonth.length), max:3, xp:60 },
-    { id:'mgun', ico:'郡', name:'시골로 가자',        desc:'군 단위 지역 1곳',                       cur:Math.min(1, inMonth.filter(v => rarity(v.f)!=='common').length), max:1, xp:40 },
-    { id:'mprov',ico:'新', name:'처음 가는 시·도',    desc:'한 번도 안 가본 시·도에서 1곳',          cur:Math.min(1, firstProvThisMonth), max:1, xp:80 },
-    { id:'mset', ico:'集', name:'도감 채우기',        desc:'도감 세트에 속한 지역 2곳',              cur:Math.min(2, inMonth.filter(v => SET_OF.has(v.code)).length), max:2, xp:50 },
-  ];
-}
 function ctx(){
+  // 지도·가방·랭킹·리캡용 파생 값만 계산한다. XP·레벨·칭호·스트릭·뱃지·도감·퀘스트는 서버 값(GET /progress·/collection·/quests) — 2단계
   const list = Object.entries(state.visits).map(([code,v]) => ({ code, ...v, f:BY_CODE.get(code) })).filter(e => e.f);
   const pc = {}; PROVS.forEach(p => pc[p] = 0);
-  let legend = 0, gun = 0, base = 0;
-  list.forEach(e => { pc[e.f.properties.prov]++; const r = rarity(e.f); base += XP[r]; if (r==='legend') legend++; if (r!=='common') gun++; });
-  const months = new Set(list.map(e => ym(e.date||'')));
-  let streak = 0; { let k = months.has(CUR_YM) ? 0 : -1; while (months.has(ymShift(k))) { streak++; k--; } }
-  const setProg = SETS.map(s => ({ s, have: s.codes.filter(cd => state.visits[cd]).length }));
-  const setsDone = setProg.filter(x => x.have === x.s.codes.length).length;
-  const provTouched = PROVS.filter(p => pc[p] > 0).length;
-  const c = { n:list.length, list, pc, legend, gun, streak, months, setProg, setsDone, p:p => pc[p], full:p => pc[p] === PROV_TOTAL[p] };
-  c.mq = monthQuests(c); c.mqDone = c.mq.filter(q => q.cur >= q.max);
-  c.longDone = LONG.filter(q => q.cur(c) >= q.max);
-  c.xp = base + provTouched * BONUS.prov + setsDone * BONUS.set + c.mqDone.reduce((a,q) => a + q.xp, 0) + c.longDone.reduce((a,q) => a + q.xp, 0);
-  c.level = Math.floor((1 + Math.sqrt(1 + c.xp/5)) / 2);
+  let legend = 0, gun = 0;
+  list.forEach(e => { pc[e.f.properties.prov]++; const r = rarity(e.f); if (r==='legend') legend++; if (r!=='common') gun++; });
+  const c = { n:list.length, list, pc, legend, gun, p:p => pc[p], full:p => pc[p] === PROV_TOTAL[p] };
   c.top = c.n === 0 ? 100 : Math.max(1, Math.round(100 * Math.exp(-c.n / 35)));
   return c;
 }
-const nextXp = L => 20 * (L+1) * L;
-function levelTitle(L){ let t = LEVEL_TITLES[0][1]; LEVEL_TITLES.forEach(([l,n]) => { if (L >= l) t = n; }); return t; }
-function titles(c){
-  const t = [];
-  LEVEL_TITLES.forEach(([l,n]) => t.push({ id:'lv'+l, name:n, ok:c.level >= l, how:`Lv.${l}` }));
-  c.setProg.forEach(x => t.push({ id:'set-'+x.s.id, name:x.s.title, ok:x.have === x.s.codes.length, how:`${x.s.name} 세트` }));
-  LONG.forEach(q => t.push({ id:'long-'+q.id, name:q.title, ok:q.cur(c) >= q.max, how:q.name }));
-  PROVS.forEach(p => t.push({ id:'own-'+p, name:`${p}의 주인`, ok:c.full(p), how:`${p} 100%` }));
-  return t;
-}
-function currentTitle(c){ const all = titles(c); const sel = all.find(t => t.id === state.title && t.ok); return sel ? sel.name : levelTitle(c.level); }
+/** 화면에 보일 칭호(서버: 선택 칭호, 없으면 레벨 칭호). */
+function currentTitle(){ return prog && prog.title ? prog.title.name : LEVEL_TITLES[0][1]; }
 
 /* ---------- map ---------- */
 const svg = d3.select('#map'), W = 720, H = 774;
@@ -1246,17 +1229,10 @@ function toggle(f){
   else openCheckin(f);
 }
 async function cancelVisit(f){
-  try { await api.cancel(f.properties.code); sampleMode = false; await refresh(); commit(); render(); toast('✓', '영토에서 제거', f.properties.name); }
+  try { await api.cancel(f.properties.code); sampleMode = false; await refresh(); commit(); render(); pollProgress(); toast('✓', '영토에서 제거', f.properties.name); }
   catch (e) { toastError(e); }
 }
-function commit(){ save(); checkBadges(); }
-function checkBadges(silent){
-  const c = ctx();
-  const got = BADGES.filter(b => b.test(c)).map(b => b.id);
-  const fresh = got.filter(id => !state.badges.includes(id));
-  state.badges = Array.from(new Set([...state.badges, ...got])); save();
-  if (!sampleMode && !silent) fresh.forEach(id => { const b = BADGES.find(x => x.id===id); toast(b.ico, `뱃지 획득 · ${b.name}`, b.desc); });
-}
+function commit(){ save(); } // 뱃지는 서버가 판정한다(GET /progress) — 새 뱃지 toast 는 refreshProgress 가 띄운다
 
 /* ---------- 체크인 모달 ---------- */
 async function openCheckin(f){
@@ -1290,7 +1266,7 @@ async function openCheckin(f){
       await refresh();
       const eq = autoEquip(it);
       (SET_OF.get(code) || []).forEach(s => { if (s.codes.every(cd => state.visits[cd])) { const bg = setItem(s.id); if (bg) { autoEquip(bg); toast('✦', `세트 배경 해금 · ${bg.n}`, '가방에서 배경으로 쓸 수 있어요'); } } });
-      commit(); render();
+      commit(); render(); pollProgress();
       $('#checkin').hidden = true;
       toast('✓', `${f.properties.name} · ${res.nth}번째 영토`, `예상 XP +${res.xp.total} · ${it.n}${eq ? ' 착용' : ''}`);
       return true;
@@ -1324,12 +1300,13 @@ function render(){
   const pct = cq.percent;
   $('#s-pct').textContent = pct; $('#s-cnt').textContent = `${cq.visited} / ${cq.total}`; $('#s-bar').style.width = pct + '%';
   $('#s-top').textContent = c.top; $('#s-rank').textContent = `약 ${(Math.round(12840 * c.top / 100)).toLocaleString()}위`;
-  $('#s-streak').textContent = c.streak;
-  const L = c.level, prev = nextXp(L-1), next = nextXp(L);
-  $('#s-xp').textContent = c.xp; $('#s-next').textContent = `다음 레벨까지 ${next - c.xp}`;
-  $('#s-xpbar').style.width = Math.round(100 * (c.xp - prev) / (next - prev)) + '%';
-  $('#lv').textContent = `Lv.${L}`; $('#ttl').textContent = currentTitle(c);
-  $('#n-sets').textContent = c.setsDone || ''; $('#n-quests').textContent = c.mq.length - c.mqDone.length || '';
+  // 헤더 Lv·XP·스트릭·칭호는 서버 진행 값(없으면 시작 상태)
+  const P = prog || { xp:0, level:1, currentLevelXp:0, nextLevelXp:40, streak:{ months:0 } };
+  $('#s-streak').textContent = P.streak.months;
+  $('#s-xp').textContent = P.xp; $('#s-next').textContent = `다음 레벨까지 ${P.nextLevelXp - P.xp}`;
+  $('#s-xpbar').style.width = Math.round(100 * (P.xp - P.currentLevelXp) / (P.nextLevelXp - P.currentLevelXp)) + '%';
+  $('#lv').textContent = `Lv.${P.level}`; $('#ttl').textContent = currentTitle();
+  $('#n-sets').textContent = (dex && dex.completed) || ''; $('#n-quests').textContent = (qs && qs.monthly.filter(q => q.claimable).length) || '';
 
   renderMapSide(c); renderBag(c); renderSets(c); renderQuests(c); renderRank(c); renderProfile(c);
   placeChar(true);
@@ -1391,30 +1368,40 @@ function renderBag(c){
 }
 
 function renderSets(c){
-  $('#sets-sum').textContent = `${c.setsDone} / ${SETS.length} 완성`;
-  $('#sets').innerHTML = c.setProg.map(({ s, have }) => {
-    const done = have === s.codes.length;
-    return `<div class="set ${done?'done':''}">
-      <h3>${esc(s.name)}<span>${have} / ${s.codes.length}</span></h3>
+  // 도감은 지도 기준 서버 값(GET /collection). 완성 기록(completedAt)은 지역을 취소해도 남는다.
+  if (!dex) { $('#sets-sum').textContent = ''; $('#sets').innerHTML = '<p class="empty">불러오는 중…</p>'; return; }
+  $('#sets-sum').textContent = `${dex.completed} / ${dex.total} 완성`;
+  $('#sets').innerHTML = dex.sets.map(s => {
+    const done = s.completed;
+    return `<div class="set ${done?'done':''}" data-set="${s.id}">
+      <h3>${esc(s.name)}<span class="have">${s.have} / ${s.total}</span></h3>
       <p class="d">${esc(s.desc)}</p>
-      <div class="bar"><i class="${done?'gold':''}" style="width:${Math.round(100*have/s.codes.length)}%"></i></div>
-      <div class="slots">${s.codes.map(cd => { const f = BY_CODE.get(cd); return `<button class="slot ${state.visits[cd]?'on':''}" data-show="${cd}" title="${esc(label(f))}">${esc(f.properties.name)}</button>`; }).join('')}</div>
-      <div class="reward">${done ? `<b>완성 · 칭호 「${esc(s.title)}」 +${BONUS.set} XP</b>` : `보상: 칭호 「${esc(s.title)}」 + ${BONUS.set} XP`}</div>
+      <div class="bar"><i class="${done?'gold':''}" style="width:${Math.round(100*s.have/s.total)}%"></i></div>
+      <div class="slots">${s.regions.map(r => { const cd = api.toClient(r.code), f = BY_CODE.get(cd); return `<button class="slot ${r.collected?'on':''}" data-show="${cd}" title="${esc(f ? label(f) : r.name)}">${esc(r.name)}</button>`; }).join('')}</div>
+      <div class="reward">${done ? `<b>완성 · 칭호 「${esc(s.title)}」 +${s.rewardXp} XP</b>` : `보상: 칭호 「${esc(s.title)}」 + ${s.rewardXp} XP`}</div>
     </div>`; }).join('');
 }
 
 function renderQuests(c){
-  $('#q-month').textContent = `${today.getMonth()+1}월 · ${c.mqDone.length}/${c.mq.length} 완료`;
-  const q = (x, cur, max, done) => `<div class="quest ${done?'done':''}"><div class="ico">${x.ico}</div><div class="body"><div class="t">${esc(x.name)}</div><div class="d">${esc(x.desc)}</div><div class="bar"><i class="${done?'gold':''}" style="width:${Math.round(100*cur/max)}%"></i></div></div><div class="xp">${done ? '완료' : `${cur}/${max}`}<br><small style="font-family:var(--body);font-size:11px;color:var(--muted)">+${x.xp} XP</small></div></div>`;
-  $('#quests-month').innerHTML = c.mq.map(x => q(x, x.cur, x.max, x.cur >= x.max)).join('');
-  $('#quests-long').innerHTML = LONG.map(x => { const cur = Math.min(x.max, x.cur(c)); return q(x, cur, x.max, cur >= x.max); }).join('');
-  const has = c.months.has(CUR_YM);
-  $('#streak-txt').textContent = c.streak === 0 ? '이번 달 새 지역 1곳만 칠하면 스트릭이 시작돼요.' : has ? `${c.streak}개월 연속 탐험 중. 다음 달에도 1곳이면 유지됩니다.` : `${c.streak}개월째. 이번 달 아직 0곳 — 이달 안에 1곳 칠해야 끊기지 않아요.`;
-  $('#streak').innerHTML = Array.from({length:12}, (_,i) => { const k = ymShift(i-11); return `<span class="${c.months.has(k)?'on':''} ${k===CUR_YM?'now':''}">${k.slice(5)}월</span>`; }).join('');
+  // 퀘스트·스트릭은 서버 값(GET /quests·/progress). 달성하면 「받기」로 보상(1회, XP 는 비동기 반영).
+  if (!qs || !prog) { $('#quests-month').innerHTML = $('#quests-long').innerHTML = '<p class="empty">불러오는 중…</p>'; return; }
+  const curYm = qs.month;
+  $('#q-month').textContent = `${Number(curYm.slice(5))}월 · ${qs.monthlyDone}/${qs.monthly.length} 완료`;
+  const q = x => {
+    const right = x.claimed ? '받음' : x.claimable ? `<button class="btn sm primary" data-claim="${esc(x.id)}">받기</button>` : `${x.current}/${x.target}`;
+    return `<div class="quest ${x.achieved?'done':''}" data-quest="${esc(x.id)}"><div class="ico">${x.ico}</div><div class="body"><div class="t">${esc(x.name)}</div><div class="d">${esc(x.desc)}${x.title ? ` · 칭호 「${esc(x.title)}」` : ''}</div><div class="bar"><i class="${x.achieved?'gold':''}" style="width:${Math.round(100*x.current/x.target)}%"></i></div></div><div class="xp"><span class="st">${right}</span><br><small style="font-family:var(--body);font-size:11px;color:var(--muted)">+${x.xp} XP</small></div></div>`;
+  };
+  $('#quests-month').innerHTML = qs.monthly.map(q).join('');
+  $('#quests-long').innerHTML = qs.always.map(q).join('');
+  const st = prog.streak, n = st.months;
+  $('#streak-txt').textContent = n === 0 ? '이번 달 새 지역 1곳만 칠하면 스트릭이 시작돼요.' : st.activeThisMonth ? `${n}개월 연속 탐험 중. 다음 달에도 1곳이면 유지됩니다.` : `${n}개월째. 이번 달 아직 0곳 — 이달 안에 1곳 칠해야 끊기지 않아요.`;
+  // 연속 구간(서버 streak: lastMonth 에서 끝나는 n개월)을 최근 12개월 띠에 표시
+  const run = new Set(); if (st.lastMonth && n > 0) { const [y, m] = st.lastMonth.split('-').map(Number); for (let i = 0; i < n; i++) { const d = new Date(y, m - 1 - i, 1); run.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); } }
+  $('#streak').innerHTML = Array.from({length:12}, (_,i) => { const k = ymShift(i-11); return `<span class="${run.has(k)?'on':''} ${k===curYm?'now':''}">${k.slice(5)}월</span>`; }).join('');
 }
 
 function renderRank(c){
-  const rows = [...FRIENDS.map(f => ({ id:f.id, name:f.name, color:f.color, n:f.codes.size, ttl:f.ttl })), { id:'me', name:'나 (Kobi)', color:null, n:c.n, ttl:currentTitle(c), me:true }].sort((a,b) => b.n - a.n);
+  const rows = [...FRIENDS.map(f => ({ id:f.id, name:f.name, color:f.color, n:f.codes.size, ttl:f.ttl })), { id:'me', name:'나 (Kobi)', color:null, n:c.n, ttl:currentTitle(), me:true }].sort((a,b) => b.n - a.n);
   $('#rank').innerHTML = rows.map((r, i) => `<li class="${r.me?'me':''}"><button data-vs="${r.me?'':r.id}"><span class="pos ${i<3?'top':''}">${i+1}</span><span class="av" style="background:${r.color||'var(--accent)'}">${r.me?'K':esc(r.name[0])}</span><span class="nm">${esc(r.name)}<small>${esc(r.ttl)}</small></span><span class="sc">${r.n}<small>${Math.round(100*r.n/FEATURES.length)}%</small></span></button></li>`).join('');
   $('#feed').innerHTML = FEED.map(([id, html, t]) => { const f = FRIENDS.find(x => x.id===id); return `<li><span class="av" style="background:${f.color}">${esc(f.name[0])}</span><div><b>${esc(f.name)}</b>님이 ${html}<time>${t}</time></div></li>`; }).join('');
   const fr = FRIENDS.find(x => x.id === state.vsFriend) || FRIENDS[0];
@@ -1439,14 +1426,14 @@ function renderRank(c){
 }
 
 function renderProfile(c){
-  const all = titles(c);
-  const cur = all.find(t => t.id === state.title && t.ok);
-  $('#titles').innerHTML = all.map(t => `<button data-title="${t.id}" aria-pressed="${cur ? t.id===cur.id : false}" ${t.ok ? '' : 'disabled'} title="${esc(t.how)}">${esc(t.name)}${t.ok ? '' : ` · ${esc(t.how)}`}</button>`).join('');
-  $('#badges').innerHTML = BADGES.map(b => `<div class="badge ${state.badges.includes(b.id)?'got':''}"><div class="ico">${b.ico}</div><div><div class="t">${b.name}</div><div class="d">${b.desc}</div></div></div>`).join('');
-  $('#b-cnt').textContent = `${state.badges.length} / ${BADGES.length}`;
+  // 칭호·뱃지는 서버 값(GET /progress). 칭호는 얻은 것만 고를 수 있다(PUT /progress/title).
+  const ts = prog ? prog.titles : [], bs = prog ? prog.badges : [];
+  $('#titles').innerHTML = ts.map(t => `<button data-title="${esc(t.id)}" aria-pressed="${t.selected}" ${t.earned ? '' : 'disabled'} title="${esc(t.how)}">${esc(t.name)}${t.earned ? '' : ` · ${esc(t.how)}`}</button>`).join('');
+  $('#badges').innerHTML = bs.map(b => `<div class="badge ${b.earned?'got':''}" data-badge="${esc(b.id)}"><div class="ico">${esc(b.ico)}</div><div><div class="t">${esc(b.name)}</div><div class="d">${esc(b.desc)}</div></div></div>`).join('');
+  $('#b-cnt').textContent = `${prog ? prog.badgeCount : 0} / ${bs.length}`;
   const yr = recap(c);
   $('#recap-year').textContent = `${yr.year}년`;
-  $('#recap').innerHTML = [['새 영토', `${yr.n}곳`], ['가장 많이 간 시·도', yr.topProv || '—'], ['가장 희귀한 곳', yr.rarest || '—'], ['새로 밟은 시·도', `${yr.newProv}곳`], ['완성한 세트', `${yr.sets}개`], ['가장 바쁜 달', yr.busiest || '—']].map(([k,v]) => `<div><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`).join('');
+  $('#recap').innerHTML = [['새 영토', `${yr.n}곳`], ['가장 많이 간 시·도', yr.topProv || '—'], ['가장 희귀한 곳', yr.rarest || '—'], ['새로 밟은 시·도', `${yr.newProv}곳`], ['완성한 세트', `${dex ? dex.completed : 0}개`], ['가장 바쁜 달', yr.busiest || '—']].map(([k,v]) => `<div><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`).join('');
   const max = Math.max(1, ...yr.months);
   $('#months').innerHTML = yr.months.map((n, i) => `<div class="${n?'':'zero'}" style="height:${Math.max(3, 100*n/max)}%"><span>${i+1}</span></div>`).join('');
 }
@@ -1460,7 +1447,7 @@ function recap(c){
   const rarest = inYear.slice().sort((a,b) => order[rarity(b.f)] - order[rarity(a.f)])[0];
   const newProv = PROVS.filter(p => { const vs = c.list.filter(v => v.f.properties.prov===p); return vs.length && vs.every(v => (v.date||'').startsWith(String(year))); }).length;
   const bi = months.indexOf(Math.max(...months));
-  return { year, n:inYear.length, months, topProv: topProv ? `${topProv[0]} ${topProv[1]}곳` : null, rarest: rarest ? `${rarest.f.properties.name} (${RAR_LABEL[rarity(rarest.f)]})` : null, newProv, sets: c.setsDone, busiest: months[bi] ? `${bi+1}월 ${months[bi]}곳` : null };
+  return { year, n:inYear.length, months, topProv: topProv ? `${topProv[0]} ${topProv[1]}곳` : null, rarest: rarest ? `${rarest.f.properties.name} (${RAR_LABEL[rarity(rarest.f)]})` : null, newProv, sets: dex ? dex.completed : 0, busiest: months[bi] ? `${bi+1}월 ${months[bi]}곳` : null };
 }
 
 /* ---------- cards ---------- */
@@ -1477,11 +1464,11 @@ function territoryCard(){
   const c = ctx(); const [cv, x] = canvas();
   const p = drawMap(x, [[50,50],[560,580]], cd => state.visits[cd] ? '#2fc3ad' : null);
   LEGEND.forEach(cd => { if (!state.visits[cd]) return; const [cx,cy] = p.centroid(BY_CODE.get(cd)); x.beginPath(); x.arc(cx,cy,7,0,Math.PI*2); x.strokeStyle = '#d7b3ff'; x.lineWidth = 2.5; x.stroke(); });
-  x.font = font(22, false, 500); x.fillStyle = '#8fb3ad'; x.fillText(`KOBI의 영토 · ${currentTitle(c)}`, 640, 70);
+  x.font = font(22, false, 500); x.fillStyle = '#8fb3ad'; x.fillText(`KOBI의 영토 · ${currentTitle()}`, 640, 70);
   x.font = font(100, true); x.fillStyle = '#fff'; x.fillText(`${Math.round(100*c.n/FEATURES.length)}%`, 634, 100);
   x.font = font(22, false, 500); x.fillStyle = '#cfe6e1'; x.fillText(`${FEATURES.length}곳 중 ${c.n}곳 · 상위 ${c.top}%`, 640, 215);
   x.save(); x.beginPath(); x.roundRect(904, 50, 248, 155, 8); x.clip(); drawScene(x, equipped(), 904, 50, 248/96); x.restore(); x.strokeStyle = '#2fc3ad'; x.lineWidth = 2; x.beginPath(); x.roundRect(904, 50, 248, 155, 8); x.stroke();
-  [['정복한 시·도', `${PROVS.filter(q => c.full(q)).length} / 17`], ['전설 지역', `${c.legend} / ${LEGEND.size}`], ['도감 세트', `${c.setsDone} / ${SETS.length}`], ['레벨', `Lv.${c.level} · 스트릭 ${c.streak}개월`], ['꾸미기', `${stylePts()}점 · ${styleRank(stylePts())}`]].forEach(([k,v], i) => { const yy = 268 + i*50; x.font = font(20); x.fillStyle = '#8fb3ad'; x.fillText(k, 640, yy); x.font = font(34, true); x.fillStyle = '#fff'; x.fillText(v, 820, yy-6); });
+  [['정복한 시·도', `${PROVS.filter(q => c.full(q)).length} / 17`], ['전설 지역', `${c.legend} / ${LEGEND.size}`], ['도감 세트', `${dex ? dex.completed : 0} / ${SETS.length}`], ['레벨', `Lv.${prog ? prog.level : 1} · 스트릭 ${prog ? prog.streak.months : 0}개월`], ['꾸미기', `${stylePts()}점 · ${styleRank(stylePts())}`]].forEach(([k,v], i) => { const yy = 268 + i*50; x.font = font(20); x.fillStyle = '#8fb3ad'; x.fillText(k, 640, yy); x.font = font(34, true); x.fillStyle = '#fff'; x.fillText(v, 820, yy-6); });
   footer(x); return cv.toDataURL('image/png');
 }
 function recentCard(code){
@@ -1535,7 +1522,20 @@ $('#t-reset-view').onclick = () => { highlight = null; render(); resetView(); };
 $('#prov').addEventListener('click', ev => { const b = ev.target.closest('[data-prov]'); if (b) zoomTo(FEATURES.filter(f => f.properties.prov === b.dataset.prov)); });
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-show]'); if (b) showOnMap(b.dataset.show); });
 $('#rank').addEventListener('click', ev => { const b = ev.target.closest('[data-vs]'); if (b && b.dataset.vs) { state.vsFriend = b.dataset.vs; save(); render(); } });
-$('#titles').addEventListener('click', ev => { const b = ev.target.closest('[data-title]'); if (b && !b.disabled) { state.title = b.dataset.title; save(); render(); toast('✓', '칭호 변경', b.textContent); } });
+$('#titles').addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-title]'); if (!b || b.disabled) return;
+  try { prog = await api.selectTitle(b.dataset.title); render(); toast('✓', '칭호 변경', prog.title.name); }
+  catch (e) { toastError(e); }
+});
+async function claimQuest(btn){
+  btn.disabled = true;
+  try {
+    const r = await api.claim(btn.dataset.claim);
+    toast('★', '퀘스트 보상', `+${r.xp} XP`);
+    qs = await api.quests(); render(); pollProgress();
+  } catch (e) { toastError(e); btn.disabled = false; }
+}
+['#quests-month', '#quests-long'].forEach(sel => $(sel).addEventListener('click', ev => { const b = ev.target.closest('[data-claim]'); if (b && !b.disabled) claimQuest(b); }));
 $('#t-share').onclick = () => withFonts(() => showCard(territoryCard()));
 $('#t-recap-card').onclick = () => withFonts(() => showCard(recapCard()));
 $('#t-recent-card').onclick = () => withFonts(() => { const c = ctx(); const last = c.list.slice().sort((a,b) => (b.date||'').localeCompare(a.date||'') || b.at - a.at)[0]; if (last) showCard(recentCard(last.code)); else toast('!', '아직 기록이 없어요', '지도를 먼저 칠해보세요'); });
@@ -1559,11 +1559,11 @@ $('#t-sample').onclick = async () => {
   try {
     await api.seed(); await refresh();
     state.equip = {}; inventory().forEach(it => autoEquip(it)); setItems().forEach(it => autoEquip(it));
-    sampleMode = true; selected = null; highlight = null; commit(); render(); resetView();
+    sampleMode = true; selected = null; highlight = null; commit(); render(); resetView(); pollProgress();
   } catch (e) { toastError(e); }
 };
 $('#t-clear').onclick = async () => {
-  try { await api.clear(); state = BLANK(); await refresh(); sampleMode = false; selected = null; highlight = null; save(); render(); }
+  try { await api.clear(); state = BLANK(); await refresh(); sampleMode = false; selected = null; highlight = null; save(); render(); pollProgress(); }
   catch (e) { toastError(e); }
 };
 
@@ -1575,7 +1575,7 @@ function start(hot){
   const h = (location.hash || '').slice(1);
   if (['map','bag','sets','quests','rank','profile'].includes(h)) setTab(h);
   render();
-  refresh().then(() => { checkBadges(true); render(); }).catch(e => toastError(e));
+  refresh().then(() => refreshProgress(false)).catch(e => toastError(e));
 }
 if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => ({ state, sampleMode }));
 (window.claude && window.claude.hot && window.claude.hot.ready) ? window.claude.hot.ready(start) : start((window.claude && window.claude.hot && window.claude.hot.data) || {});

@@ -1,0 +1,186 @@
+[
+ {
+  "id": "east",
+  "name": "동해안 종주",
+  "desc": "고성에서 포항까지 7번 국도를 따라",
+  "title": "동해의 파도",
+  "regionCodes": [
+   "KR-32400",
+   "KR-32060",
+   "KR-32410",
+   "KR-32030",
+   "KR-32040",
+   "KR-32070",
+   "KR-37420",
+   "KR-37350",
+   "KR-37012"
+  ],
+  "background": {
+   "emoji": "🌅",
+   "name": "동해 일출 배경",
+   "theme": "sunrise"
+  }
+ },
+ {
+  "id": "sea",
+  "name": "바다 도시",
+  "desc": "바다를 낀 대표 도시 여섯",
+  "title": "바다 수집가",
+  "regionCodes": [
+   "KR-21090",
+   "KR-21140",
+   "KR-36020",
+   "KR-32030",
+   "KR-39020",
+   "KR-38050"
+  ],
+  "background": {
+   "emoji": "⚓",
+   "name": "항구의 밤 배경",
+   "theme": "harbor"
+  }
+ },
+ {
+  "id": "old",
+  "name": "천년 고도",
+  "desc": "왕조의 수도였던 도시들",
+  "title": "역사 덕후",
+  "regionCodes": [
+   "KR-37020",
+   "KR-35011",
+   "KR-34020",
+   "KR-34330",
+   "KR-37040",
+   "KR-36040"
+  ],
+  "background": {
+   "emoji": "🏯",
+   "name": "궁궐 뜰 배경",
+   "theme": "palace"
+  }
+ },
+ {
+  "id": "island",
+  "name": "섬 순례",
+  "desc": "배나 다리를 건너야 닿는 곳",
+  "title": "섬 사냥꾼",
+  "regionCodes": [
+   "KR-39010",
+   "KR-39020",
+   "KR-37430",
+   "KR-36460",
+   "KR-36470",
+   "KR-23310",
+   "KR-38090",
+   "KR-38350"
+  ],
+  "background": {
+   "emoji": "🏝️",
+   "name": "푸른 섬바다 배경",
+   "theme": "islands"
+  }
+ },
+ {
+  "id": "ball",
+  "name": "야구장 투어",
+  "desc": "KBO 홈구장이 있는 지역 전부",
+  "title": "직관러",
+  "regionCodes": [
+   "KR-11240",
+   "KR-11170",
+   "KR-21060",
+   "KR-22060",
+   "KR-24040",
+   "KR-25020",
+   "KR-23030",
+   "KR-38114",
+   "KR-31011"
+  ],
+  "background": {
+   "emoji": "🏟️",
+   "name": "야간 경기장 배경",
+   "theme": "stadium"
+  }
+ },
+ {
+  "id": "soup",
+  "name": "국밥 로드",
+  "desc": "지역 국밥의 본진만 골라서",
+  "title": "국밥 순례자",
+  "regionCodes": [
+   "KR-21020",
+   "KR-38080",
+   "KR-22010",
+   "KR-35011",
+   "KR-34011",
+   "KR-36040"
+  ],
+  "background": {
+   "emoji": "🍲",
+   "name": "밤 시장 골목 배경",
+   "theme": "market"
+  }
+ },
+ {
+  "id": "dmz",
+  "name": "최전방",
+  "desc": "휴전선과 맞닿은 접경 지역",
+  "title": "최전방 탐험가",
+  "regionCodes": [
+   "KR-23310",
+   "KR-31200",
+   "KR-31350",
+   "KR-32360",
+   "KR-32370",
+   "KR-32380",
+   "KR-32390",
+   "KR-32400"
+  ],
+  "background": {
+   "emoji": "🕊️",
+   "name": "접경의 새벽 배경",
+   "theme": "dmz"
+  }
+ },
+ {
+  "id": "jiri",
+  "name": "지리산 둘레",
+  "desc": "지리산을 둘러싼 다섯 고을",
+  "title": "산 사람",
+  "regionCodes": [
+   "KR-35050",
+   "KR-36330",
+   "KR-38360",
+   "KR-38370",
+   "KR-38380"
+  ],
+  "background": {
+   "emoji": "⛰️",
+   "name": "지리산 능선 배경",
+   "theme": "ridge"
+  }
+ },
+ {
+  "id": "han",
+  "name": "한강 라인",
+  "desc": "한강을 끼고 있는 서울 10개 구",
+  "title": "한강러",
+  "regionCodes": [
+   "KR-11160",
+   "KR-11140",
+   "KR-11030",
+   "KR-11040",
+   "KR-11050",
+   "KR-11240",
+   "KR-11230",
+   "KR-11220",
+   "KR-11190",
+   "KR-11200"
+  ],
+  "background": {
+   "emoji": "🌉",
+   "name": "한강 야경 배경",
+   "theme": "hanriver"
+  }
+ }
+]

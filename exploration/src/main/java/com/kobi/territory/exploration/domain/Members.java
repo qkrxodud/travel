@@ -16,7 +16,7 @@ public final class Members {
 
     private Members(List<Member> items) {
         if (items.size() > MAX) throw ExplorationError.MAP_FULL.exception(MAX);
-        long owners = items.stream().filter(m -> m.role() == MemberRole.OWNER).count();
+        long owners = items.stream().filter(member -> member.role() == MemberRole.OWNER).count();
         if (owners != 1) throw ExplorationError.INVALID_MAP.exception("OWNER 수=" + owners);
         if (items.stream().map(Member::explorerId).distinct().count() != items.size()) {
             throw ExplorationError.ALREADY_MEMBER.exception();
@@ -33,7 +33,7 @@ public final class Members {
     }
 
     public Optional<Member> find(ExplorerId explorerId) {
-        return items.stream().filter(m -> m.explorerId().equals(explorerId)).findFirst();
+        return items.stream().filter(member -> member.explorerId().equals(explorerId)).findFirst();
     }
 
     /** "이 탐험가가 이 지도의 멤버인가" — 아니면 NOT_A_MEMBER. */
@@ -42,7 +42,7 @@ public final class Members {
     }
 
     public Member owner() {
-        return items.stream().filter(m -> m.role() == MemberRole.OWNER).findFirst().orElseThrow();
+        return items.stream().filter(member -> member.role() == MemberRole.OWNER).findFirst().orElseThrow();
     }
 
     public int size() {

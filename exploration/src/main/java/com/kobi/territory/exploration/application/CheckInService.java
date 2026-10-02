@@ -1,8 +1,8 @@
 package com.kobi.territory.exploration.application;
 
-import com.kobi.territory.catalog.api.ItemView;
-import com.kobi.territory.catalog.api.RegionCatalog;
-import com.kobi.territory.catalog.api.RegionView;
+import com.kobi.territory.catalog.api.query.ItemView;
+import com.kobi.territory.catalog.api.query.RegionCatalog;
+import com.kobi.territory.catalog.api.query.RegionView;
 import com.kobi.territory.common.event.EventOutbox;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
@@ -25,6 +25,7 @@ import com.kobi.territory.exploration.domain.Visit;
 import com.kobi.territory.exploration.domain.VisitDate;
 import com.kobi.territory.exploration.domain.VisitPatch;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -70,27 +71,31 @@ public class CheckInService {
         MapMembership mm = mapAccess.resolve(explorerId, MapSelector.of(mapId));
         RegionSnapshot region = regions.require(code);
         Territory territory = territories.load(mm.map().id());
-        return outcome(mm.map().id(), CheckInPreview.preview(territory, explorerId, region, regions.rewardTable()));
+        return outcome(mm.map().id(), CheckInPreview.preview(territory, explorerId, region, regions));
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public CheckInOutcome checkIn(CheckInCommand cmd) {
-        return checkIn(cmd, null);
+        return checkIn(cmd, null, null);
     }
 
-    /** policyOverride: 개발용 시드처럼 상한을 우회할 때만 (같은 패키지에서만 호출). */
+    /**
+     * 개발용 시드 전용(같은 패키지에서만 호출): policyOverride 로 상한을 우회하고, visitedAtOverride 로 처리 시각을
+     * 샘플 날짜로 둔다(D6 — 스트릭·월간 퀘스트가 프로토타입과 비슷한 그림이 나오게). 둘 다 null 이면 일반 체크인.
+     */
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    CheckInOutcome checkIn(CheckInCommand cmd, CheckInPolicy policyOverride) {
+    CheckInOutcome checkIn(CheckInCommand cmd, CheckInPolicy policyOverride, Instant visitedAtOverride) {
         MapId mapId = lockTerritory(cmd.explorerId(), MapSelector.of(cmd.mapId())); // 반드시 첫 문장
         MapMembership mm = mapAccess.resolve(cmd.explorerId(), MapSelector.of(mapId));
         RegionSnapshot region = regions.require(cmd.regionCode());
         Territory territory = territories.load(mapId);
 
-        CheckInPreview.Result preview = CheckInPreview.preview(territory, cmd.explorerId(), region, regions.rewardTable());
+        CheckInPreview.Result preview = CheckInPreview.preview(territory, cmd.explorerId(), region, regions);
         CheckInPolicy policy = Optional.ofNullable(policyOverride)
             .orElseGet(() -> mm.map().checkInPolicy(settings.onboardingGrace()));
+        Instant now = Optional.ofNullable(visitedAtOverride).orElseGet(clock::instant);
         CheckInResult result = territory.checkIn(cmd.explorerId(), region, VisitDate.of(cmd.visitDate()),
-            Memo.of(cmd.memo()), PhotoRef.ofNullable(cmd.photoUrl()), context(policy, mm));
+            Memo.of(cmd.memo()), PhotoRef.ofNullable(cmd.photoUrl()), context(policy, mm, now));
         territories.save(territory);
 
         outbox.append(AGGREGATE, mapId.value(), regionVisited(result));
@@ -105,7 +110,7 @@ public class CheckInService {
 
         Visit edited = territory.editVisit(cmd.explorerId(), cmd.regionCode(),
             VisitPatch.of(cmd.visitDate(), cmd.memo(), cmd.photoUrl()),
-            context(mm.map().checkInPolicy(settings.onboardingGrace()), mm));
+            context(mm.map().checkInPolicy(settings.onboardingGrace()), mm, clock.instant()));
         territories.save(territory);
 
         outbox.append(AGGREGATE, mapId.value(), new VisitEdited(cmd.explorerId().value(), mapId.value(),
@@ -125,7 +130,8 @@ public class CheckInService {
 
         RegionSnapshot region = result.visit().region();
         outbox.append(AGGREGATE, mapId.value(), new VisitCancelled(explorerId.value(), mapId.value(), code.value(),
-            region.rarity(), region.provinceCode(), result.wasClaim(), result.remaining(), clock.instant()));
+            region.rarity(), region.provinceCode(), result.wasClaim(), result.remaining(), result.regionStillOnMap(),
+            clock.instant()));
         return result;
     }
 
@@ -137,16 +143,17 @@ public class CheckInService {
         });
     }
 
-    private CheckInContext context(CheckInPolicy policy, MapMembership mm) {
-        return new CheckInContext(policy, mm.member().joinedAt(), clock.instant(), clock.getZone());
+    private CheckInContext context(CheckInPolicy policy, MapMembership mm, Instant now) {
+        return new CheckInContext(policy, mm.member().joinedAt(), now, clock.getZone());
     }
 
-    private static RegionVisited regionVisited(CheckInResult r) {
-        Visit v = r.visit();
-        RegionSnapshot region = v.region();
-        return new RegionVisited(v.checkedInBy().value(), r.mapId().value(), region.code().value(), region.rarity(),
-            region.provinceCode(), v.visitedAt(), v.visitDate().value(), r.facts().firstInProvince(), r.facts().nth(),
-            r.facts().firstClaim());
+    /** 체크인 결과 → 공개 이벤트. 재계산 배치의 이력 재생(TerritoryQuery.visitHistory)도 같은 변환을 쓴다. */
+    static RegionVisited regionVisited(CheckInResult result) {
+        Visit visit = result.visit();
+        RegionSnapshot region = visit.region();
+        return new RegionVisited(visit.checkedInBy().value(), result.mapId().value(), region.code().value(), region.rarity(),
+            region.provinceCode(), visit.visitedAt(), visit.visitDate().value(), result.facts().firstInProvince(), result.facts().nth(),
+            result.facts().firstClaim());
     }
 
     private PreviewOutcome outcome(MapId mapId, CheckInPreview.Result preview) {

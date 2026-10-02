@@ -1,0 +1,86 @@
+[
+ {
+  "id": "m3",
+  "scope": "MONTHLY",
+  "ico": "3",
+  "name": "새 영토 3곳",
+  "desc": "이번 달 새 지역 3곳 칠하기",
+  "metric": "NEW_REGIONS",
+  "param": 0,
+  "target": 3,
+  "xp": 60,
+  "title": null
+ },
+ {
+  "id": "mgun",
+  "scope": "MONTHLY",
+  "ico": "郡",
+  "name": "시골로 가자",
+  "desc": "군 단위 지역 1곳",
+  "metric": "NON_COMMON_REGIONS",
+  "param": 0,
+  "target": 1,
+  "xp": 40,
+  "title": null
+ },
+ {
+  "id": "mprov",
+  "scope": "MONTHLY",
+  "ico": "新",
+  "name": "처음 가는 시·도",
+  "desc": "한 번도 안 가본 시·도에서 1곳",
+  "metric": "FIRST_IN_PROVINCE",
+  "param": 0,
+  "target": 1,
+  "xp": 80,
+  "title": null
+ },
+ {
+  "id": "mset",
+  "scope": "MONTHLY",
+  "ico": "集",
+  "name": "도감 채우기",
+  "desc": "도감 세트에 속한 지역 2곳",
+  "metric": "SET_REGIONS",
+  "param": 0,
+  "target": 2,
+  "xp": 50,
+  "title": null
+ },
+ {
+  "id": "leg5",
+  "scope": "ALWAYS",
+  "ico": "★",
+  "name": "전설 사냥",
+  "desc": "전설 지역 5곳",
+  "metric": "LEGEND_REGIONS",
+  "param": 0,
+  "target": 5,
+  "xp": 150,
+  "title": "전설 사냥꾼"
+ },
+ {
+  "id": "gun30",
+  "scope": "ALWAYS",
+  "ico": "郡",
+  "name": "시골길",
+  "desc": "군 단위 지역 30곳",
+  "metric": "NON_COMMON_REGIONS",
+  "param": 0,
+  "target": 30,
+  "xp": 150,
+  "title": "시골길 전문가"
+ },
+ {
+  "id": "p3",
+  "scope": "ALWAYS",
+  "ico": "八",
+  "name": "팔도 전문가",
+  "desc": "17개 시·도 각 3곳 이상",
+  "metric": "PROVINCES_WITH_MIN_REGIONS",
+  "param": 3,
+  "target": 17,
+  "xp": 200,
+  "title": "팔도 전문가"
+ }
+]

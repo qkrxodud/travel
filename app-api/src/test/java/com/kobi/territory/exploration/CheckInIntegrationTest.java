@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kobi.territory.catalog.api.RegionCatalog;
+import com.kobi.territory.catalog.api.query.RegionCatalog;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
@@ -60,8 +60,8 @@ class CheckInIntegrationTest {
         return outbox.findByAggregateIdOrderByIdAsc(mapId);
     }
 
-    private static ExplorationError errorOf(Throwable t) {
-        return ((ExplorationException) t).error();
+    private static ExplorationError errorOf(Throwable thrown) {
+        return ((ExplorationException) thrown).error();
     }
 
     @Test
@@ -76,14 +76,14 @@ class CheckInIntegrationTest {
 
     @Test
     void 가입하면_개인_지도와_OWNER_멤버가_생기고_MapCreated가_적재된다() {
-        var r = register();
-        String mapId = r.personalMap().id().value();
+        ExplorerService.RegisteredExplorer registered = register();
+        String mapId = registered.personalMap().id().value();
         assertThat(jdbc.queryForObject("SELECT kind FROM expedition_map WHERE id = ?", String.class, mapId))
             .isEqualTo("PERSONAL");
         assertThat(jdbc.queryForObject("SELECT daily_check_in_cap FROM expedition_map WHERE id = ?", Integer.class, mapId))
             .isEqualTo(5);
         assertThat(jdbc.queryForObject("SELECT role FROM map_member WHERE map_id = ? AND explorer_id = ?", String.class,
-            mapId, r.explorer().id().value())).isEqualTo("OWNER");
+            mapId, registered.explorer().id().value())).isEqualTo("OWNER");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM territory WHERE map_id = ?", Integer.class, mapId))
             .as("빈 Territory 루트 행(잠금 대상)").isEqualTo(1);
         assertThat(eventsOf(mapId)).extracting(OutboxEventEntity::eventName).containsExactly("MapCreated");
@@ -91,28 +91,28 @@ class CheckInIntegrationTest {
 
     @Test
     void 체크인하면_visit과_RegionVisited가_같은_트랜잭션에_적재된다() throws Exception {
-        var r = register();
-        ExplorerId me = r.explorer().id();
-        String mapId = r.personalMap().id().value();
+        ExplorerService.RegisteredExplorer registered = register();
+        ExplorerId me = registered.explorer().id();
+        String mapId = registered.personalMap().id().value();
 
         var out = checkIn(me, ULLEUNG);
         assertThat(out.preview().preview().totalXp()).isEqualTo(50 + 15 + 10);
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE map_id = ? AND region_code = ?", Integer.class,
             mapId, "KR-37430")).isEqualTo(1);
-        OutboxEventEntity row = eventsOf(mapId).stream().filter(e -> e.eventName().equals("RegionVisited"))
+        OutboxEventEntity row = eventsOf(mapId).stream().filter(entity -> entity.eventName().equals("RegionVisited"))
             .findFirst().orElseThrow();
         assertThat(row.getAggregate()).isEqualTo("Territory");
-        JsonNode p = objectMapper.readTree(row.getPayload());
-        assertThat(p.get("explorerId").asText()).isEqualTo(me.value());
-        assertThat(p.get("mapId").asText()).isEqualTo(mapId);
-        assertThat(p.get("regionCode").asText()).isEqualTo("KR-37430");
-        assertThat(p.get("rarity").asText()).isEqualTo("LEGEND");
-        assertThat(p.get("provinceCode").asText()).isEqualTo("KR-37");
-        assertThat(p.get("isFirstInProvince").asBoolean()).isTrue();
-        assertThat(p.get("nth").asInt()).isEqualTo(1);
-        assertThat(p.get("isFirstClaim").asBoolean()).isTrue();
-        assertThat(p.has("visitedAt")).isTrue();
+        JsonNode payload = objectMapper.readTree(row.getPayload());
+        assertThat(payload.get("explorerId").asText()).isEqualTo(me.value());
+        assertThat(payload.get("mapId").asText()).isEqualTo(mapId);
+        assertThat(payload.get("regionCode").asText()).isEqualTo("KR-37430");
+        assertThat(payload.get("rarity").asText()).isEqualTo("LEGEND");
+        assertThat(payload.get("provinceCode").asText()).isEqualTo("KR-37");
+        assertThat(payload.get("isFirstInProvince").asBoolean()).isTrue();
+        assertThat(payload.get("nth").asInt()).isEqualTo(1);
+        assertThat(payload.get("isFirstClaim").asBoolean()).isTrue();
+        assertThat(payload.has("visitedAt")).isTrue();
 
         RegionVisited back = objectMapper.readValue(row.getPayload(), RegionVisited.class);
         assertThat(back.isFirstInProvince()).isTrue();
@@ -122,17 +122,17 @@ class CheckInIntegrationTest {
 
     @Test
     void 실패한_체크인은_visit도_outbox도_남기지_않는다() {
-        var r = register();
-        ExplorerId me = r.explorer().id();
-        String mapId = r.personalMap().id().value();
+        ExplorerService.RegisteredExplorer registered = register();
+        ExplorerId me = registered.explorer().id();
+        String mapId = registered.personalMap().id().value();
         checkIn(me, JONGNO);
         int before = eventsOf(mapId).size();
 
         assertThatThrownBy(() -> checkIn(me, JONGNO))
-            .satisfies(e -> assertThat(errorOf(e)).isEqualTo(ExplorationError.DUPLICATE_VISIT));
+            .satisfies(thrown -> assertThat(errorOf(thrown)).isEqualTo(ExplorationError.DUPLICATE_VISIT));
         assertThatThrownBy(() -> checkIns.checkIn(new CheckInCommand(me, null, ULLEUNG,
             LocalDate.now(clock).plusDays(1), null, null)))
-            .satisfies(e -> assertThat(errorOf(e)).isEqualTo(ExplorationError.FUTURE_VISIT_DATE));
+            .satisfies(thrown -> assertThat(errorOf(thrown)).isEqualTo(ExplorationError.FUTURE_VISIT_DATE));
 
         assertThat(eventsOf(mapId)).hasSize(before);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE map_id = ?", Integer.class, mapId)).isEqualTo(1);
@@ -140,8 +140,8 @@ class CheckInIntegrationTest {
 
     @Test
     void 온보딩_72시간은_상한_미적용_이후엔_하루_5곳_다음날_초기화() {
-        var r = register();
-        ExplorerId me = r.explorer().id();
+        ExplorerService.RegisteredExplorer registered = register();
+        ExplorerId me = registered.explorer().id();
         List<String> codes = List.of("KR-11010", "KR-11020", "KR-11030", "KR-11040", "KR-11050", "KR-11060",
             "KR-11070", "KR-11080", "KR-11090", "KR-11100", "KR-11110", "KR-11120", "KR-11130", "KR-11140");
         // 가입 직후: 6곳 이상도 허용
@@ -152,7 +152,7 @@ class CheckInIntegrationTest {
         for (int i = 6; i < 11; i++) checkIn(me, RegionCode.of(codes.get(i)));
         assertThatThrownBy(() -> checkIn(me, RegionCode.of(codes.get(11))))
             .isInstanceOf(ExplorationException.class)
-            .satisfies(e -> assertThat(errorOf(e)).isEqualTo(ExplorationError.DAILY_CAP_EXCEEDED));
+            .satisfies(thrown -> assertThat(errorOf(thrown)).isEqualTo(ExplorationError.DAILY_CAP_EXCEEDED));
 
         // 다음 날이면 다시 가능
         clock.advance(Duration.ofDays(1));
@@ -161,9 +161,9 @@ class CheckInIntegrationTest {
 
     @Test
     void 수정과_취소는_VisitEdited_VisitCancelled를_적재하고_취소는_물리_삭제한다() {
-        var r = register();
-        ExplorerId me = r.explorer().id();
-        String mapId = r.personalMap().id().value();
+        ExplorerService.RegisteredExplorer registered = register();
+        ExplorerId me = registered.explorer().id();
+        String mapId = registered.personalMap().id().value();
         checkIn(me, JONGNO);
         checkIns.edit(new EditVisitCommand(me, null, JONGNO, LocalDate.now(clock).minusDays(2), "야간개장", null));
         assertThat(jdbc.queryForObject("SELECT memo FROM visit WHERE map_id = ?", String.class, mapId)).isEqualTo("야간개장");
@@ -174,37 +174,37 @@ class CheckInIntegrationTest {
         assertThat(eventsOf(mapId)).extracting(OutboxEventEntity::eventName)
             .containsExactly("MapCreated", "RegionVisited", "VisitEdited", "VisitCancelled");
         assertThatThrownBy(() -> checkIns.cancel(me, null, JONGNO))
-            .satisfies(e -> assertThat(errorOf(e)).isEqualTo(ExplorationError.VISIT_NOT_FOUND));
+            .satisfies(thrown -> assertThat(errorOf(thrown)).isEqualTo(ExplorationError.VISIT_NOT_FOUND));
     }
 
     @Test
     void outbox_릴레이가_이벤트를_발행하고_published_at을_기록한다() throws Exception {
-        var r = register();
-        checkIn(r.explorer().id(), JONGNO);
-        String mapId = r.personalMap().id().value();
+        ExplorerService.RegisteredExplorer registered = register();
+        checkIn(registered.explorer().id(), JONGNO);
+        String mapId = registered.personalMap().id().value();
         long deadline = System.currentTimeMillis() + 10_000;
         while (System.currentTimeMillis() < deadline
-            && eventsOf(mapId).stream().anyMatch(e -> e.getPublishedAt() == null)) {
+            && eventsOf(mapId).stream().anyMatch(entity -> entity.getPublishedAt() == null)) {
             Thread.sleep(100);
         }
-        assertThat(eventsOf(mapId)).allSatisfy(e -> assertThat(e.getPublishedAt()).isNotNull());
-        assertThat(captured.all()).anySatisfy(e -> {
-            assertThat(e).isInstanceOf(RegionVisited.class);
-            RegionVisited rv = (RegionVisited) e;
-            assertThat(rv.mapId()).isEqualTo(mapId);
-            assertThat(rv.regionCode()).isEqualTo("KR-11010");
-            assertThat(rv.nth()).isEqualTo(1);
-            assertThat(rv.isFirstClaim()).isTrue();
+        assertThat(eventsOf(mapId)).allSatisfy(entity -> assertThat(entity.getPublishedAt()).isNotNull());
+        assertThat(captured.all()).anySatisfy(event -> {
+            assertThat(event).isInstanceOf(RegionVisited.class);
+            RegionVisited visited = (RegionVisited) event;
+            assertThat(visited.mapId()).isEqualTo(mapId);
+            assertThat(visited.regionCode()).isEqualTo("KR-11010");
+            assertThat(visited.nth()).isEqualTo(1);
+            assertThat(visited.isFirstClaim()).isTrue();
         });
     }
 
     @Test
     void 개발용_시드는_온보딩이_끝난_탐험가도_상한을_우회해_칠한다() {
-        var r = register();
-        ExplorerId me = r.explorer().id();
+        ExplorerService.RegisteredExplorer registered = register();
+        ExplorerId me = registered.explorer().id();
         clock.advance(Duration.ofHours(100));
-        var samples = catalog.activeRegions().stream().filter(x -> x.provinceCode().equals("KR-31")).limit(12)
-            .map(x -> new ExplorationDevService.SampleVisit(RegionCode.of(x.code()), LocalDate.now(clock).minusMonths(3), "샘플"))
+        var samples = catalog.activeRegions().stream().filter(region -> region.provinceCode().equals("KR-31")).limit(12)
+            .map(region -> new ExplorationDevService.SampleVisit(RegionCode.of(region.code()), LocalDate.now(clock).minusMonths(3), "샘플"))
             .toList();
         assertThat(dev.seed(me, samples)).isEqualTo(12);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE checked_in_by = ?", Integer.class, me.value()))

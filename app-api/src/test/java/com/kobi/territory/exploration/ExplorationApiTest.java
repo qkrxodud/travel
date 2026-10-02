@@ -49,12 +49,12 @@ class ExplorationApiTest {
         today = LocalDate.now(clock);
     }
 
-    private JsonNode json(ResultActions r) throws Exception {
-        return om.readTree(r.andReturn().getResponse().getContentAsString());
+    private JsonNode json(ResultActions result) throws Exception {
+        return om.readTree(result.andReturn().getResponse().getContentAsString());
     }
 
-    private MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder b) {
-        return b.header(H, me);
+    private MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder builder) {
+        return builder.header(H, me);
     }
 
     private ResultActions checkIn(String code, LocalDate date, String memo) throws Exception {
@@ -63,8 +63,8 @@ class ExplorationApiTest {
         return mvc.perform(as(post("/visits")).contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
-    private static void error(ResultActions r, int status, String code) throws Exception {
-        r.andExpect(status().is(status)).andExpect(jsonPath("$.code").value(code))
+    private static void error(ResultActions result, int status, String code) throws Exception {
+        result.andExpect(status().is(status)).andExpect(jsonPath("$.code").value(code))
             .andExpect(jsonPath("$.message").isNotEmpty());
     }
 
@@ -186,7 +186,7 @@ class ExplorationApiTest {
         mvc.perform(as(post("/dev/explorers/age")).contentType(MediaType.APPLICATION_JSON).content("{\"hours\":73}"))
             .andExpect(status().isOk());
         String[] codes = {"KR-11010", "KR-11020", "KR-11030", "KR-11040", "KR-11050"};
-        for (String c : codes) checkIn(c, today, "").andExpect(status().isCreated());
+        for (String code : codes) checkIn(code, today, "").andExpect(status().isCreated());
         error(checkIn("KR-11060", today, ""), 422, "DAILY_CAP_EXCEEDED");
         mvc.perform(as(get("/territory"))).andExpect(jsonPath("$.conquest.visited").value(5));
         clock.advance(Duration.ofDays(1));

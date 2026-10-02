@@ -26,8 +26,17 @@ final class Fixtures {
     static final RegionSnapshot GAPYEONG = region("KR-31370", Rarity.RARE, "KR-31");
     static final RegionSnapshot ULLEUNG = region("KR-37430", Rarity.LEGEND, "KR-37");
 
-    static final RewardTable REWARDS = new RewardTable(
-        Map.of(Rarity.COMMON, 10, Rarity.RARE, 20, Rarity.LEGEND, 50), 15, 10);
+    /**
+     * 보상 포트 대역(카탈로그 RewardRules 와 같은 값: 기본 10/20/50, 시·도 첫 발 15, 선점 10). 실제 함수는 catalog 테스트가 검증한다.
+     */
+    static final CheckInRewards REWARDS = (rarity, firstInProvince, firstClaim) -> {
+        java.util.List<CheckInPreview.XpLine> lines = new java.util.ArrayList<>();
+        lines.add(new CheckInPreview.XpLine(CheckInPreview.XpSource.REGION_BASE,
+            Map.of(Rarity.COMMON, 10, Rarity.RARE, 20, Rarity.LEGEND, 50).get(rarity)));
+        if (firstInProvince) lines.add(new CheckInPreview.XpLine(CheckInPreview.XpSource.PROVINCE_FIRST, 15));
+        if (firstClaim) lines.add(new CheckInPreview.XpLine(CheckInPreview.XpSource.FIRST_CLAIM, 10));
+        return lines;
+    };
 
     static final CheckInPolicy POLICY = new CheckInPolicy(5, Duration.ofHours(72), false);
 
@@ -38,8 +47,8 @@ final class Fixtures {
     }
 
     /** 서울 25개 구 중 n번째(KR-110n0) 같은 가짜 일반 지역. */
-    static RegionSnapshot seoul(int i) {
-        return region(String.format("KR-11%03d", 100 + i), Rarity.COMMON, "KR-11");
+    static RegionSnapshot seoul(int ordinal) {
+        return region(String.format("KR-11%03d", 100 + ordinal), Rarity.COMMON, "KR-11");
     }
 
     /** 가입 직후(온보딩 중) 컨텍스트. */
@@ -52,7 +61,7 @@ final class Fixtures {
         return new CheckInContext(POLICY, now.minus(Duration.ofHours(73)), now, KST);
     }
 
-    static CheckInResult checkIn(Territory t, ExplorerId who, RegionSnapshot r, CheckInContext ctx) {
-        return t.checkIn(who, r, VisitDate.of(ctx.today()), Memo.EMPTY, null, ctx);
+    static CheckInResult checkIn(Territory territory, ExplorerId who, RegionSnapshot region, CheckInContext ctx) {
+        return territory.checkIn(who, region, VisitDate.of(ctx.today()), Memo.EMPTY, null, ctx);
     }
 }

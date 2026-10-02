@@ -15,8 +15,8 @@ public final class Provinces {
     private Provinces(List<Province> items) {
         this.inOrder = items.stream().sorted(Comparator.comparingInt(Province::displayOrder)).toList();
         Map<String, Province> map = new LinkedHashMap<>();
-        for (Province p : inOrder) {
-            if (map.put(p.code(), p) != null) throw new IllegalStateException("시·도 코드 중복: " + p.code());
+        for (Province province : inOrder) {
+            if (map.put(province.code(), province) != null) throw new IllegalStateException("시·도 코드 중복: " + province.code());
         }
         this.byCode = map;
     }
@@ -39,11 +39,11 @@ public final class Provinces {
 
     /** 모든 지역이 알려진 시·도에 속하고, 시·도별 regionCount 가 현행 지역 수와 같아야 한다. */
     public void requireConsistentWith(Regions regions) {
-        regions.all().forEach(r -> require(r.provinceCode()));
+        regions.all().forEach(region -> require(region.provinceCode()));
         Map<String, Integer> counts = regions.activeCountByProvince();
-        for (Province p : inOrder) {
-            if (counts.getOrDefault(p.code(), 0) != p.regionCount()) {
-                throw new IllegalStateException("시·도 지역 수 불일치: " + p.code());
+        for (Province province : inOrder) {
+            if (counts.getOrDefault(province.code(), 0) != province.regionCount()) {
+                throw new IllegalStateException("시·도 지역 수 불일치: " + province.code());
             }
         }
     }

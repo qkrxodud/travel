@@ -4,7 +4,6 @@ import com.kobi.territory.common.error.ErrorKind;
 
 /** 탐험 컨텍스트 오류 코드. code 문자열은 API 계약이다(클라이언트가 분기에 사용). */
 public enum ExplorationError {
-    EXPLORER_ID_REQUIRED(ErrorKind.UNAUTHENTICATED, "X-Explorer-Id 헤더로 탐험가를 알려 주세요(POST /explorers 로 발급)."),
     EXPLORER_NOT_FOUND(ErrorKind.NOT_FOUND, "탐험가를 찾을 수 없습니다. 다시 발급해 주세요."),
     MAP_NOT_FOUND(ErrorKind.NOT_FOUND, "지도를 찾을 수 없습니다: %s"),
     NOT_A_MEMBER(ErrorKind.FORBIDDEN, "이 지도의 멤버가 아닙니다."),

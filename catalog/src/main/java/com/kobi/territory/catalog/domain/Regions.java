@@ -14,8 +14,8 @@ public final class Regions {
 
     private Regions(List<Region> items) {
         Map<RegionCode, Region> map = new LinkedHashMap<>();
-        for (Region r : items) {
-            if (map.put(r.code(), r) != null) throw new IllegalStateException("지역 코드 중복: " + r.code());
+        for (Region region : items) {
+            if (map.put(region.code(), region) != null) throw new IllegalStateException("지역 코드 중복: " + region.code());
         }
         this.items = List.copyOf(items);
         this.byCode = map;
@@ -38,7 +38,7 @@ public final class Regions {
     /** 시·도 코드 → 현행 지역 수. */
     public Map<String, Integer> activeCountByProvince() {
         Map<String, Integer> out = new LinkedHashMap<>();
-        active().forEach(r -> out.merge(r.provinceCode(), 1, Integer::sum));
+        active().forEach(region -> out.merge(region.provinceCode(), 1, Integer::sum));
         return out;
     }
 

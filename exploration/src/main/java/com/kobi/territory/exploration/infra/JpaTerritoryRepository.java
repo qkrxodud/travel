@@ -2,6 +2,7 @@ package com.kobi.territory.exploration.infra;
 
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
+import com.kobi.territory.exploration.domain.ExplorationError;
 import com.kobi.territory.exploration.domain.MapId;
 import com.kobi.territory.exploration.domain.Memo;
 import com.kobi.territory.exploration.domain.PhotoRef;
@@ -13,9 +14,11 @@ import com.kobi.territory.exploration.domain.Visit;
 import com.kobi.territory.exploration.domain.VisitDate;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -49,7 +52,7 @@ class JpaTerritoryRepository implements TerritoryRepository {
 
     @Override
     public Optional<MapId> lockPersonal(ExplorerId owner) {
-        return territories.lockPersonal(owner.value()).stream().findFirst().map(t -> MapId.of(t.getMapId()));
+        return territories.lockPersonal(owner.value()).stream().findFirst().map(territoryEntity -> MapId.of(territoryEntity.getMapId()));
     }
 
     @Override
@@ -61,28 +64,49 @@ class JpaTerritoryRepository implements TerritoryRepository {
     public void save(Territory territory) {
         String mapId = territory.mapId().value();
         Map<String, VisitJpaEntity> existing = new HashMap<>();
-        visits.findByMapId(mapId).forEach(e -> existing.put(key(e.getRegionCode(), e.getCheckedInBy()), e));
-        for (Visit v : territory.visits()) {
-            VisitJpaEntity row = existing.remove(key(v.regionCode().value(), v.checkedInBy().value()));
-            String photo = v.photo() == null ? null : v.photo().url();
+        visits.findByMapId(mapId).forEach(visitEntity -> existing.put(key(visitEntity.getRegionCode(), visitEntity.getCheckedInBy()), visitEntity));
+        for (Visit visit : territory.visits()) {
+            VisitJpaEntity row = existing.remove(key(visit.regionCode().value(), visit.checkedInBy().value()));
+            String photo = visit.photo() == null ? null : visit.photo().url();
             if (row == null) {
-                visits.save(new VisitJpaEntity(mapId, v.regionCode().value(), v.checkedInBy().value(),
-                    v.verification().name(), v.visitDate().value(), v.memo().value(), photo, v.visitedAt()));
+                visits.save(new VisitJpaEntity(mapId, visit.regionCode().value(), visit.checkedInBy().value(),
+                    visit.verification().name(), visit.visitDate().value(), visit.memo().value(), photo, visit.visitedAt()));
             } else {
-                row.update(v.visitDate().value(), v.memo().value(), photo);
+                row.update(visit.visitDate().value(), visit.memo().value(), photo);
             }
         }
         List<VisitJpaEntity> removed = List.copyOf(existing.values());
         if (!removed.isEmpty()) {
             visits.deleteAll(removed);
+            visits.flush(); // 같은 트랜잭션의 재체크인이 UNIQUE에 걸리지 않게 삭제를 먼저 반영
+        }
+        flushTranslatingDuplicate();
+    }
+
+    /**
+     * 추가한 방문을 즉시 반영하고, 동시 요청이 visit UNIQUE(지도, 지역, 멤버)에 걸리면 도메인 오류 DUPLICATE_VISIT 로
+     * 번역한다(QA N3 — 제약 이름은 이 테이블을 아는 infra 의 지식이다). 그 밖의 무결성 위반은 그대로 던진다.
+     */
+    private void flushTranslatingDuplicate() {
+        try {
             visits.flush();
+        } catch (DataIntegrityViolationException exception) {
+            throw translate(exception);
         }
     }
 
-    private Visit toDomain(VisitJpaEntity e) {
-        return new Visit(regions.require(RegionCode.of(e.getRegionCode())), ExplorerId.of(e.getCheckedInBy()),
-            VisitDate.of(e.getVisitDate()), Memo.of(e.getMemo()), PhotoRef.ofNullable(e.getPhotoUrl()),
-            Verification.valueOf(e.getVerification()), e.getVisitedAt());
+    static RuntimeException translate(DataIntegrityViolationException exception) {
+        String cause = String.valueOf(exception.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT);
+        return cause.contains(VISIT_UNIQUE) ? ExplorationError.DUPLICATE_VISIT.exception("(동시 요청)") : exception;
+    }
+
+    /** V1 visit 테이블 UNIQUE 제약 이름. */
+    static final String VISIT_UNIQUE = "uq_visit_map_region_member";
+
+    private Visit toDomain(VisitJpaEntity entity) {
+        return new Visit(regions.require(RegionCode.of(entity.getRegionCode())), ExplorerId.of(entity.getCheckedInBy()),
+            VisitDate.of(entity.getVisitDate()), Memo.of(entity.getMemo()), PhotoRef.ofNullable(entity.getPhotoUrl()),
+            Verification.valueOf(entity.getVerification()), entity.getVisitedAt());
     }
 
     private static String key(String regionCode, String explorerId) {

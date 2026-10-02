@@ -20,6 +20,8 @@ export type DevApi = {
   checkIn: (explorerId: string, regionCode: string, visitDate: string, memo?: string) => Promise<void>;
   /** 화면이 발급·저장한 탐험가 id (localStorage) */
   explorerOf: (page: Page) => Promise<string>;
+  /** 진행 조회 (GET /progress) — 2단계 */
+  progress: (explorerId: string) => Promise<any>;
   /** 개발용 로그인 (POST /dev/login). 4단계 구현 예정 — 지금 호출하면 에러를 던진다. */
   login: (userId?: string) => Promise<void>;
 };
@@ -55,6 +57,11 @@ export const test = base.extend<{ dev: DevApi }>({
           const id = await page.evaluate(() => localStorage.getItem('territory-explorer-id'));
           expect(id, 'localStorage territory-explorer-id').toBeTruthy();
           return id!;
+        },
+        progress: async (explorerId) => {
+          const res = await request.get('/progress', { headers: { [EXPLORER_HEADER]: explorerId } });
+          await expectOk(res, 'GET /progress');
+          return res.json();
         },
         login: async () => {
           throw new Error('dev.login 은 아직 구현되지 않았다 (4단계에서 /dev/login 연결)');

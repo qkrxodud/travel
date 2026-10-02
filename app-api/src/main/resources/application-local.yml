@@ -16,6 +16,15 @@ spring:
       enabled: true
       path: /h2-console
 
+territory:
+  outbox:
+    relay:
+      # 로컬은 체크인 → 진행 반영(비동기)이 화면에서 바로 보이도록 짧게.
+      delay-ms: 300
+      backoff:
+        initial-ms: 100
+        max-ms: 2000
+
 logging:
   level:
     com.kobi.territory: DEBUG

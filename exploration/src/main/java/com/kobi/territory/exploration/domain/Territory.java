@@ -84,7 +84,20 @@ public final class Territory {
         Visit visit = visits.require(code, member);
         boolean wasClaim = visits.claimOf(code).orElseThrow() == visit;
         visits.remove(visit);
-        return new CancelResult(mapId, visit, wasClaim, visits.of(member).size());
+        return new CancelResult(mapId, visit, wasClaim, visits.of(member).size(), visits.anyIn(code));
+    }
+
+    /**
+     * 현재 방문을 처리 시각(visitedAt) 순으로 다시 체크인했을 때의 결과(사실 값 재계산). 진행·도감·퀘스트 재계산 배치
+     * (RecalculateService)가 RegionVisited 를 재생할 때 쓴다. 취소된 방문은 물리 삭제돼 포함되지 않는다.
+     */
+    public List<CheckInResult> history() {
+        Territory replay = empty(mapId);
+        return visits.chronological().stream().map(visit -> {
+            VisitFacts facts = replay.factsFor(visit.checkedInBy(), visit.region());
+            replay.visits.add(visit);
+            return new CheckInResult(mapId, visit, facts);
+        }).toList();
     }
 
     /** 오늘(ctx.zone 기준) 이 멤버가 처리한 체크인 수. 취소된 방문은 물리 삭제되므로 세지 않는다. */

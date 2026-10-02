@@ -6,7 +6,8 @@
   "scripts": {
     "test": "playwright test",
     "test:stage0": "playwright test tests/stage0-boot.spec.ts",
-    "test:stage1": "playwright test tests/stage1-map.spec.ts"
+    "test:stage1": "playwright test tests/stage1-map.spec.ts",
+    "test:stage2": "playwright test tests/stage2-progress.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

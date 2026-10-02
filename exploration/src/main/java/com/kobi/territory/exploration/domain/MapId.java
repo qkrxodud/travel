@@ -9,7 +9,7 @@ public record MapId(String value) {
         Objects.requireNonNull(value, "mapId");
         try {
             value = UUID.fromString(value).toString();
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException exception) {
             throw ExplorationError.MAP_NOT_FOUND.exception(value);
         }
     }

@@ -11,24 +11,36 @@ description: 나의 영토(territory) 바운디드 컨텍스트의 도메인 코
 
 | 패키지 | 담는 것 | 의존 허용 |
 |--------|---------|----------|
-| `api` | Controller, DTO, **다른 컨텍스트에 공개하는 이벤트·Query 인터페이스** | application |
+| `api` | `api.event`: 다른 컨텍스트에 공개하는 이벤트 · `api.query`: 공개 Query 인터페이스와 그 DTO · `api.web`: Controller·웹 DTO (2단계 D7) | application(api.web만), 다른 컨텍스트의 api.event·api.query |
 | `application` | UseCase 서비스, 트랜잭션 경계, 이벤트 발행/구독 핸들러 | domain |
 | `domain` | 애그리거트, VO, 도메인 이벤트, Repository 인터페이스 | common만 |
 | `infra` | JPA 엔티티/리포지토리 구현, 외부 클라이언트 | domain, application |
 
 - **application 서비스는 얇게 (사용자 확정 규칙)**: 서비스에는 리포지토리 조회·저장, 트랜잭션·잠금, 이벤트/outbox 적재, 정책 VO 조립 같은 **DB·인프라 접근과 호출 순서만** 둔다. 판단·계산·검증·분기(상한 체크, nth·isFirstInProvince 계산, 보상 계산, 정복률 집계 등)는 전부 애그리거트·VO·도메인 서비스, 그리고 **일급 컬렉션**(예: `Visits`, `OwnedItems`, `XpLedger`)으로 옮긴다. 서비스에 `if`/반복문으로 된 비즈니스 규칙이 보이면 QA 결함이다. 이유: 규칙을 Spring 없이 단위 테스트하고, 서비스는 "불러와서 → 도메인에 시키고 → 저장"만 읽히게.
 - domain은 순수 Java — Spring·JPA 어노테이션 금지. JPA 엔티티는 infra에 따로 두고 리포지토리가 변환한다. 이유: 애그리거트 단위 테스트가 컨텍스트 없이 돌고, 컨텍스트를 서비스로 떼어낼 때 모듈째 가져갈 수 있다.
-- 다른 컨텍스트는 그 컨텍스트의 `api` 패키지만 참조한다. Gradle로는 못 막으므로 ArchUnit 규칙으로 강제한다 — 위반하면 빌드가 깨진다.
-- **의존 규칙의 진화**: 뼈대(0단계)의 Gradle 의존·ArchUnit 규칙은 "도메인 모듈 간 참조 전면 금지"다. 1단계부터 구독 관계가 생기면 domain-model.md §1의 의존 매트릭스에 맞춰 **둘을 함께 갱신한다**: Gradle에 `implementation project(':exploration')` 등 허용된 의존을 추가하고, ArchUnit 규칙을 "다른 컨텍스트의 `api` 패키지 외 참조 금지" 형태(`..exploration..`은 `..exploration.api..`를 제외하고 타 컨텍스트에서 참조 불가)로 바꾼다. 둘 중 하나만 고치면 컴파일 불가 또는 ArchUnit 실패가 난다.
-- **공개 이벤트의 위치**: `RegionVisited` 같은 컨텍스트 간 이벤트는 그 컨텍스트의 `api` 패키지에 둔다. domain은 api를 참조할 수 없으므로, 애그리거트 커맨드는 계산 결과(지급 목록, isFirstInProvince 등)를 **결과 객체로 반환**하고, application 서비스가 이를 api의 공개 이벤트로 변환해 outbox에 적재한다.
+- 다른 컨텍스트는 그 컨텍스트의 `api.event`·`api.query` 패키지만 참조한다(`api.web`·domain·application·infra 금지). `api.event`·`api.query`는 자기 domain·application·infra·api.web 을 참조하지 않는다. Gradle로는 못 막으므로 ArchUnit 규칙으로 강제한다 — 위반하면 빌드가 깨진다.
+- **의존 규칙의 진화**: 뼈대(0단계)의 Gradle 의존·ArchUnit 규칙은 "도메인 모듈 간 참조 전면 금지"다. 구독 관계가 생기면 domain-model.md §1의 의존 매트릭스에 맞춰 **둘을 함께 갱신한다**: Gradle에 `implementation project(':exploration')` 등 허용된 의존을 추가하고, ArchUnit 규칙은 **허용 목록**으로 쓴다 — "다른 컨텍스트 클래스는 `..X.api.event..`·`..X.api.query..`만 참조 가능"(X.api 루트·api.web·기타 하위 패키지·domain·application·infra 는 모두 금지, 2단계 D7·QA P2-1), "X.api 아래에는 event·query·web 만", "api.event·api.query 는 공개 계약 밖을 참조하지 않는다". 금지 목록으로 쓰면 새 하위 패키지가 빈틈이 된다. 둘 중 하나만 고치면 컴파일 불가 또는 ArchUnit 실패가 난다.
+- **공개 이벤트의 위치**: `RegionVisited` 같은 컨텍스트 간 이벤트는 그 컨텍스트의 `api.event` 패키지에 둔다. domain은 api를 참조할 수 없으므로, 애그리거트 커맨드는 계산 결과(지급 목록, isFirstInProvince 등)를 **결과 객체로 반환**하고, application 서비스가 이를 api의 공개 이벤트로 변환해 outbox에 적재한다.
 - **게임 규칙 값의 주입 경로**: domain은 Spring을 모르므로 `TerritoryProperties`를 직접 주입받을 수 없다. app-api의 `TerritoryProperties`는 바인딩만 담당하고, application 서비스가 그 값을 정책 VO(예: `CheckInPolicy{dailyCap, onboardingGraceHours}`)나 커맨드 인자로 변환해 애그리거트에 전달한다. domain에 숫자를 하드코딩하면 QA 결함이다.
+
+## 명명 규칙 (사용자 확정)
+
+- **한 글자 변수·파라미터명 금지** — 지역 변수, 메서드 파라미터, 람다 파라미터 모두. 타입이나 역할을 드러내는 이름을 쓴다: `Collection c` ✗ → `CollectionBook collectionBook` ✓, `RegionVisited e` ✗ → `RegionVisited event` ✓, `forEach(s -> …)` ✗ → `forEach(completion -> …)` ✓. 특히 `e`는 예외로 읽히므로 이벤트에 쓰지 않는다. 예외는 숫자 인덱스 루프의 `i`/`j`뿐이다.
+- **JDK·Spring 타입과 같은 이름의 도메인 클래스 금지** (`Collection`, `List`, `Map`, `Optional`, `Event`, `Order` 등). 도메인 의미를 살려 구분한다 — 예: 도감은 `CollectionBook`. 설계 문서 용어와 다르게 지었으면 domain-model.md에 매핑을 적는다.
+- 이유: 코드만 보고 무엇인지 읽혀야 하고, import 충돌로 FQCN을 쓰게 되는 일을 막는다.
 
 ## 이벤트 통신 규칙
 
-1. 컨텍스트 간 호출은 `ApplicationEventPublisher` + outbox 테이블로만 한다. 동기 메서드 호출 금지. Kafka는 지금 안 붙인다(outbox 릴레이를 `@Scheduled`로).
+1. 컨텍스트 간 호출은 outbox 테이블 + 릴레이로만 한다(공개 Query 인터페이스 조회는 예외). 구독은 application 계층이 common `EventSubscriber` 빈으로 등록하는데, **소비 대상 애그리거트 하나당 구독자 하나**(예: `progression.progress`가 RegionVisited·VisitCancelled·SetCompleted·QuestCompleted 를 모두 받아 타입별로 나눠 처리)로 만든다 — 이벤트 타입마다 구독자를 따로 두면 같은 애그리거트로 가는 체크인·취소의 순서가 깨진다(QA P1-1). 릴레이(2단계 D5, `outbox_delivery`)는 구독자별로 전달·트랜잭션 분리하고, 순서 단위 (aggregateId, 구독자) 안에서 앞 이벤트가 DELIVERED 가 아니면 뒤 이벤트를 보내지 않는다(head-of-line). 낙관적 락 충돌은 상한 없이 지수 백오프+지터로 재시도, 그 밖의 실패는 5회 후 FAILED → 그 단위가 멈추고 재전달(`OutboxRedelivery`, local `POST /dev/outbox/redeliver`)로 푼다. 핸들러 트랜잭션은 애그리거트 로드·저장만 담아 짧게 둔다. Kafka는 지금 안 붙인다(릴레이는 `@Scheduled`).
 2. 트랜잭션은 커맨드를 받은 애그리거트 하나만 잠근다. 체크인이면 Territory만 커밋하고, `RegionVisited`를 같은 트랜잭션의 outbox에 쌓는다. 나머지 애그리거트는 이벤트를 구독해 각자 자기 트랜잭션에서 갱신한다.
 3. 이벤트에는 하류가 원본을 다시 읽지 않아도 되도록 계산된 값을 실어 보낸다(예: `RegionVisited`의 `isFirstInProvince`, `nth`, `isFirstClaim`).
-4. **모든 핸들러는 멱등하다.** `xp_ledger.ref_id` 같은 유니크 키로 중복 적용을 막는다. refId 형식: 기본 XP는 `region:{explorerId}:{code}`, 선점 보너스는 `claim:{mapId}:{code}:{explorerId}`(수령자를 포함해야 선점 이전 시 새 선점자 지급이 UNIQUE에 막히지 않는다).
+4. **모든 핸들러는 멱등하다.** `xp_ledger.ref_id` 같은 유니크 키로 중복 적용을 막는다. refId 형식(2단계 D3·D4 반영):
+   - 기본 XP 지급 `region:{explorerId}:{code}#{k}`, 회수 `region:{explorerId}:{code}#{k}:revoke`(음수) — k 는 세대(XpLedger 가 계산). 지역당 회수 안 된 지급은 최대 1개라 지급·회수 재전달이 이벤트 id 없이 no-op 이 된다.
+   - 시·도 첫 발 `province:{explorerId}:{provinceCode}`(탐험가 단위, 판정은 explorer_region 기준, 취소해도 회수 없음).
+   - 선점 보너스 `claim:{mapId}:{code}:{explorerId}`(수령자를 포함해야 선점 이전 시 새 선점자 지급이 UNIQUE에 막히지 않는다).
+   - 세트 완성 `set:{explorerId}:{setId}`, 퀘스트 `quest:{explorerId}:{period}:{questId}`.
+   - 카운터(+1/−1)는 그대로 쌓지 말고 집합으로 들고 있는다(예: explorer_region 의 활성 지도 id 집합, 퀘스트의 센 지역 키 집합).
+   - 취소의 지도 단위/탐험가 단위 판단: `VisitCancelled.regionStillOnMap`(지도 단위 — 도감), explorer_region.active_map_count(탐험가 단위 — 기본 XP·지역 아이템)(D2).
 5. 순서가 중요한 연쇄(세트 완성 → 보상)는 2차 이벤트(`SetCompleted`)로 잇는다.
 
 ## 일관성 3원칙

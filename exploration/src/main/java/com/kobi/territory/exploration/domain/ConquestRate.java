@@ -17,17 +17,17 @@ public record ConquestRate(int visited, int total, List<ProvinceRate> provinces)
      */
     public static ConquestRate of(Collection<RegionSnapshot> regions, Map<String, Integer> provinceTotals) {
         Map<String, Integer> counts = new HashMap<>();
-        for (RegionSnapshot r : regions) {
-            if (provinceTotals.containsKey(r.provinceCode())) counts.merge(r.provinceCode(), 1, Integer::sum);
+        for (RegionSnapshot region : regions) {
+            if (provinceTotals.containsKey(region.provinceCode())) counts.merge(region.provinceCode(), 1, Integer::sum);
         }
         List<ProvinceRate> rows = new ArrayList<>();
         int total = 0;
         int visited = 0;
-        for (var e : provinceTotals.entrySet()) {
-            int n = Math.min(counts.getOrDefault(e.getKey(), 0), e.getValue());
-            rows.add(new ProvinceRate(e.getKey(), n, e.getValue()));
-            total += e.getValue();
-            visited += n;
+        for (var provinceTotal : provinceTotals.entrySet()) {
+            int visitedCount = Math.min(counts.getOrDefault(provinceTotal.getKey(), 0), provinceTotal.getValue());
+            rows.add(new ProvinceRate(provinceTotal.getKey(), visitedCount, provinceTotal.getValue()));
+            total += provinceTotal.getValue();
+            visited += visitedCount;
         }
         return new ConquestRate(visited, total, List.copyOf(rows));
     }

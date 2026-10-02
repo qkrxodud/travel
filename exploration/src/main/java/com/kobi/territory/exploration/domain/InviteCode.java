@@ -9,7 +9,7 @@ public record InviteCode(String value) {
     private static final String ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     public InviteCode {
-        if (value == null || value.length() != LENGTH || !value.chars().allMatch(c -> ALPHABET.indexOf(c) >= 0)) {
+        if (value == null || value.length() != LENGTH || !value.chars().allMatch(character -> ALPHABET.indexOf(character) >= 0)) {
             throw ExplorationError.INVALID_MAP.exception("inviteCode=" + value);
         }
     }

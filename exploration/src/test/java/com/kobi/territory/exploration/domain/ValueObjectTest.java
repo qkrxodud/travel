@@ -17,9 +17,9 @@ class ValueObjectTest {
         assertThat(Memo.of("가".repeat(40)).value()).hasSize(40);
         assertThatThrownBy(() -> Memo.of("가".repeat(41)))
             .isInstanceOf(ExplorationException.class)
-            .satisfies(e -> {
-                assertThat(((ExplorationException) e).error()).isEqualTo(ExplorationError.MEMO_TOO_LONG);
-                assertThat(((TerritoryException) e).kind()).isEqualTo(ErrorKind.INVALID);
+            .satisfies(exception -> {
+                assertThat(((ExplorationException) exception).error()).isEqualTo(ExplorationError.MEMO_TOO_LONG);
+                assertThat(((TerritoryException) exception).kind()).isEqualTo(ErrorKind.INVALID);
             });
         String emoji40 = "🍜".repeat(40); // UTF-16 80자지만 40 코드포인트
         assertThat(Memo.of(emoji40).value()).isEqualTo(emoji40);
@@ -39,7 +39,7 @@ class ValueObjectTest {
         assertThat(RegionCode.of("KR-11010").countryCode()).isEqualTo("KR");
         for (String bad : new String[] {"11010", "KR11010", "kr-11010", "KR-1101", "KR-110100", ""}) {
             assertThatThrownBy(() -> RegionCode.of(bad)).isInstanceOf(TerritoryException.class)
-                .satisfies(e -> assertThat(((TerritoryException) e).code()).isEqualTo("INVALID_REGION_CODE"));
+                .satisfies(exception -> assertThat(((TerritoryException) exception).code()).isEqualTo("INVALID_REGION_CODE"));
         }
     }
 
@@ -54,7 +54,7 @@ class ValueObjectTest {
     @Test
     void 방문일은_필수다() {
         assertThatThrownBy(() -> VisitDate.of(null))
-            .satisfies(e -> assertThat(((ExplorationException) e).error()).isEqualTo(ExplorationError.INVALID_VISIT_DATE));
+            .satisfies(exception -> assertThat(((ExplorationException) exception).error()).isEqualTo(ExplorationError.INVALID_VISIT_DATE));
     }
 
     @Test
@@ -80,6 +80,6 @@ class ValueObjectTest {
     @Test
     void 지도_id_형식이_틀리면_지도_없음() {
         assertThatThrownBy(() -> MapId.of("x"))
-            .satisfies(e -> assertThat(((ExplorationException) e).error()).isEqualTo(ExplorationError.MAP_NOT_FOUND));
+            .satisfies(exception -> assertThat(((ExplorationException) exception).error()).isEqualTo(ExplorationError.MAP_NOT_FOUND));
     }
 }

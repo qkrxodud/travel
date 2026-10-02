@@ -3,7 +3,14 @@ package com.kobi.territory.catalog.infra;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kobi.territory.catalog.domain.BadgeCondition;
+import com.kobi.territory.catalog.domain.BadgeDefinition;
 import com.kobi.territory.catalog.domain.Catalog;
+import com.kobi.territory.catalog.domain.CollectionSetDefinition;
+import com.kobi.territory.catalog.domain.LevelRules;
+import com.kobi.territory.catalog.domain.LevelTitle;
+import com.kobi.territory.catalog.domain.ProgressionDefinitions;
+import com.kobi.territory.catalog.domain.QuestDefinition;
 import com.kobi.territory.catalog.domain.CatalogRepository;
 import com.kobi.territory.catalog.domain.ItemDefinition;
 import com.kobi.territory.catalog.domain.ItemDefinitions;
@@ -40,23 +47,47 @@ public class JsonCatalogRepository implements CatalogRepository {
     public JsonCatalogRepository() {
         ObjectMapper om = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         List<Province> provinces = read(om, "provinces.json", new TypeReference<List<ProvinceJson>>() {}).stream()
-            .map(p -> new Province(p.code, p.name, p.fullName, p.displayOrder, p.regionCount)).toList();
+            .map(provinceJson -> new Province(provinceJson.code, provinceJson.name, provinceJson.fullName, provinceJson.displayOrder, provinceJson.regionCount)).toList();
         List<Region> regions = read(om, "regions.json", new TypeReference<List<RegionJson>>() {}).stream()
-            .map(r -> new Region(RegionCode.of(r.code), r.name, r.provinceCode, Rarity.valueOf(r.rarity), r.countryCode,
-                r.version, r.replacedBy == null ? null : RegionCode.of(r.replacedBy),
-                r.retiredAt == null ? null : LocalDate.parse(r.retiredAt)))
+            .map(regionJson -> new Region(RegionCode.of(regionJson.code), regionJson.name, regionJson.provinceCode, Rarity.valueOf(regionJson.rarity), regionJson.countryCode,
+                regionJson.version, regionJson.replacedBy == null ? null : RegionCode.of(regionJson.replacedBy),
+                regionJson.retiredAt == null ? null : LocalDate.parse(regionJson.retiredAt)))
             .toList();
         List<ItemDefinition> items = read(om, "items.json", new TypeReference<List<ItemJson>>() {}).stream()
-            .map(i -> new ItemDefinition(i.itemId, i.regionCode == null ? null : RegionCode.of(i.regionCode), i.name, i.emoji,
-                ItemSlot.valueOf(i.slot), Rarity.valueOf(i.tier), i.theme,
-                i.look == null ? null : new ItemDefinition.Look(i.look.type, i.look.primary, i.look.secondary)))
+            .map(itemJson -> new ItemDefinition(itemJson.itemId, itemJson.regionCode == null ? null : RegionCode.of(itemJson.regionCode), itemJson.name, itemJson.emoji,
+                ItemSlot.valueOf(itemJson.slot), Rarity.valueOf(itemJson.tier), itemJson.theme,
+                itemJson.look == null ? null : new ItemDefinition.Look(itemJson.look.type, itemJson.look.primary, itemJson.look.secondary)))
             .toList();
         RewardJson rj = read(om, "reward-rules.json", new TypeReference<RewardJson>() {});
         Map<Rarity, Integer> xp = new HashMap<>();
-        rj.xpByRarity.forEach((k, v) -> xp.put(Rarity.valueOf(k), v));
+        rj.xpByRarity.forEach((rarityName, amount) -> xp.put(Rarity.valueOf(rarityName), amount));
         // 정합성 검증은 도메인(Catalog·일급 컬렉션)이 생성 시 한다
         this.catalog = new Catalog(Regions.of(regions), Provinces.of(provinces), ItemDefinitions.of(items),
-            new RewardRules(xp, rj.provinceFirstBonus, rj.setCompleteBonus, rj.claimBonus), readString("regions.geojson"));
+            new RewardRules(xp, rj.provinceFirstBonus, rj.setCompleteBonus, rj.claimBonus), readString("regions.geojson"),
+            progression(om));
+    }
+
+    /** 2단계 진행 정의: levels.json, sets.json, badges.json, quests.json */
+    private static ProgressionDefinitions progression(ObjectMapper om) {
+        LevelsJson lj = read(om, "levels.json", new TypeReference<LevelsJson>() {});
+        List<CollectionSetDefinition> sets = read(om, "sets.json", new TypeReference<List<SetJson>>() {}).stream()
+            .map(setJson -> new CollectionSetDefinition(setJson.id, setJson.name, setJson.desc, setJson.title,
+                setJson.regionCodes.stream().map(RegionCode::of).toList(),
+                setJson.background == null ? null
+                    : new CollectionSetDefinition.Background(setJson.background.emoji, setJson.background.name, setJson.background.theme)))
+            .toList();
+        List<BadgeDefinition> badges = read(om, "badges.json", new TypeReference<List<BadgeJson>>() {}).stream()
+            .map(badgeJson -> new BadgeDefinition(badgeJson.id, badgeJson.ico, badgeJson.name, badgeJson.desc, new BadgeCondition(
+                BadgeCondition.Type.valueOf(badgeJson.condition.type), badgeJson.condition.min, badgeJson.condition.provinces, badgeJson.condition.groups,
+                badgeJson.condition.ratio)))
+            .toList();
+        List<QuestDefinition> quests = read(om, "quests.json", new TypeReference<List<QuestJson>>() {}).stream()
+            .map(questJson -> new   QuestDefinition(questJson.id, QuestDefinition.Scope.valueOf(questJson.scope), questJson.ico, questJson.name, questJson.desc,
+                QuestDefinition.Metric.valueOf(questJson.metric), questJson.param, questJson.target, questJson.xp, questJson.title))
+            .toList();
+        return new ProgressionDefinitions(
+            new LevelRules(lj.divisor, lj.titles.stream().map(titleJson -> new LevelTitle(titleJson.level, titleJson.name)).toList()),
+            sets, badges, quests);
     }
 
     @Override
@@ -67,16 +98,16 @@ public class JsonCatalogRepository implements CatalogRepository {
     private static <T> T read(ObjectMapper om, String name, TypeReference<T> type) {
         try (InputStream in = open(name)) {
             return om.readValue(in, type);
-        } catch (IOException e) {
-            throw new UncheckedIOException("카탈로그 로딩 실패: " + name, e);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("카탈로그 로딩 실패: " + name, exception);
         }
     }
 
     private static String readString(String name) {
         try (InputStream in = open(name)) {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException("카탈로그 로딩 실패: " + name, e);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("카탈로그 로딩 실패: " + name, exception);
         }
     }
 
@@ -95,6 +126,21 @@ public class JsonCatalogRepository implements CatalogRepository {
 
     record ItemJson(String itemId, String regionCode, String name, String emoji, String slot, String tier, String theme,
                     LookJson look) {}
+
+    record LevelTitleJson(int level, String name) {}
+
+    record LevelsJson(int divisor, List<LevelTitleJson> titles) {}
+
+    record BackgroundJson(String emoji, String name, String theme) {}
+
+    record SetJson(String id, String name, String desc, String title, List<String> regionCodes, BackgroundJson background) {}
+
+    record ConditionJson(String type, int min, List<String> provinces, List<List<String>> groups, double ratio) {}
+
+    record BadgeJson(String id, String ico, String name, String desc, ConditionJson condition) {}
+
+    record QuestJson(String id, String scope, String ico, String name, String desc, String metric, int param, int target,
+                     int xp, String title) {}
 
     record RewardJson(Map<String, Integer> xpByRarity, int provinceFirstBonus, int setCompleteBonus, int claimBonus) {}
 }

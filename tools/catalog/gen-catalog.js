@@ -11,7 +11,12 @@ let seg = html.slice(html.indexOf('const PROVS = '), html.indexOf('/* ==========
 for (const [from, to] of RENAMES) seg = seg.split(`'${from}'`).join(`'${to}'`);
 const localStorage = { getItem: () => null, setItem: () => {} };
 const api = new Function('RAW', 'localStorage', seg + `
-return { PROVS, FEATURES, LEGEND, rarity, XP, BONUS, RAR_LABEL, itemOf, lookOf: (typeof lookOf !== 'undefined' ? lookOf : null), SAMPLE, findCode, TIER };`)(RAW, localStorage);
+return { PROVS, FEATURES, LEGEND, rarity, XP, BONUS, RAR_LABEL, itemOf, lookOf: (typeof lookOf !== 'undefined' ? lookOf : null), SAMPLE, findCode, TIER,
+  LEVEL_TITLES, SETS, SET_BG, BADGES, LONG };`)(RAW, localStorage);
+// monthQuests 는 '기본 캐릭터' 구획 뒤에 있다 — 함수 본문만 잘라 빈 컨텍스트로 실행해 정의(id·이름·목표·XP)를 얻는다.
+const mqSrc = html.slice(html.indexOf('function monthQuests(c){'), html.indexOf('function ctx(){'));
+const MONTH_QUESTS = new Function('PROVS', 'rarity', 'SET_OF', 'ym', 'CUR_YM', mqSrc + '\nreturn monthQuests({ list: [] });')(
+  api.PROVS, api.rarity, new Map(), () => '', 'none');
 
 const PROV_META = {
   '서울':['서울특별시'], '부산':['부산광역시'], '대구':['대구광역시'], '인천':['인천광역시'], '광주':['광주광역시'],
@@ -53,6 +58,55 @@ const sample = api.SAMPLE.map(([p, n, mo, day, memo]) => {
   const c = api.findCode(p, n); if (!c) throw new Error('sample missing ' + p + n);
   return { regionCode: 'KR-' + c, monthOffset: mo, day, memo };
 });
+
+// ---- 2단계(진행) 정의 데이터: 레벨 곡선·칭호, 도감 세트 9, 뱃지 12, 퀘스트(월간 4 + 상시 3) ----
+// 판정 함수(test/cur)는 JS 라 그대로 옮길 수 없으므로 id 별 조건을 아래 표로 선언하고, id 집합이 프로토타입과 같은지 검사한다.
+const provOf = name => { const c = provCode[name]; if (!c) throw new Error('unknown prov ' + name); return c; };
+const levels = {
+  // 프로토타입: level = floor((1 + sqrt(1 + xp/5)) / 2)  ⇔  레벨 L 의 하한 XP = 4·divisor·L·(L-1)
+  divisor: 5,
+  titles: api.LEVEL_TITLES.map(([level, name]) => ({ level, name })),
+};
+const sets = api.SETS.map(s => ({ id: s.id, name: s.name, desc: s.desc, title: s.title,
+  regionCodes: s.codes.map(c => 'KR-' + c),
+  background: { emoji: api.SET_BG[s.id][0], name: api.SET_BG[s.id][1] + ' 배경', theme: api.SET_BG[s.id][2] } }));
+sets.forEach(s => { if (s.regionCodes.length !== api.SETS.find(x => x.id === s.id).m.length) throw new Error('set code missing ' + s.id); });
+const BADGE_RULES = {
+  first:   { type: 'REGION_COUNT', min: 1 },
+  ten:     { type: 'REGION_COUNT', min: 10 },
+  fifty:   { type: 'REGION_COUNT', min: 50 },
+  hundred: { type: 'REGION_COUNT', min: 100 },
+  seoul:   { type: 'PROVINCES_COMPLETE', provinces: [provOf('서울')] },
+  capital: { type: 'PROVINCES_COMPLETE', provinces: [provOf('서울'), provOf('경기'), provOf('인천')] },
+  samnam:  { type: 'PROVINCE_GROUPS_TOUCHED', groups: [[provOf('충북'), provOf('충남')], [provOf('전북'), provOf('전남')], [provOf('경북'), provOf('경남')]] },
+  legend:  { type: 'LEGEND_COUNT', min: 1 },
+  allprov: { type: 'ALL_PROVINCES_TOUCHED' },
+  set1:    { type: 'SETS_COMPLETED', min: 1 },
+  streak3: { type: 'STREAK_MONTHS', min: 3 },
+  half:    { type: 'CONQUEST_RATIO', ratio: 0.5 },
+};
+const badges = api.BADGES.map(b => {
+  if (!BADGE_RULES[b.id]) throw new Error('badge rule missing ' + b.id);
+  return { id: b.id, ico: b.ico, name: b.name, desc: b.desc, condition: BADGE_RULES[b.id] };
+});
+if (badges.length !== Object.keys(BADGE_RULES).length) throw new Error('badge rule extra');
+const QUEST_RULES = {
+  m3:    { metric: 'NEW_REGIONS' },
+  mgun:  { metric: 'NON_COMMON_REGIONS' },
+  mprov: { metric: 'FIRST_IN_PROVINCE' },
+  mset:  { metric: 'SET_REGIONS' },
+  leg5:  { metric: 'LEGEND_REGIONS' },
+  gun30: { metric: 'NON_COMMON_REGIONS' },
+  p3:    { metric: 'PROVINCES_WITH_MIN_REGIONS', param: 3 },
+};
+const quest = (q, scope, target, title) => {
+  const rule = QUEST_RULES[q.id]; if (!rule) throw new Error('quest rule missing ' + q.id);
+  return { id: q.id, scope, ico: q.ico, name: q.name, desc: q.desc, metric: rule.metric, param: rule.param || 0,
+    target, xp: q.xp, title: title || null };
+};
+const quests = [...MONTH_QUESTS.map(q => quest(q, 'MONTHLY', q.max, null)), ...api.LONG.map(q => quest(q, 'ALWAYS', q.max, q.title))];
+if (quests.length !== Object.keys(QUEST_RULES).length) throw new Error('quest rule extra');
+
 const CAT = ROOT + '/catalog/src/main/resources/catalog', DEV = ROOT + '/app-api/src/main/resources/dev';
 fs.mkdirSync(CAT, { recursive: true }); fs.mkdirSync(DEV, { recursive: true });
 const w = (name, obj, pretty) => fs.writeFileSync(name, pretty ? JSON.stringify(obj, null, 1) + '\n' : JSON.stringify(obj));
@@ -62,4 +116,8 @@ w(CAT + '/items.json', items, true);
 w(CAT + '/regions.geojson', geojson, false);
 w(CAT + '/reward-rules.json', rewardRules, true);
 w(DEV + '/sample-visits.json', sample, true);
-console.log('provinces', provinces.length, 'regions', regions.length, 'items', items.length, 'legend', regions.filter(r => r.rarity==='LEGEND').length, 'rare', regions.filter(r=>r.rarity==='RARE').length, 'sample', sample.length);
+w(CAT + '/levels.json', levels, true);
+w(CAT + '/sets.json', sets, true);
+w(CAT + '/badges.json', badges, true);
+w(CAT + '/quests.json', quests, true);
+console.log('provinces', provinces.length, 'regions', regions.length, 'items', items.length, 'legend', regions.filter(r => r.rarity==='LEGEND').length, 'rare', regions.filter(r=>r.rarity==='RARE').length, 'sample', sample.length, 'sets', sets.length, 'badges', badges.length, 'quests', quests.length);

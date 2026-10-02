@@ -1,0 +1,128 @@
+### 2단계(진행) 왕복 확인 — IntelliJ HTTP Client / VS Code REST Client
+### 서버: ./gradlew :app-api:bootRun   (8080이 점유돼 있으면 --args='--server.port=18080' 으로 띄우고 아래 @host 를 바꾼다)
+### 진행 값(XP·도감·퀘스트)은 체크인 후 outbox 릴레이로 비동기 반영된다(local 주기 300ms) — 체크인 직후 1초쯤 뒤에 조회한다.
+@host = http://localhost:8080
+
+### 0. [local] 전체 초기화 → 204
+DELETE {{host}}/dev/reset
+
+### 1. 익명 탐험가 발급 → 201
+# @name issue
+POST {{host}}/explorers
+
+> {% client.global.set("explorerId", response.body.explorerId); %}
+
+### 2. 처음 진행 → xp 0, level 1, levelTitle "초보 탐험가", nextLevelXp 40, badges[12] 미획득, titles[35](lv1만 earned)
+GET {{host}}/progress
+X-Explorer-Id: {{explorerId}}
+
+### 3. 미리보기(D1: 이 지도 기준 최대 보상) → xp.total 35, xp.basis "MAP_MAX", xp.note
+GET {{host}}/visits/preview?region=KR-35050
+X-Explorer-Id: {{explorerId}}
+
+### 4. 지리산 둘레 세트 5곳 체크인(남원시·구례군·하동군·산청군·함양군) → 각 201
+POST {{host}}/visits
+X-Explorer-Id: {{explorerId}}
+Content-Type: application/json
+
+{"regionCode": "KR-35050", "visitDate": "2025-05-01"}
+
+###
+POST {{host}}/visits
+X-Explorer-Id: {{explorerId}}
+Content-Type: application/json
+
+{"regionCode": "KR-36330", "visitDate": "2025-05-01"}
+
+###
+POST {{host}}/visits
+X-Explorer-Id: {{explorerId}}
+Content-Type: application/json
+
+{"regionCode": "KR-38360", "visitDate": "2025-05-02"}
+
+###
+POST {{host}}/visits
+X-Explorer-Id: {{explorerId}}
+Content-Type: application/json
+
+{"regionCode": "KR-38370", "visitDate": "2025-05-02"}
+
+###
+POST {{host}}/visits
+X-Explorer-Id: {{explorerId}}
+Content-Type: application/json
+
+{"regionCode": "KR-38380", "visitDate": "2025-05-03"}
+
+### 5. 진행 → xp 285(35+45+45+30+30 + 세트 100), level 4, levelTitle "동네 산책러", badges first·set1, titles set-jiri earned,
+###    streak.months 1, recentXp(최근 장부: set:{e}:jiri, region:{e}:KR-38380#1 …)
+GET {{host}}/progress
+X-Explorer-Id: {{explorerId}}
+
+### 6. 도감(지도 기준) → completed 1, sets[jiri] have 5/5 completed:true completedAt
+GET {{host}}/collection
+X-Explorer-Id: {{explorerId}}
+
+### 7. 퀘스트 → month, monthlyDone 4, monthly[m3] current 3/3 claimable:true, always[gun30] current 4/30
+GET {{host}}/quests
+X-Explorer-Id: {{explorerId}}
+
+### 8. 보상 받기 → 200 {questId:m3, period:"yyyy-MM", xp:60} (XP 는 잠시 뒤 progress 에 +60)
+POST {{host}}/quests/m3/claim
+X-Explorer-Id: {{explorerId}}
+
+### 9. 다시 받기 → 409 QUEST_ALREADY_CLAIMED / 미달성 → 422 QUEST_NOT_COMPLETED / 모르는 퀘스트 → 404 QUEST_NOT_FOUND
+POST {{host}}/quests/m3/claim
+X-Explorer-Id: {{explorerId}}
+
+###
+POST {{host}}/quests/leg5/claim
+X-Explorer-Id: {{explorerId}}
+
+### 10. 칭호 선택: 못 얻은 칭호 → 422 TITLE_NOT_EARNED, 얻은 칭호 → 200 title.name "산 사람", null → 레벨 칭호로
+PUT {{host}}/progress/title
+X-Explorer-Id: {{explorerId}}
+Content-Type: application/json
+
+{"titleId": "own-KR-11"}
+
+###
+PUT {{host}}/progress/title
+X-Explorer-Id: {{explorerId}}
+Content-Type: application/json
+
+{"titleId": "set-jiri"}
+
+### 11. 취소 → 204. 잠시 뒤 progress xp −20(함양군 기본 XP만 회수), collection jiri have 4/5 completed:true(완성 유지)
+DELETE {{host}}/visits/KR-38380
+X-Explorer-Id: {{explorerId}}
+
+###
+GET {{host}}/progress
+X-Explorer-Id: {{explorerId}}
+
+###
+GET {{host}}/collection
+X-Explorer-Id: {{explorerId}}
+
+### 12. [local] 재계산 배치(이 탐험가) → {recalculated:1}. 헤더 없이 부르면 전체
+POST {{host}}/dev/recalculate
+X-Explorer-Id: {{explorerId}}
+
+### 13. [local] 예시 시드(D6: 처리 시각 = 샘플 방문일) → {seeded:45}. 잠시 뒤 progress.streak.months 가 20개월 근처
+POST {{host}}/dev/seed
+X-Explorer-Id: {{explorerId}}
+
+###
+GET {{host}}/progress
+X-Explorer-Id: {{explorerId}}
+
+### 14. [local] FAILED 전달 재전달(QA P1-2) → {redelivered:n}. eventId·subscriber 로 좁힐 수 있다(생략하면 전체)
+POST {{host}}/dev/outbox/redeliver
+
+###
+POST {{host}}/dev/outbox/redeliver?subscriber=progression.progress
+
+### 15. 오류: 헤더 없음 → 401 EXPLORER_ID_REQUIRED
+GET {{host}}/progress
