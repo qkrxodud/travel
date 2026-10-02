@@ -1,12 +1,12 @@
 package com.kobi.territory.exploration.application;
 
 import com.kobi.territory.common.model.ExplorerId;
-import com.kobi.territory.exploration.domain.ExpeditionMap;
-import com.kobi.territory.exploration.domain.ExpeditionMapRepository;
+import com.kobi.territory.exploration.domain.map.ExpeditionMap;
+import com.kobi.territory.exploration.domain.map.ExpeditionMapRepository;
 import com.kobi.territory.exploration.domain.ExplorationError;
-import com.kobi.territory.exploration.domain.Explorer;
-import com.kobi.territory.exploration.domain.ExplorerRepository;
-import com.kobi.territory.exploration.domain.MapSelector;
+import com.kobi.territory.exploration.domain.explorer.Explorer;
+import com.kobi.territory.exploration.domain.explorer.ExplorerRepository;
+import com.kobi.territory.exploration.domain.map.MapSelector;
 import org.springframework.stereotype.Component;
 
 /** 탐험가·지도 조회(DB 접근). 멤버십 판정은 ExpeditionMap(Members)이 한다. */

@@ -102,8 +102,8 @@ class CheckInIntegrationTest {
             mapId, "KR-37430")).isEqualTo(1);
         OutboxEventEntity row = eventsOf(mapId).stream().filter(entity -> entity.eventName().equals("RegionVisited"))
             .findFirst().orElseThrow();
-        assertThat(row.getAggregate()).isEqualTo("Territory");
-        JsonNode payload = objectMapper.readTree(row.getPayload());
+        assertThat(row.aggregate()).isEqualTo("Territory");
+        JsonNode payload = objectMapper.readTree(row.payload());
         assertThat(payload.get("explorerId").asText()).isEqualTo(me.value());
         assertThat(payload.get("mapId").asText()).isEqualTo(mapId);
         assertThat(payload.get("regionCode").asText()).isEqualTo("KR-37430");
@@ -114,7 +114,7 @@ class CheckInIntegrationTest {
         assertThat(payload.get("isFirstClaim").asBoolean()).isTrue();
         assertThat(payload.has("visitedAt")).isTrue();
 
-        RegionVisited back = objectMapper.readValue(row.getPayload(), RegionVisited.class);
+        RegionVisited back = objectMapper.readValue(row.payload(), RegionVisited.class);
         assertThat(back.isFirstInProvince()).isTrue();
         assertThat(back.rarity()).isEqualTo(Rarity.LEGEND);
         assertThat(back.visitedAt()).isEqualTo(clock.instant());
@@ -184,10 +184,10 @@ class CheckInIntegrationTest {
         String mapId = registered.personalMap().id().value();
         long deadline = System.currentTimeMillis() + 10_000;
         while (System.currentTimeMillis() < deadline
-            && eventsOf(mapId).stream().anyMatch(entity -> entity.getPublishedAt() == null)) {
+            && eventsOf(mapId).stream().anyMatch(entity -> entity.publishedAt() == null)) {
             Thread.sleep(100);
         }
-        assertThat(eventsOf(mapId)).allSatisfy(entity -> assertThat(entity.getPublishedAt()).isNotNull());
+        assertThat(eventsOf(mapId)).allSatisfy(entity -> assertThat(entity.publishedAt()).isNotNull());
         assertThat(captured.all()).anySatisfy(event -> {
             assertThat(event).isInstanceOf(RegionVisited.class);
             RegionVisited visited = (RegionVisited) event;

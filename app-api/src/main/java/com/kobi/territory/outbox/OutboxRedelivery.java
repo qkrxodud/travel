@@ -28,8 +28,8 @@ public class OutboxRedelivery {
     @Transactional
     public int redeliverFailed(Long eventId, String subscriber) {
         List<OutboxDeliveryEntity> failed = deliveries.findByStatus(OutboxDeliveryEntity.Status.FAILED).stream()
-            .filter(delivery -> eventId == null || eventId.equals(delivery.getEventId()))
-            .filter(delivery -> subscriber == null || subscriber.equals(delivery.getSubscriber()))
+            .filter(delivery -> eventId == null || eventId.equals(delivery.eventId()))
+            .filter(delivery -> subscriber == null || subscriber.equals(delivery.subscriber()))
             .toList();
         failed.forEach(delivery -> delivery.redeliver(clock.instant()));
         return failed.size();

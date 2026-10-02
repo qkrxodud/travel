@@ -1,5 +1,12 @@
 package com.kobi.territory.exploration.domain;
 
+import com.kobi.territory.exploration.domain.map.MapSelector;
+import com.kobi.territory.exploration.domain.territory.Memo;
+import com.kobi.territory.exploration.domain.territory.PhotoRef;
+import com.kobi.territory.exploration.domain.territory.Territory;
+import com.kobi.territory.exploration.domain.territory.VisitDate;
+import com.kobi.territory.exploration.domain.territory.Visit;
+import com.kobi.territory.exploration.domain.territory.VisitPatch;
 import static com.kobi.territory.exploration.domain.Fixtures.JONGNO;
 import static com.kobi.territory.exploration.domain.Fixtures.MAP;
 import static com.kobi.territory.exploration.domain.Fixtures.ME;

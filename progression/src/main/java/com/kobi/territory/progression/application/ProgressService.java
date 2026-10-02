@@ -10,11 +10,11 @@ import com.kobi.territory.progression.api.event.BadgeEarned;
 import com.kobi.territory.progression.api.event.LevelUp;
 import com.kobi.territory.progression.api.event.QuestCompleted;
 import com.kobi.territory.progression.api.event.SetCompleted;
-import com.kobi.territory.progression.domain.ExplorerProgress;
-import com.kobi.territory.progression.domain.ExplorerProgressRepository;
-import com.kobi.territory.progression.domain.ProgressChange;
-import com.kobi.territory.progression.domain.ProgressVisit;
-import com.kobi.territory.progression.domain.QuestPeriod;
+import com.kobi.territory.progression.domain.progress.ExplorerProgress;
+import com.kobi.territory.progression.domain.progress.ExplorerProgressRepository;
+import com.kobi.territory.progression.domain.progress.ProgressChange;
+import com.kobi.territory.progression.domain.progress.ProgressVisit;
+import com.kobi.territory.progression.domain.quest.QuestPeriod;
 import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -50,7 +50,7 @@ public class ProgressService {
 
     @Transactional
     public void onRegionVisited(RegionVisited event) {
-        ExplorerProgress progress = load(ExplorerId.of(event.explorerId()));
+        ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
         ProgressChange change = progress.applyVisit(visitOf(event), catalog.policy());
         progresses.save(progress);
         publish(progress, change);
@@ -58,7 +58,7 @@ public class ProgressService {
 
     @Transactional
     public void onVisitCancelled(VisitCancelled event) {
-        ExplorerProgress progress = load(ExplorerId.of(event.explorerId()));
+        ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
         ProgressChange change = progress.revokeVisit(event.mapId(), RegionCode.of(event.regionCode()), event.cancelledAt(),
             catalog.policy());
         progresses.save(progress);
@@ -67,15 +67,15 @@ public class ProgressService {
 
     @Transactional
     public void onSetCompleted(SetCompleted event) {
-        ExplorerProgress progress = load(ExplorerId.of(event.explorerId()));
-        ProgressChange change = progress.applySetCompleted(event.setId(), event.completedAt(), catalog.policy());
+        ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
+        ProgressChange change = progress.applyThemeCompleted(event.setId(), event.completedAt(), catalog.policy());
         progresses.save(progress);
         publish(progress, change);
     }
 
     @Transactional
     public void onQuestCompleted(QuestCompleted event) {
-        ExplorerProgress progress = load(ExplorerId.of(event.explorerId()));
+        ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
         ProgressChange change = progress.applyQuestReward(new QuestPeriod(event.period()), event.questId(), event.xp(),
             event.claimedAt(), catalog.policy());
         progresses.save(progress);
@@ -94,7 +94,7 @@ public class ProgressService {
         territories.personalMapId(explorerId.value());
         return writeTx.execute(status -> {
             ExplorerProgress progress = load(explorerId);
-            progress.selectTitle(titleId, catalog.policy());
+            progress.selectTitle(titleId, catalog.policy(), clock.instant());
             progresses.save(progress);
             return progress;
         });
@@ -107,6 +107,14 @@ public class ProgressService {
 
     private ExplorerProgress load(ExplorerId explorerId) {
         return progresses.find(explorerId)
+            .orElseGet(() -> ExplorerProgress.start(explorerId, catalog.policy(), clock.instant()));
+    }
+
+    /**
+     * 이벤트 처리용: 루트 행을 먼저 잠그고 불러온다 — 재계산과 같은 잠금 순서(루트 → 자식)라 교착이 생기지 않는다(구조 QA S2-2).
+     */
+    private ExplorerProgress loadLocked(ExplorerId explorerId) {
+        return progresses.findLocked(explorerId)
             .orElseGet(() -> ExplorerProgress.start(explorerId, catalog.policy(), clock.instant()));
     }
 

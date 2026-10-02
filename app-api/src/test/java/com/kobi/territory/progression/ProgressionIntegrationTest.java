@@ -18,12 +18,17 @@ import com.kobi.territory.outbox.OutboxRedelivery;
 import com.kobi.territory.progression.api.event.SetCompleted;
 import com.kobi.territory.progression.application.QuestService;
 import com.kobi.territory.progression.application.RecalculateService;
-import com.kobi.territory.progression.domain.ExplorerProgress;
-import com.kobi.territory.progression.domain.ExplorerProgressRepository;
-import com.kobi.territory.progression.domain.XpLedgerEntry;
+import com.kobi.territory.progression.domain.progress.ExplorerProgress;
+import com.kobi.territory.progression.domain.progress.ExplorerProgressRepository;
+import com.kobi.territory.progression.domain.progress.XpLedgerEntry;
 import com.kobi.territory.support.IntegrationTest;
 import com.kobi.territory.support.IntegrationTestConfig.FaultInjection;
 import com.kobi.territory.support.IntegrationTestConfig.PoisonSubscriber;
+import com.kobi.territory.support.IntegrationTestConfig.ReplacePause;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import com.kobi.territory.support.MutableClock;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -240,14 +245,14 @@ class ProgressionIntegrationTest {
             OutboxDeliveryEntity.Key poisonKey = new OutboxDeliveryEntity.Key(eventId, PoisonSubscriber.ID);
             await().atMost(WAIT).until(() -> deliveries.findById(poisonKey).map(OutboxDeliveryEntity::failed).orElse(false));
             OutboxDeliveryEntity poison = deliveries.findById(poisonKey).orElseThrow();
-            assertThat(poison.getAttempts()).isEqualTo(5);
-            assertThat(poison.getLastError()).contains("독성 이벤트");
-            assertThat(deliveries.findByEventId(eventId)).filteredOn(delivery -> delivery.getSubscriber().startsWith("progression."))
+            assertThat(poison.attempts()).isEqualTo(5);
+            assertThat(poison.lastError()).contains("독성 이벤트");
+            assertThat(deliveries.findByEventId(eventId)).filteredOn(delivery -> delivery.subscriber().startsWith("progression."))
                 .hasSize(3).allSatisfy(delivery -> {
                     assertThat(delivery.delivered()).isTrue();
-                    assertThat(delivery.getAttempts()).as("다른 구독자는 한 번만 처리됨").isEqualTo(1);
+                    assertThat(delivery.attempts()).as("다른 구독자는 한 번만 처리됨").isEqualTo(1);
                 });
-            assertThat(outbox.findById(eventId).orElseThrow().getPublishedAt()).as("FAILED 가 남아 미발행").isNull();
+            assertThat(outbox.findById(eventId).orElseThrow().publishedAt()).as("FAILED 가 남아 미발행").isNull();
 
             // 같은 지도의 다음 이벤트: 다른 구독자 단위는 진행, 독성 구독자 단위는 순서를 지켜 멈춘다
             checkIn(explorerId, "KR-38370");
@@ -342,5 +347,74 @@ class ProgressionIntegrationTest {
         }
         assertThat(jdbc.queryForList("SELECT ref_id FROM xp_ledger WHERE explorer_id = ? AND source <> 'REGION_BASE' "
             + "ORDER BY ref_id", String.class, explorerId)).hasSize(3 + 5 + 1); // 시·도 3, 선점 5, 세트 1
+    }
+
+    @Test
+    void 진행_저장은_루트_값이_그대로여도_version_을_올린다_QA_I_2() {
+        String explorerId = register();
+        checkIn(explorerId, "KR-38360");
+        await().atMost(WAIT).until(() -> xp(explorerId) == 45);
+        awaitRelayed(explorerId);
+        long before = jdbc.queryForObject("SELECT version FROM explorer_progress WHERE explorer_id = ?", Long.class, explorerId);
+
+        transaction.executeWithoutResult(status ->
+            progresses.save(progresses.find(ExplorerId.of(explorerId)).orElseThrow())); // 아무것도 안 바뀐 저장
+
+        long after = jdbc.queryForObject("SELECT version FROM explorer_progress WHERE explorer_id = ?", Long.class, explorerId);
+        assertThat(after).isGreaterThan(before);
+    }
+
+    @Test
+    void 재계산_replace_도_version_을_올리고_장부를_시간_순으로_다시_넣는다_QA_S_1_S_3() {
+        String explorerId = register();
+        JIRI.forEach(code -> {
+            clock.advance(Duration.ofSeconds(1)); // 실제처럼 체크인마다 처리 시각이 다르게
+            checkIn(explorerId, code);
+        });
+        await().atMost(WAIT).until(() -> xp(explorerId) == JIRI_XP);
+        awaitRelayed(explorerId);
+        long versionBefore = jdbc.queryForObject("SELECT version FROM explorer_progress WHERE explorer_id = ?", Long.class,
+            explorerId);
+        List<String> recentBefore = progress(explorerId).ledger().recent(10).stream().map(XpLedgerEntry::refId).toList();
+
+        recalculate.recalculate(ExplorerId.of(explorerId)); // 루트 값(xp·레벨·칭호·스트릭)은 그대로인 재계산
+
+        long versionAfter = jdbc.queryForObject("SELECT version FROM explorer_progress WHERE explorer_id = ?", Long.class,
+            explorerId);
+        assertThat(versionAfter).as("replace 도 version 증가").isGreaterThan(versionBefore);
+        assertThat(progress(explorerId).ledger().recent(10).stream().map(XpLedgerEntry::refId).toList())
+            .as("GET /progress recentXp 순서 유지").isEqualTo(recentBefore);
+        assertThat(xp(explorerId)).isEqualTo(JIRI_XP);
+    }
+
+    @Test
+    void 재계산이_읽은_뒤_커밋된_도감_반영분을_재계산이_덮어쓰지_않는다_QA_S2_1() throws Exception {
+        String explorerId = register();
+        String mapId = mapOf(explorerId);
+        List.of("KR-35050", "KR-36330", "KR-38360").forEach(code -> checkIn(explorerId, code));
+        await().atMost(WAIT).until(() -> xp(explorerId) == 35 + 45 + 45);
+        awaitRelayed(explorerId);
+
+        ReplacePause.arm();
+        ExecutorService recalculation = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> running = recalculation.submit(() -> recalculate.recalculate(ExplorerId.of(explorerId)));
+            assertThat(ReplacePause.awaitReached(Duration.ofSeconds(20))).as("재계산이 도감 replace 직전에 멈춤").isTrue();
+
+            checkIn(explorerId, "KR-38370"); // 재계산이 도감을 읽은 뒤의 체크인
+            await().atMost(Duration.ofSeconds(40)).until(() -> jdbc.queryForObject(
+                "SELECT collected_codes FROM set_progress WHERE map_id = ? AND set_id = 'jiri'", String.class, mapId)
+                .contains("KR-38370")); // 도감 이벤트 반영이 먼저 커밋됨
+
+            ReplacePause.release();
+            running.get(60, TimeUnit.SECONDS); // version 충돌 → 재계산 재시도
+        } finally {
+            ReplacePause.release();
+            recalculation.shutdownNow();
+        }
+        awaitRelayed(explorerId);
+        assertThat(jdbc.queryForObject("SELECT collected_codes FROM set_progress WHERE map_id = ? AND set_id = 'jiri'",
+            String.class, mapId)).as("도감 반영분 유지").contains("KR-38370");
+        await().atMost(WAIT).until(() -> xp(explorerId) == 35 + 45 + 45 + 30);
     }
 }

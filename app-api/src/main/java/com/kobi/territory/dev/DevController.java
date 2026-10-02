@@ -8,7 +8,7 @@ import com.kobi.territory.common.identity.CurrentExplorer;
 import com.kobi.territory.exploration.application.ExplorationDevService;
 import com.kobi.territory.exploration.application.ExplorationDevService.SampleVisit;
 import com.kobi.territory.exploration.application.MapAccess;
-import com.kobi.territory.exploration.domain.Explorer;
+import com.kobi.territory.exploration.domain.explorer.Explorer;
 import com.kobi.territory.outbox.OutboxRedelivery;
 import com.kobi.territory.progression.application.RecalculateService;
 import java.io.IOException;
@@ -126,9 +126,12 @@ public class DevController {
     }
 
     @PostMapping("/recalculate")
-    public Map<String, Integer> recalculate(
+    public Map<String, Object> recalculate(
         @RequestHeader(value = CurrentExplorer.HEADER, required = false) String explorerId) {
-        if (explorerId == null || explorerId.isBlank()) return Map.of("recalculated", recalculate.recalculateAll());
+        if (explorerId == null || explorerId.isBlank()) {
+            RecalculateService.RecalculationReport report = recalculate.recalculateAll();
+            return Map.of("recalculated", report.recalculated(), "failed", report.failedExplorerIds());
+        }
         recalculate.recalculate(ExplorerId.of(explorerId.strip()));
         return Map.of("recalculated", 1);
     }

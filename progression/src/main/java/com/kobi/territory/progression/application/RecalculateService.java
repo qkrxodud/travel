@@ -3,24 +3,26 @@ package com.kobi.territory.progression.application;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
-import com.kobi.territory.progression.domain.CollectionBook;
-import com.kobi.territory.progression.domain.CollectionBookRepository;
-import com.kobi.territory.progression.domain.ExplorerProgress;
-import com.kobi.territory.progression.domain.ExplorerProgressRepository;
-import com.kobi.territory.progression.domain.ProgressionReplay;
-import com.kobi.territory.progression.domain.QuestBoard;
-import com.kobi.territory.progression.domain.QuestBoardRepository;
-import com.kobi.territory.progression.domain.ReplayVisit;
+import com.kobi.territory.progression.domain.collectionbook.CollectionBook;
+import com.kobi.territory.progression.domain.collectionbook.CollectionBookRepository;
+import com.kobi.territory.progression.domain.progress.ExplorerProgress;
+import com.kobi.territory.progression.domain.progress.ExplorerProgressRepository;
+import com.kobi.territory.progression.domain.replay.ProgressionReplay;
+import com.kobi.territory.progression.domain.quest.QuestBoard;
+import com.kobi.territory.progression.domain.quest.QuestBoardRepository;
+import com.kobi.territory.progression.domain.replay.ReplayVisit;
 import java.time.Clock;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -34,6 +36,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class RecalculateService {
 
     private static final Logger log = LoggerFactory.getLogger(RecalculateService.class);
+    private static final int MAX_ATTEMPTS = 3;
 
     private final TerritoryQuery territories;
     private final ExplorerProgressRepository progresses;
@@ -55,35 +58,69 @@ public class RecalculateService {
         this.perExplorerTx = new TransactionTemplate(transactionManager);
     }
 
-    /** 한 탐험가(와 그가 속한 지도의 도감)를 다시 만든다. */
-    @Transactional
+    /**
+     * 한 탐험가(와 그가 속한 지도의 도감)를 다시 만든다. 진행 루트 행을 먼저 배타 잠금하고 읽는다(findLocked) — 진행 이벤트
+     * 처리도 같은 잠금으로 시작하므로 직렬화된다. 도감·퀘스트 행은 version 검사로 지킨다(재계산이 읽은 뒤 바뀌면 충돌).
+     * 잠금 경합·교착·version 충돌·신규 행 동시 생성(PK 충돌)으로 이 트랜잭션이 실패하면 몇 번 다시 시도한다
+     * (트랜잭션 경계·재시도는 application 몫, QA S-1·S2-1·S2-4).
+     */
     public ExplorerProgress recalculate(ExplorerId explorerId) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return perExplorerTx.execute(status -> recalculateLocked(explorerId));
+            } catch (ConcurrencyFailureException | DataIntegrityViolationException exception) {
+                if (attempt >= MAX_ATTEMPTS) throw exception;
+                log.info("재계산 {} 동시성 충돌 {}회째 — 다시 시도: {}", explorerId, attempt, exception.toString());
+            }
+        }
+    }
+
+    private ExplorerProgress recalculateLocked(ExplorerId explorerId) {
+        ExplorerProgress current = progresses.findLocked(explorerId)
+            .orElseGet(() -> ExplorerProgress.start(explorerId, catalog.policy(), clock.instant()));
         Map<String, List<ReplayVisit>> histories = new LinkedHashMap<>();
         territories.mapIdsOf(explorerId.value()).forEach(mapId -> histories.put(mapId,
             territories.visitHistory(mapId).stream().map(RecalculateService::replayVisit).toList()));
         Map<String, CollectionBook> existingBooks = new LinkedHashMap<>();
         histories.keySet().forEach(mapId -> existingBooks.put(mapId, collectionBooks.load(mapId)));
-        ExplorerProgress current = progresses.find(explorerId)
-            .orElseGet(() -> ExplorerProgress.start(explorerId, catalog.policy(), clock.instant()));
         List<QuestBoard> explorerBoards = boards.loadAll(explorerId);
         YearMonth now = catalog.currentMonth();
 
         ProgressionReplay.Result result = ProgressionReplay.replay(explorerId, current, histories, existingBooks,
-            explorerBoards, catalog.policy(), catalog.sets(), catalog.quests(), now, clock.instant());
+            explorerBoards, catalog.policy(), catalog.themes(), catalog.questRules(), now, clock.instant());
 
-        progresses.save(result.progress());
-        result.collections().forEach(collectionBooks::save);
-        boards.save(result.monthly());
-        boards.save(result.always());
+        // 재계산은 통째로 바꾸는 경로 — 저장소에 replace 를 명시해 호출한다(어댑터가 의도를 추측하지 않게)
+        progresses.replace(result.progress());
+        result.collectionBooks().forEach(collectionBooks::replace);
+        boards.replace(result.monthly());
+        boards.replace(result.always());
         return result.progress();
     }
 
-    /** 모든 탐험가. 탐험가마다 트랜잭션을 나눈다(한 명 실패가 전체를 되돌리지 않게). @return 처리한 탐험가 수 */
-    public int recalculateAll() {
+    /**
+     * 모든 탐험가. 탐험가마다 트랜잭션·재시도를 나누고 실패를 격리한다 — 한 명이 재시도를 다 써도 나머지는 계속한다(QA S2-3).
+     */
+    public RecalculationReport recalculateAll() {
+        List<String> failed = new ArrayList<>();
         List<String> explorerIds = territories.explorerIds();
-        explorerIds.forEach(explorerId -> perExplorerTx.executeWithoutResult(status -> recalculate(ExplorerId.of(explorerId))));
-        log.info("진행 재계산 완료: 탐험가 {}명", explorerIds.size());
-        return explorerIds.size();
+        explorerIds.forEach(explorerId -> {
+            try {
+                recalculate(ExplorerId.of(explorerId));
+            } catch (RuntimeException exception) {
+                failed.add(explorerId);
+                log.error("진행 재계산 실패(다음 탐험가로 계속): {} — {}", explorerId, exception.toString());
+            }
+        });
+        RecalculationReport report = new RecalculationReport(explorerIds.size() - failed.size(), failed);
+        log.info("진행 재계산 완료: 성공 {}명, 실패 {}명 {}", report.recalculated(), failed.size(), failed);
+        return report;
+    }
+
+    /** @param failedExplorerIds 재시도를 다 쓰고도 실패한 탐험가(다시 돌리면 된다) */
+    public record RecalculationReport(int recalculated, List<String> failedExplorerIds) {
+        public RecalculationReport {
+            failedExplorerIds = List.copyOf(failedExplorerIds);
+        }
     }
 
     private static ReplayVisit replayVisit(RegionVisited event) {

@@ -12,7 +12,7 @@ import com.kobi.territory.exploration.api.web.ExplorationDtos.VisitResponse;
 import com.kobi.territory.exploration.application.CheckInCommand;
 import com.kobi.territory.exploration.application.CheckInService;
 import com.kobi.territory.exploration.application.EditVisitCommand;
-import com.kobi.territory.exploration.domain.VisitFacts;
+import com.kobi.territory.exploration.domain.territory.VisitFacts;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;

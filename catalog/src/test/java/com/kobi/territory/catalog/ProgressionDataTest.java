@@ -6,22 +6,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.kobi.territory.catalog.api.query.ProgressionRules;
 import com.kobi.territory.catalog.api.query.RewardLineView;
 import com.kobi.territory.catalog.application.CatalogService;
-import com.kobi.territory.catalog.domain.BadgeCondition;
-import com.kobi.territory.catalog.domain.BadgeDefinition;
-import com.kobi.territory.catalog.domain.Catalog;
-import com.kobi.territory.catalog.domain.CollectionSetDefinition;
-import com.kobi.territory.catalog.domain.ItemDefinitions;
-import com.kobi.territory.catalog.domain.LevelRules;
-import com.kobi.territory.catalog.domain.LevelTitle;
-import com.kobi.territory.catalog.domain.ProgressionDefinitions;
-import com.kobi.territory.catalog.domain.Province;
-import com.kobi.territory.catalog.domain.Provinces;
-import com.kobi.territory.catalog.domain.Region;
-import com.kobi.territory.catalog.domain.Regions;
-import com.kobi.territory.catalog.domain.RewardLine;
-import com.kobi.territory.catalog.domain.RewardRules;
-import com.kobi.territory.catalog.domain.RewardSource;
-import com.kobi.territory.catalog.infra.JsonCatalogRepository;
+import com.kobi.territory.catalog.domain.definition.BadgeCondition;
+import com.kobi.territory.catalog.domain.definition.BadgeDefinition;
+import com.kobi.territory.catalog.domain.catalog.Catalog;
+import com.kobi.territory.catalog.domain.definition.ThemeDefinition;
+import com.kobi.territory.catalog.domain.item.ItemDefinitions;
+import com.kobi.territory.catalog.domain.item.ItemDefinition;
+import com.kobi.territory.catalog.domain.item.ItemSlot;
+import com.kobi.territory.catalog.domain.definition.LevelRules;
+import com.kobi.territory.catalog.domain.definition.LevelTitle;
+import com.kobi.territory.catalog.domain.definition.ProgressionDefinitions;
+import com.kobi.territory.catalog.domain.region.Province;
+import com.kobi.territory.catalog.domain.region.Provinces;
+import com.kobi.territory.catalog.domain.region.Region;
+import com.kobi.territory.catalog.domain.region.Regions;
+import com.kobi.territory.catalog.domain.reward.RewardLine;
+import com.kobi.territory.catalog.domain.reward.RewardRules;
+import com.kobi.territory.catalog.domain.reward.RewardSource;
+import com.kobi.territory.catalog.infra.repository.JsonCatalogRepository;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
 import java.util.List;
@@ -103,10 +105,10 @@ class ProgressionDataTest {
         Regions regions = Regions.of(List.of(new Region(RegionCode.of("KR-11010"), "종로구", "KR-11", Rarity.COMMON, "KR", 1,
             null, null)));
         Provinces provinces = Provinces.of(List.of(new Province("KR-11", "서울", "서울특별시", 1, 1)));
-        var items = ItemDefinitions.of(List.of(new com.kobi.territory.catalog.domain.ItemDefinition("region:KR-11010",
-            RegionCode.of("KR-11010"), "i", "*", com.kobi.territory.catalog.domain.ItemSlot.HAND, Rarity.COMMON, null, null)));
-        var levels = new LevelRules(5, List.of(new LevelTitle(1, "초보")));
-        var badSet = new ProgressionDefinitions(levels, List.of(new CollectionSetDefinition("x", "x", "", "t",
+        ItemDefinitions items = ItemDefinitions.of(List.of(new ItemDefinition("region:KR-11010",
+            RegionCode.of("KR-11010"), "i", "*", ItemSlot.HAND, Rarity.COMMON, null, null)));
+        LevelRules levels = new LevelRules(5, List.of(new LevelTitle(1, "초보")));
+        var badSet = new ProgressionDefinitions(levels, List.of(new ThemeDefinition("x", "x", "", "t",
             List.of(RegionCode.of("KR-99999")), null)), List.of(), List.of());
         assertThatThrownBy(() -> new Catalog(regions, provinces, items, RULES, "{}", badSet))
             .hasMessageContaining("모르는 지역");

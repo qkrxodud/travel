@@ -13,7 +13,6 @@ import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
@@ -27,7 +26,6 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "outbox_delivery")
 @IdClass(OutboxDeliveryEntity.Key.class)
-@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OutboxDeliveryEntity {
 
@@ -69,6 +67,12 @@ public class OutboxDeliveryEntity {
         this.status = Status.PENDING;
         this.updatedAt = now;
     }
+
+    public Long eventId() { return eventId; }
+    public String subscriber() { return subscriber; }
+    public int attempts() { return attempts; }
+    public int conflicts() { return conflicts; }
+    public String lastError() { return lastError; }
 
     public boolean delivered() {
         return status == Status.DELIVERED;

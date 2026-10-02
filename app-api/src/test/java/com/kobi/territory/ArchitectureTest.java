@@ -78,6 +78,12 @@ class ArchitectureTest {
     @ArchTest static final ArchRule exploration_api_has_only_event_query_web = apiHasOnlyEventQueryWeb(ROOT, "exploration");
     @ArchTest static final ArchRule progression_api_has_only_event_query_web = apiHasOnlyEventQueryWeb(ROOT, "progression");
 
+    // ---- 3-1. infra 하위(entity·repository)는 같은 컨텍스트 infra 안에서만 (infra 하위 패키지 규칙) -------------
+
+    @ArchTest static final ArchRule catalog_infra_is_internal = infraInternal(ROOT, "catalog");
+    @ArchTest static final ArchRule exploration_infra_is_internal = infraInternal(ROOT, "exploration");
+    @ArchTest static final ArchRule progression_infra_is_internal = infraInternal(ROOT, "progression");
+
     // ---- 4. 의존 매트릭스(허용되지 않은 컨텍스트는 api도 금지) -----------------------------
 
     @ArchTest
@@ -137,6 +143,17 @@ class ArchitectureTest {
         return classes().that().resideInAPackage(prefix + ".api..").and().doNotHaveSimpleName("package-info")
             .should().resideInAnyPackage(prefix + ".api.event..", prefix + ".api.query..", prefix + ".api.web..")
             .as(context + ".api 아래에는 event·query·web 만 둔다");
+    }
+
+    /**
+     * infra/entity·infra/repository 는 패키지가 갈려 public 이 된 타입이 많다(엔티티·변환 메서드·Spring Data 인터페이스).
+     * 그 대신 같은 컨텍스트의 infra 밖(application·api·domain·다른 컨텍스트·app-api)에서는 참조하지 못하게 막는다.
+     */
+    static ArchRule infraInternal(String root, String context) {
+        String prefix = root + context;
+        return classes().that().resideInAnyPackage(prefix + ".infra.entity..", prefix + ".infra.repository..")
+            .should().onlyHaveDependentClassesThat().resideInAPackage(prefix + ".infra..")
+            .as(context + ".infra.entity·infra.repository 는 같은 컨텍스트 infra 안에서만 참조한다");
     }
 
     private static DescribedPredicate<JavaClass> outsidePublicContract(String root, String context) {

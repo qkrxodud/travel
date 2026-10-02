@@ -81,6 +81,7 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 ### 2-3. Collection (도감 진행)
 
 - **코드 이름 매핑**: 설계 용어 Collection(도감) ↔ 코드 `CollectionBook`(JDK `java.util.Collection`과 겹치지 않게 — 명명 규칙). 리포지토리 `CollectionBookRepository`, 서비스 `CollectionBookService`, 구독자 `progression.collection-book`. 테이블 `set_progress`, API `/collection`, 이벤트 이름(`SetCompleted`)과 outbox aggregate 이름("Collection")은 그대로.
+- **세트 ↔ 테마 매핑**: 설계 용어 세트(CollectionSet·SetProgress·세트 카탈로그) ↔ 코드 `Theme`·`ThemeProgress`·`Themes`(일급 컬렉션), 완성 결과 `ThemeCompletion`, 카탈로그 정의 `ThemeDefinition`, JPA `ThemeProgressJpaEntity` — 클래스명에 JDK 자료형 단어(Set)를 쓰지 않는 명명 규칙. **유지하는 외부 계약 이름**: 공개 이벤트 `SetCompleted`(필드 `setId` = 테마 id), 테이블 `set_progress`·컬럼 `set_id`, API 응답 `sets`·`SetResponse`·`setId`, 카탈로그 공개 Query `ProgressionRules.sets()`·`SetView`·`RewardCalculator.setComplete()`, 정의 JSON `sets.json`, 장부 refId 접두사 `set:`, `XpSource.SET_COMPLETE`, 칭호 출처 `SET`·id `set-{id}`, 뱃지 조건 `SETS_COMPLETED`, 퀘스트 지표 `SET_REGIONS`.
 - 루트 `Collection(mapId)` — **지도 단위**. 세트별 진행·완성 여부.
 - VO: `SetProgress{setId, collected:Set<RegionCode>, completedAt?}`
 - 불변식: 완성은 정의된 지역 전부 모였을 때 단 한 번. 완성 후 지역 취소해도 완성 기록 유지(보상 회수 없음).

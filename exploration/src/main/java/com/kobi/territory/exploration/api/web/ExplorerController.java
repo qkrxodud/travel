@@ -5,7 +5,7 @@ import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.exploration.api.web.ExplorationDtos.ExplorerResponse;
 import com.kobi.territory.exploration.application.ExplorerService;
 import com.kobi.territory.exploration.application.MapAccess;
-import com.kobi.territory.exploration.domain.MapSelector;
+import com.kobi.territory.exploration.domain.map.MapSelector;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;

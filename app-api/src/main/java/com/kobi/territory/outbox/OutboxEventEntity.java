@@ -9,12 +9,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AccessLevel;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "outbox")
-@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OutboxEventEntity {
 
@@ -57,6 +55,14 @@ public class OutboxEventEntity {
     void markPublished(Instant at) {
         this.publishedAt = at;
     }
+
+    public Long id() { return id; }
+    public String aggregate() { return aggregate; }
+    public String aggregateId() { return aggregateId; }
+    /** 이벤트 record 의 FQCN. */
+    public String eventType() { return eventType; }
+    public String payload() { return payload; }
+    public Instant publishedAt() { return publishedAt; }
 
     /** 이벤트 클래스 단순 이름(예: RegionVisited). */
     public String eventName() {

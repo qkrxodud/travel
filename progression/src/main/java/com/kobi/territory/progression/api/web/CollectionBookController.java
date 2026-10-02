@@ -11,8 +11,8 @@ import com.kobi.territory.progression.api.web.ProgressionDtos.CollectionResponse
 import com.kobi.territory.progression.api.web.ProgressionDtos.SetRegionResponse;
 import com.kobi.territory.progression.api.web.ProgressionDtos.SetResponse;
 import com.kobi.territory.progression.application.CollectionBookService;
-import com.kobi.territory.progression.domain.CollectionBook;
-import com.kobi.territory.progression.domain.SetProgress;
+import com.kobi.territory.progression.domain.collectionbook.CollectionBook;
+import com.kobi.territory.progression.domain.collectionbook.ThemeProgress;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -40,13 +40,14 @@ public class CollectionBookController {
                                          @RequestParam(value = "mapId", required = false) String mapId) {
         CollectionBook collectionBook = collectionBooks.view(explorerId, mapId);
         int bonus = rewards.setComplete().amount();
-        List<SetResponse> sets = rules.sets().stream().map(set -> {
-            SetProgress setProgress = collectionBook.of(set.id());
-            List<SetRegionResponse> members = set.regionCodes().stream().map(code -> new SetRegionResponse(code,
+        // 응답 필드(sets·SetResponse)는 공개 API 계약이라 이름 유지 — 내용은 테마(ThemeProgress)
+        List<SetResponse> sets = rules.sets().stream().map(setView -> {
+            ThemeProgress themeProgress = collectionBook.progressOf(setView.id());
+            List<SetRegionResponse> members = setView.regionCodes().stream().map(code -> new SetRegionResponse(code,
                 regions.findRegion(RegionCode.of(code)).map(RegionView::name).orElse(code),
-                setProgress.collected().contains(RegionCode.of(code)))).toList();
-            return new SetResponse(set.id(), set.name(), set.desc(), set.title(), setProgress.have(),
-                set.regionCodes().size(), setProgress.completed(), setProgress.completedAt(), bonus, members);
+                themeProgress.holds(RegionCode.of(code)))).toList();
+            return new SetResponse(setView.id(), setView.name(), setView.desc(), setView.title(), themeProgress.have(),
+                setView.regionCodes().size(), themeProgress.completed(), themeProgress.completedAt(), bonus, members);
         }).toList();
         return new CollectionResponse(collectionBook.mapId(), collectionBook.completedCount(), sets.size(), sets);
     }

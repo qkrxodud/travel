@@ -2,12 +2,12 @@ package com.kobi.territory.exploration.application;
 
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
-import com.kobi.territory.exploration.domain.CheckInPolicy;
-import com.kobi.territory.exploration.domain.MapId;
-import com.kobi.territory.exploration.domain.MapSelector;
-import com.kobi.territory.exploration.domain.Territory;
-import com.kobi.territory.exploration.domain.TerritoryRepository;
-import com.kobi.territory.exploration.domain.Visit;
+import com.kobi.territory.exploration.domain.map.CheckInPolicy;
+import com.kobi.territory.exploration.domain.map.MapId;
+import com.kobi.territory.exploration.domain.map.MapSelector;
+import com.kobi.territory.exploration.domain.territory.Territory;
+import com.kobi.territory.exploration.domain.territory.TerritoryRepository;
+import com.kobi.territory.exploration.domain.territory.Visit;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;

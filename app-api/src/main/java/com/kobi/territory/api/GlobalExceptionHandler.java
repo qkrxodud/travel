@@ -6,7 +6,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -78,9 +78,9 @@ public class GlobalExceptionHandler {
         return respond(HttpStatus.CONFLICT, "CONFLICT", "동시에 같은 요청이 처리되었습니다. 새로고침 후 다시 시도해 주세요.");
     }
 
-    /** 낙관적 락 충돌(진행·퀘스트 보드 동시 갱신 — 예: 보상 받기 두 번 동시 클릭). */
-    @ExceptionHandler(OptimisticLockingFailureException.class)
-    public ResponseEntity<ErrorResponse> handle(OptimisticLockingFailureException exception) {
+    /** 동시성 충돌 — 낙관적 락 충돌·비관적 잠금 실패(진행·퀘스트 보드 동시 갱신 — 예: 보상 받기 두 번 동시 클릭). */
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ResponseEntity<ErrorResponse> handle(ConcurrencyFailureException exception) {
         return respond(HttpStatus.CONFLICT, "CONCURRENT_UPDATE", "동시에 같은 요청이 처리되었습니다. 새로고침 후 다시 시도해 주세요.");
     }
 

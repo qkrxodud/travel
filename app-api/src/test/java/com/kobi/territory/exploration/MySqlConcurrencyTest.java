@@ -236,4 +236,46 @@ class MySqlConcurrencyTest {
             + "ON o.id = d.event_id WHERE o.aggregate_id IN (?, ?)", Integer.class, mapId, me);
         System.out.println("[QA P1-2] PUT " + puts + "건 경합 중 릴레이 낙관적 락 충돌 " + conflicts + "회 — 전부 재시도로 흡수");
     }
+
+    @Test
+    void 재계산과_릴레이가_동시에_돌아도_릴레이_반영분이_사라지지_않는다_QA_S_1() throws Exception {
+        String me = newExplorer().get("explorerId").asText();
+        String mapId = jdbc.queryForObject("SELECT id FROM expedition_map WHERE owner_id = ?", String.class, me);
+        AtomicBoolean running = new AtomicBoolean(true);
+        Future<List<Integer>> recalculations = POOL.submit(() -> {
+            List<Integer> statuses = new ArrayList<>();
+            while (running.get()) statuses.add(send("POST", "/dev/recalculate", me, null).statusCode());
+            return statuses;
+        });
+        String today = LocalDate.now(clock).toString();
+        try {
+            for (String code : List.of("KR-35050", "KR-36330", "KR-38360", "KR-38370", "KR-38380")) {
+                assertThat(send("POST", "/visits", me, "{\"regionCode\":\"" + code + "\",\"visitDate\":\"" + today + "\"}")
+                    .statusCode()).isEqualTo(201);
+            }
+            Thread.sleep(3000); // 릴레이가 이벤트를 처리하는 동안 재계산을 몇 초 더 겹쳐 돌린다
+        } finally {
+            running.set(false);
+        }
+        List<Integer> statuses = recalculations.get();
+        Awaitility.await().atMost(Duration.ofSeconds(60)).until(() -> jdbc.queryForObject(
+            "SELECT COUNT(*) FROM outbox WHERE published_at IS NULL AND aggregate_id IN (?, ?)", Integer.class, mapId, me) == 0);
+        System.out.println("[QA S-1] 실패 전달: " + jdbc.queryForList("SELECT d.subscriber, d.status, d.attempts, d.conflicts, "
+            + "d.last_error FROM outbox_delivery d JOIN outbox o ON o.id = d.event_id WHERE o.aggregate_id IN (?, ?) "
+            + "AND (d.attempts > 1 OR d.conflicts > 0)", mapId, me));
+        assertThat(statuses).as("겹쳐 돈 재계산 수").hasSizeGreaterThan(3).containsOnly(200);
+
+        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+            assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(285));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM xp_ledger WHERE explorer_id = ? AND ref_id LIKE 'set:%'",
+            Integer.class, me)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM explorer_region WHERE explorer_id = ? AND active_map_count = 1",
+            Integer.class, me)).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_delivery d JOIN outbox o ON o.id = d.event_id "
+            + "WHERE o.aggregate_id IN (?, ?) AND d.status = 'FAILED'", Integer.class, mapId, me)).isZero();
+        // 조용해진 뒤 한 번 더 재계산해도 같은 결과(재계산 결과 = 모든 이벤트 반영 상태)
+        assertThat(send("POST", "/dev/recalculate", me, null).statusCode()).isEqualTo(200);
+        assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(285);
+        System.out.println("[QA S-1] 재계산 " + statuses.size() + "회를 릴레이와 겹쳐 실행 — xp 285, FAILED 0");
+    }
 }

@@ -8,14 +8,14 @@ import com.kobi.territory.catalog.api.query.ProvinceView;
 import com.kobi.territory.catalog.api.query.RegionCatalog;
 import com.kobi.territory.catalog.api.query.RegionView;
 import com.kobi.territory.catalog.api.query.RewardRulesView;
-import com.kobi.territory.catalog.domain.Catalog;
-import com.kobi.territory.catalog.domain.CatalogRepository;
-import com.kobi.territory.catalog.domain.ItemDefinition;
-import com.kobi.territory.catalog.domain.Province;
-import com.kobi.territory.catalog.domain.ProgressionDefinitions;
-import com.kobi.territory.catalog.domain.Region;
-import com.kobi.territory.catalog.domain.RewardRules;
-import com.kobi.territory.catalog.domain.RewardLine;
+import com.kobi.territory.catalog.domain.catalog.Catalog;
+import com.kobi.territory.catalog.domain.catalog.CatalogRepository;
+import com.kobi.territory.catalog.domain.item.ItemDefinition;
+import com.kobi.territory.catalog.domain.region.Province;
+import com.kobi.territory.catalog.domain.definition.ProgressionDefinitions;
+import com.kobi.territory.catalog.domain.region.Region;
+import com.kobi.territory.catalog.domain.reward.RewardRules;
+import com.kobi.territory.catalog.domain.reward.RewardLine;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
 import java.util.List;
@@ -51,9 +51,9 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
             rules.claimBonus());
         ProgressionDefinitions definitions = catalog.progression();
         this.levelTitles = definitions.levels().titles().stream().map(levelTitle -> new LevelTitleView(levelTitle.level(), levelTitle.name())).toList();
-        this.sets = definitions.sets().stream().map(set -> new SetView(set.id(), set.name(), set.desc(), set.title(),
-            set.regions().stream().map(RegionCode::value).toList(),
-            set.background() == null ? null : set.background().name())).toList();
+        this.sets = definitions.themes().stream().map(theme -> new SetView(theme.id(), theme.name(), theme.desc(), theme.title(),
+            theme.regions().stream().map(RegionCode::value).toList(),
+            theme.background() == null ? null : theme.background().name())).toList();
         this.badges = definitions.badges().stream().map(badge -> new BadgeView(badge.id(), badge.ico(), badge.name(), badge.desc(),
             new BadgeConditionView(badge.condition().type().name(), badge.condition().min(), badge.condition().provinces(),
                 badge.condition().groups(), badge.condition().ratio()))).toList();

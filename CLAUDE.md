@@ -51,3 +51,7 @@ cd e2e && E2E_PORT=18080 npx playwright test                # if 8080 is taken b
 | 2026-10-03 | 명명 규칙 추가(한 글자 변수·람다 파라미터 금지, JDK 타입과 같은 도메인 클래스명 금지 → 도감 `Collection`을 `CollectionBook`으로), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 코드 리뷰 지적 |
 | 2026-10-03 | infra(JPA) 규칙 추가(엔티티·Spring Data 리포지토리 1개=파일 1개, 도메인↔엔티티 변환은 엔티티의 from/apply/toDomain), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 코드 리뷰 지적(ProgressJpaEntities 중첩 묶음) |
 | 2026-10-03 | 일급 컬렉션·클래스명 규칙 추가(클래스명에 JDK 자료형 단어 금지 → 세트 `SetCatalog`/`CollectionSet`/`SetProgress`를 `Themes`/`Theme`/`ThemeProgress`로, 변수·접근자명은 클래스명 따름, record 금지·원본 컬렉션 게터 금지), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 코드 리뷰 지적(`SetCatalog` 클래스명) |
+| 2026-10-03 | 리포지토리 어댑터 규칙 추가(애그리거트 단위 저장 유지, 어댑터는 저장 기술만 — 의도 분기·Clock·diff 금지, 재계산은 replace), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정(A안: JpaExplorerProgressRepository 리뷰) |
+| 2026-10-03 | class vs record 기준 추가(애그리거트·엔티티·일급 컬렉션·행동 있는 VO=class / 단순 VO·결과·정책·커맨드·이벤트·DTO·정의=record, 컬렉션 필드 copyOf), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정(도메인 record 리뷰) |
+| 2026-10-03 | domain 하위 패키지 구성 규칙 추가(애그리거트별 폴더, 리포지토리 포트 동거, 종류별 분류 금지), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 요청(domain 한눈에 보이게) |
+| 2026-10-03 | infra 하위 패키지 규칙 추가(infra/entity, infra/repository 2개로 종류별 분리 — 애그리거트 구분은 domain이 담당), QA 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정 |

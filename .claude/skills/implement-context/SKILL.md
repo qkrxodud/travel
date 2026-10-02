@@ -27,10 +27,31 @@ description: 나의 영토(territory) 바운디드 컨텍스트의 도메인 코
 
 - **한 글자 변수·파라미터명 금지** — 지역 변수, 메서드 파라미터, 람다 파라미터 모두. 타입이나 역할을 드러내는 이름을 쓴다: `Collection c` ✗ → `CollectionBook collectionBook` ✓, `RegionVisited e` ✗ → `RegionVisited event` ✓, `forEach(s -> …)` ✗ → `forEach(completion -> …)` ✓. 특히 `e`는 예외로 읽히므로 이벤트에 쓰지 않는다. 예외는 숫자 인덱스 루프의 `i`/`j`뿐이다.
 - **JDK·Spring 타입과 같은 이름의 도메인 클래스 금지** (`Collection`, `List`, `Map`, `Optional`, `Event`, `Order` 등). 도메인 의미를 살려 구분한다 — 예: 도감은 `CollectionBook`. 설계 문서 용어와 다르게 지었으면 domain-model.md에 매핑을 적는다.
-- **클래스명에 JDK 자료형 단어 금지** (`Set`, `List`, `Map`, `Collection`, `Array`, `Queue` 등이 **자료형으로 읽히는 경우** — 예: `SetCatalog`은 "Set들의 카탈로그"로 읽힘. `CollectionBook`(도감)처럼 도메인 합성어로 의미가 분명하면 허용): `SetCatalog`·`CollectionSet`·`SetProgress` ✗ → 도메인 용어로(세트=테마: `Theme`, `Themes`, `ThemeProgress`) ✓. 공개 이벤트·테이블·API처럼 이미 커밋된 외부 계약 이름은 바꾸지 않고 domain-model.md에 매핑을 적는다(예: `SetCompleted`·`set_progress` = Theme).
+- **클래스명에 JDK 자료형 단어 금지** (`Set`, `List`, `Map`, `Collection`, `Array`, `Queue` 등이 **자료형으로 읽히는 경우** — 예: `SetCatalog`은 "Set들의 카탈로그"로 읽힘. `CollectionBook`(도감)처럼 도메인 합성어로 의미가 분명하면 허용. 도메인 용어 "지도"는 `ExpeditionMap`, `MapId`, `MapSettings`처럼 합성어로만 쓰고 단독 `Map` 클래스(설정 record 포함)는 금지): `SetCatalog`·`CollectionSet`·`SetProgress` ✗ → 도메인 용어로(세트=테마: `Theme`, `Themes`, `ThemeProgress`) ✓. 공개 이벤트·테이블·API처럼 이미 커밋된 외부 계약 이름은 바꾸지 않고 domain-model.md에 매핑을 적는다(예: `SetCompleted`·`set_progress` = Theme).
 - **일급 컬렉션 변수·접근자 이름은 클래스명을 따른다**: `QuestRules quests` ✗ → `QuestRules questRules` ✓ (접근자도 `questRules()`). 원소 복수형은 `List`로 읽혀 일급 컬렉션임이 가려진다. 클래스명 자체가 복수 명사(`Visits`, `Members`, `Themes`)면 `visits`, `members`, `themes` 그대로.
 - **일급 컬렉션은 `record`로 만들지 않는다**: `final class` + `private final` 컬렉션, 원본 컬렉션을 반환하는 게터 금지. 밖에는 행동 메서드(`find`, `containing`, `byScope`, `count…`)만 공개하고, 꼭 순회가 필요하면 불변 뷰(`List.copyOf`)나 `stream()`만. 호출부에서 `xxx.list().stream().filter(...)`가 보이면 그 로직을 일급 컬렉션 안으로 옮긴다.
 - 이유: 코드만 보고 무엇인지 읽혀야 하고, import 충돌로 FQCN을 쓰게 되는 일을 막는다.
+
+## domain 하위 패키지 구성 (사용자 확정)
+
+- `domain/` 바로 아래에 클래스를 늘어놓지 않고 **애그리거트별 하위 패키지**로 나눈다. 폴더 하나 = 애그리거트 하나: 루트·엔티티·VO·일급 컬렉션·결과 record·**리포지토리 포트**를 그 애그리거트 폴더에 함께 둔다. 예: `progression/domain/{progress, collectionbook, quest, badge, replay}`, `exploration/domain/{territory, map, explorer}`, `catalog/domain/{region, item, reward, definition}`.
+- 종류별(`vo/`, `collection/`, `repository/`) 분류는 하지 않는다 — 애그리거트 하나가 여러 폴더로 흩어진다.
+- 여러 애그리거트가 함께 쓰는 정책 VO·도메인 서비스만 별도 폴더(`policy/`, `replay/` 등)로 뺀다. 애그리거트 폴더끼리는 내부 구현을 참조하지 않고 id(VO)로만 가리킨다.
+- 폴더를 나누며 package-private 이던 것을 무분별하게 `public`으로 열지 않는다 — 꼭 필요한 것만.
+
+## class vs record 기준 (사용자 확정)
+
+| 종류 | 형태 | 예 |
+|------|------|----|
+| 애그리거트·엔티티 | **class** | `Territory`, `ExplorerProgress`, `CollectionBook` |
+| 일급 컬렉션 | **class** (record 금지 — 원본 컬렉션이 노출됨) | `Visits`, `Members`, `Themes`, `QuestRules` |
+| 다음 상태를 계산하는(`withX`/`record(month)`처럼 새 값을 돌려주는) 값 객체, 내부 표현을 숨기거나 팩토리를 강제해야 하는 값 객체 — 판정·조회 메서드(`isX`, `contains`)만 있으면 record 유지 | **class** (`equals`/`hashCode` 직접 구현) | `Streak`, `LevelCurve`, `ThemeProgress` |
+| 값 하나를 감싸 검증만 하는 단순 값 객체 | record (compact constructor에서 검증) | `RegionCode`, `Memo`, `VisitDate`, `InviteCode` |
+| 넘겨주는 값 묶음 — 결과·사실·정책·커맨드 | record | `CheckInResult`, `VisitFacts`, `CheckInPolicy`, `ProgressChange` |
+| 이벤트·DTO·카탈로그 정의(읽기 전용 참조 데이터) | record | `RegionVisited`, `*Response`, `Region`, `ItemDefinition` |
+
+- record에 컬렉션 필드가 있으면 compact constructor에서 `List.copyOf`/`Set.copyOf`/`Map.copyOf`로 방어 복사해 불변으로. 컬렉션을 감싸는 것 자체가 목적이면 record가 아니라 일급 컬렉션 class로.
+- 판단이 애매하면: "이 타입에 상태를 바꾸거나 다음 값을 계산하는 메서드가 있는가?" → 있으면 class.
 
 ## infra(JPA) 규칙 (사용자 확정)
 
@@ -38,6 +59,8 @@ description: 나의 영토(territory) 바운디드 컨텍스트의 도메인 코
 - 이름은 `{도메인개념}JpaEntity`(예: `ExplorerProgressJpaEntity`, `XpLedgerJpaEntity`), 복합키는 엔티티 안의 `Key` 또는 별도 `{이름}Key` 파일.
 - **도메인 ↔ 엔티티 변환은 그 엔티티가 가진다**: `static XxxJpaEntity from(도메인)`/`void apply(도메인)`(갱신), `도메인 toDomain()`. 리포지토리 어댑터(`JpaXxxRepository implements 도메인 포트`)는 조회·저장 호출과 엔티티 조합만 하고 필드 단위 매핑 코드를 갖지 않는다. 여러 엔티티로 하나의 애그리거트를 복원해야 하면 루트 엔티티의 `toDomain(자식 엔티티들)`로.
 - 이유: 테이블 하나를 볼 때 그 파일 하나만 열면 매핑까지 다 보이게.
+- **infra 하위 패키지는 종류별 2개 (사용자 확정)**: `infra/entity/`(JPA 엔티티 + `CsvColumn` 같은 매핑 보조), `infra/repository/`(Spring Data 리포지토리 + 도메인 포트를 구현한 어댑터). 애그리거트 구분은 domain 폴더가 하므로 infra는 애그리거트별로 나누지 않는다. 패키지가 갈리면서 엔티티·변환 메서드·Spring Data 인터페이스가 `public`이 되는 것은 허용(infra 밖에서 참조하지 않는 것은 ArchUnit이 막는다). 예외: app-api의 outbox는 조립 모듈의 인프라+릴레이 프로세스 묶음이라 나누지 않는다(나누면 상태 전이 메서드를 public으로 열어야 함).
+- **리포지토리 어댑터는 "어떻게 저장할지"만, "무엇을/왜"는 호출자가 (사용자 확정 — 애그리거트 단위 저장 유지)**: 포트는 애그리거트 단위(`save(aggregate)`, `replace(aggregate)` 등)로 두고 서비스가 테이블 구조를 모르게 한다. 어댑터에 허용되는 것은 저장 기술뿐 — 매핑 호출, 새 행만 insert/변경 행 update 같은 변경 반영, 삭제 후 재삽입. **금지**: 호출 의도를 추측하는 분기(`if (aggregate.rebuilt())` ✗ → 서비스가 `save`/`replace` 중 골라 호출), `Clock` 주입·시각 결정(시각은 도메인이 들고 온다), 비즈니스 판단. 재계산처럼 통째로 바꾸는 경로는 기존 행과 비교(diff)하지 말고 `replace`가 그 애그리거트 행을 지우고 다시 넣는다.
 
 ## 이벤트 통신 규칙
 

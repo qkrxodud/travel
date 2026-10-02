@@ -64,11 +64,13 @@ CREATE TABLE explorer_region (
 CREATE INDEX idx_explorer_region_active ON explorer_region (explorer_id, active_map_count);
 
 -- 도감(지도 단위). collected_codes = 지금 지도에 칠해진 세트 지역, completed_at = 처음 완성 시각(취소해도 유지).
+-- version = 낙관적 락 — 재계산과 도감 이벤트 처리가 같은 행을 동시에 고치면 충돌로 드러나 재시도된다(구조 QA S2-1).
 CREATE TABLE set_progress (
     map_id          VARCHAR(36)   NOT NULL,
     set_id          VARCHAR(20)   NOT NULL,
     collected_codes VARCHAR(1000) NOT NULL,
     completed_at    DATETIME(6)   NULL,
+    version         BIGINT        NOT NULL,
     CONSTRAINT pk_set_progress PRIMARY KEY (map_id, set_id)
 );
 

@@ -5,13 +5,13 @@ import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
 import com.kobi.territory.progression.api.event.QuestCompleted;
-import com.kobi.territory.progression.domain.ExplorerProgressRepository;
-import com.kobi.territory.progression.domain.ProgressVisit;
-import com.kobi.territory.progression.domain.QuestBoard;
-import com.kobi.territory.progression.domain.QuestBoardRepository;
-import com.kobi.territory.progression.domain.QuestFact;
-import com.kobi.territory.progression.domain.QuestPeriod;
-import com.kobi.territory.progression.domain.QuestReward;
+import com.kobi.territory.progression.domain.progress.ExplorerProgressRepository;
+import com.kobi.territory.progression.domain.progress.ProgressVisit;
+import com.kobi.territory.progression.domain.quest.QuestBoard;
+import com.kobi.territory.progression.domain.quest.QuestBoardRepository;
+import com.kobi.territory.progression.domain.quest.QuestFact;
+import com.kobi.territory.progression.domain.quest.QuestPeriod;
+import com.kobi.territory.progression.domain.quest.QuestReward;
 import java.time.Clock;
 import java.time.YearMonth;
 import org.springframework.stereotype.Service;
@@ -49,7 +49,9 @@ public class QuestService {
     public void onRegionVisited(RegionVisited event) {
         ExplorerId explorerId = ExplorerId.of(event.explorerId());
         ProgressVisit visit = ProgressService.visitOf(event);
-        QuestFact fact = QuestFact.of(visit, catalog.sets(), progresses.exploredRegions(explorerId));
+        QuestFact fact = QuestFact.of(visit.region(), visit.provinceCode(), visit.rarity(),
+            catalog.themes().includeAny(visit.region()),
+            progresses.exploredRegions(explorerId).visitedProvinceBefore(visit.provinceCode(), visit.visitedAt()));
         YearMonth now = catalog.currentMonth();
         apply(boards.load(explorerId, QuestPeriod.monthOf(event.visitedAt(), clock.getZone())), fact, now);
         apply(boards.load(explorerId, QuestPeriod.ALL), fact, now);
@@ -68,8 +70,8 @@ public class QuestService {
     public QuestReward claim(ExplorerId explorerId, String questId) {
         territories.personalMapId(explorerId.value());
         YearMonth now = catalog.currentMonth();
-        QuestBoard board = boards.load(explorerId, catalog.quests().require(questId).periodAt(now));
-        QuestReward reward = board.claim(questId, catalog.quests(), clock.instant(), now);
+        QuestBoard board = boards.load(explorerId, catalog.questRules().require(questId).periodAt(now));
+        QuestReward reward = board.claim(questId, catalog.questRules(), clock.instant(), now);
         boards.save(board);
         outbox.append(AGGREGATE, explorerId.value(), new QuestCompleted(explorerId.value(), reward.period().value(),
             reward.questId(), reward.xp(), reward.claimedAt()));
@@ -77,7 +79,7 @@ public class QuestService {
     }
 
     private void apply(QuestBoard board, QuestFact fact, YearMonth now) {
-        board.applyVisit(fact, catalog.quests(), now);
+        board.applyVisit(fact, catalog.questRules(), now);
         boards.save(board);
     }
 

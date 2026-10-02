@@ -3,13 +3,18 @@ package com.kobi.territory.support;
 import com.kobi.territory.common.event.DomainEvent;
 import com.kobi.territory.common.event.EventSubscriber;
 import com.kobi.territory.exploration.api.event.RegionVisited;
+import com.kobi.territory.progression.domain.collectionbook.CollectionBook;
+import com.kobi.territory.progression.domain.collectionbook.CollectionBookRepository;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -56,6 +61,63 @@ public class IntegrationTestConfig {
                     ? FaultInjection.wrap(subscriber) : bean;
             }
         };
+    }
+
+    @Bean
+    public static BeanPostProcessor pausableCollectionBooks() {
+        return new BeanPostProcessor() {
+            @Override
+            public Object postProcessAfterInitialization(Object bean, String beanName) {
+                return bean instanceof CollectionBookRepository repository ? ReplacePause.wrap(repository) : bean;
+            }
+        };
+    }
+
+    /**
+     * 재계산 일시정지(구조 QA S2-1 재현): arm 후 첫 CollectionBookRepository.replace 호출 직전에 멈춰, 그 사이에 다른
+     * 처리(도감 이벤트 반영)를 커밋시킬 수 있게 한다. 한 번만 멈춘다(재계산 재시도는 그대로 통과).
+     */
+    public static final class ReplacePause {
+        private static volatile CountDownLatch reached;
+        private static volatile CountDownLatch release;
+
+        private ReplacePause() {}
+
+        public static void arm() {
+            reached = new CountDownLatch(1);
+            release = new CountDownLatch(1);
+        }
+
+        public static boolean awaitReached(Duration timeout) throws InterruptedException {
+            return reached.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        }
+
+        public static void release() {
+            CountDownLatch waiting = release;
+            if (waiting != null) waiting.countDown();
+        }
+
+        static CollectionBookRepository wrap(CollectionBookRepository delegate) {
+            return new CollectionBookRepository() {
+                @Override public CollectionBook load(String mapId) { return delegate.load(mapId); }
+                @Override public void save(CollectionBook collectionBook) { delegate.save(collectionBook); }
+
+                @Override
+                public void replace(CollectionBook collectionBook) {
+                    CountDownLatch waitFor = release;
+                    if (waitFor != null && reached.getCount() > 0) {
+                        reached.countDown();
+                        try {
+                            waitFor.await(60, TimeUnit.SECONDS);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                        }
+                        release = null;
+                    }
+                    delegate.replace(collectionBook);
+                }
+            };
+        }
     }
 
     public static class CapturedEvents {

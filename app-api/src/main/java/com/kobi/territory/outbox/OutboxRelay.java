@@ -89,7 +89,7 @@ public class OutboxRelay {
         do {
             page = events.findByPublishedAtIsNullAndIdGreaterThanOrderByIdAsc(cursor, Limit.of(PAGE));
             for (OutboxEventEntity row : page) {
-                cursor = row.getId();
+                cursor = row.id();
                 relayRow(row, stalledLanes);
             }
         } while (page.size() == PAGE);
@@ -98,18 +98,18 @@ public class OutboxRelay {
     private void relayRow(OutboxEventEntity row, Set<String> stalledLanes) {
         Optional<DomainEvent> parsed = deserialize(row);
         if (parsed.isEmpty()) {
-            markPublished(row.getId());
+            markPublished(row.id());
             return;
         }
         DomainEvent event = parsed.get();
-        Map<String, OutboxDeliveryEntity> state = deliveries.findByEventId(row.getId()).stream()
-            .collect(Collectors.toMap(OutboxDeliveryEntity::getSubscriber, Function.identity()));
+        Map<String, OutboxDeliveryEntity> state = deliveries.findByEventId(row.id()).stream()
+            .collect(Collectors.toMap(OutboxDeliveryEntity::subscriber, Function.identity()));
         Instant now = retryClock.instant();
         boolean allDelivered = true;
         for (EventSubscriber subscriber : subscribersOf(event)) {
             OutboxDeliveryEntity delivery = state.get(subscriber.id());
             if (delivery != null && delivery.delivered()) continue;
-            String lane = row.getAggregateId() + "|" + subscriber.id();
+            String lane = row.aggregateId() + "|" + subscriber.id();
             boolean blocked = stalledLanes.contains(lane)
                 || (delivery != null && (delivery.failed() || delivery.waitingAt(now)));
             if (blocked || !deliver(row, event, subscriber)) {
@@ -118,7 +118,7 @@ public class OutboxRelay {
             }
         }
         if (allDelivered) {
-            markPublished(row.getId());
+            markPublished(row.id());
             notifyListeners(event);
         }
     }
@@ -128,7 +128,7 @@ public class OutboxRelay {
         try {
             newTx.executeWithoutResult(status -> {
                 subscriber.handle(event);
-                OutboxDeliveryEntity delivery = loadOrNew(row.getId(), subscriber.id());
+                OutboxDeliveryEntity delivery = loadOrNew(row.id(), subscriber.id());
                 delivery.markDelivered(clock.instant());
                 deliveries.save(delivery);
             });
@@ -142,19 +142,19 @@ public class OutboxRelay {
     private void recordFailure(OutboxEventEntity row, EventSubscriber subscriber, RuntimeException exception) {
         boolean conflict = isConflict(exception);
         newTx.executeWithoutResult(status -> {
-            OutboxDeliveryEntity delivery = loadOrNew(row.getId(), subscriber.id());
+            OutboxDeliveryEntity delivery = loadOrNew(row.id(), subscriber.id());
             Instant now = retryClock.instant();
             if (conflict) {
-                delivery.markConflict(exception.toString(), backoff.delay(delivery.getConflicts() + 1), now);
-                log.info("outbox {} ({}) → {} 낙관적 락 충돌 {}회째, 백오프 후 재시도", row.getId(), row.eventName(),
-                    subscriber.id(), delivery.getConflicts());
+                delivery.markConflict(exception.toString(), backoff.delay(delivery.conflicts() + 1), now);
+                log.info("outbox {} ({}) → {} 낙관적 락 충돌 {}회째, 백오프 후 재시도", row.id(), row.eventName(),
+                    subscriber.id(), delivery.conflicts());
             } else if (delivery.markFailure(exception.toString(), maxAttempts,
-                backoff.delay(delivery.getAttempts() + 1), now)) {
-                log.error("outbox {} ({}) → {} 전달 {}회 실패, FAILED — 이 순서 단위는 재전달 전까지 멈춘다: {}", row.getId(),
+                backoff.delay(delivery.attempts() + 1), now)) {
+                log.error("outbox {} ({}) → {} 전달 {}회 실패, FAILED — 이 순서 단위는 재전달 전까지 멈춘다: {}", row.id(),
                     row.eventName(), subscriber.id(), maxAttempts, exception.toString());
             } else {
-                log.warn("outbox {} ({}) → {} 전달 실패 {}회째, 백오프 후 재시도: {}", row.getId(), row.eventName(),
-                    subscriber.id(), delivery.getAttempts(), exception.toString());
+                log.warn("outbox {} ({}) → {} 전달 실패 {}회째, 백오프 후 재시도: {}", row.id(), row.eventName(),
+                    subscriber.id(), delivery.attempts(), exception.toString());
             }
             deliveries.save(delivery);
         });
@@ -196,10 +196,10 @@ public class OutboxRelay {
 
     private Optional<DomainEvent> deserialize(OutboxEventEntity row) {
         try {
-            Class<?> type = Class.forName(row.getEventType());
-            return Optional.of((DomainEvent) objectMapper.readValue(row.getPayload(), type));
+            Class<?> type = Class.forName(row.eventType());
+            return Optional.of((DomainEvent) objectMapper.readValue(row.payload(), type));
         } catch (Exception exception) {
-            log.error("outbox {} 역직렬화 실패({}) — 발행 불가로 표시하고 넘어간다", row.getId(), row.getEventType(), exception);
+            log.error("outbox {} 역직렬화 실패({}) — 발행 불가로 표시하고 넘어간다", row.id(), row.eventType(), exception);
             return Optional.empty();
         }
     }
