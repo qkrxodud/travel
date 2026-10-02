@@ -1,0 +1,15 @@
+### 0단계 뼈대 수동 확인 (IntelliJ HTTP Client / VS Code REST Client)
+### 먼저 ./gradlew :app-api:bootRun 으로 서버를 띄운다 (local 프로파일, H2).
+@host = http://localhost:8080
+
+### 애플리케이션 헬스 + 설정값 노출 → {"status":"UP","dailyCap":5,"leaveGraceDays":7,"service":"territory"}
+GET {{host}}/health
+
+### Actuator 헬스 → {"status":"UP"}
+GET {{host}}/actuator/health
+
+### [local 전용] 전체 데이터 초기화 (0단계 no-op) → 204
+DELETE {{host}}/dev/reset
+
+### [local 전용] 테스트 시드 투입 (0단계 no-op) → 204
+POST {{host}}/dev/seed

@@ -1,0 +1,15 @@
+{
+  "name": "territory-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "description": "나의 영토(territory) Playwright E2E 테스트",
+  "scripts": {
+    "test": "playwright test",
+    "test:stage0": "playwright test tests/stage0-boot.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2"
+  }
+}

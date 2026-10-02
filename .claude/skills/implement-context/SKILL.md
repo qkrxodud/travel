@@ -1,0 +1,53 @@
+---
+name: implement-context
+description: 나의 영토(territory) 바운디드 컨텍스트의 도메인 코드를 구현한다. 애그리거트(Territory, ExplorerProgress, Collection, QuestBoard, Inventory, Scene, Friendship, ShareCard, ExpeditionMap), 체크인 API, 이벤트 핸들러, JPA 인프라, Flyway 마이그레이션 등 도메인 구현·수정·보완 작업 전부에 반드시 이 스킬을 사용할 것. 뼈대 생성에는 scaffold-multimodule을 쓴다.
+---
+
+# Implement Context — 바운디드 컨텍스트 구현 규칙
+
+`doc/나의 영토 도메인 분석 · 애그리거트 설계.pdf`를 구현 규칙으로 옮긴 스킬이다. 담당 애그리거트의 상세 스펙(루트·VO·불변식·커맨드·이벤트·테이블)은 **`references/domain-model.md`에서 해당 섹션을 읽고 그대로 따른다.** 이 본문은 모든 컨텍스트에 공통인 규칙만 담는다.
+
+## 레이어 규칙 (모듈 내 4패키지)
+
+| 패키지 | 담는 것 | 의존 허용 |
+|--------|---------|----------|
+| `api` | Controller, DTO, **다른 컨텍스트에 공개하는 이벤트·Query 인터페이스** | application |
+| `application` | UseCase 서비스, 트랜잭션 경계, 이벤트 발행/구독 핸들러 | domain |
+| `domain` | 애그리거트, VO, 도메인 이벤트, Repository 인터페이스 | common만 |
+| `infra` | JPA 엔티티/리포지토리 구현, 외부 클라이언트 | domain, application |
+
+- domain은 순수 Java — Spring·JPA 어노테이션 금지. JPA 엔티티는 infra에 따로 두고 리포지토리가 변환한다. 이유: 애그리거트 단위 테스트가 컨텍스트 없이 돌고, 컨텍스트를 서비스로 떼어낼 때 모듈째 가져갈 수 있다.
+- 다른 컨텍스트는 그 컨텍스트의 `api` 패키지만 참조한다. Gradle로는 못 막으므로 ArchUnit 규칙으로 강제한다 — 위반하면 빌드가 깨진다.
+- **의존 규칙의 진화**: 뼈대(0단계)의 Gradle 의존·ArchUnit 규칙은 "도메인 모듈 간 참조 전면 금지"다. 1단계부터 구독 관계가 생기면 domain-model.md §1의 의존 매트릭스에 맞춰 **둘을 함께 갱신한다**: Gradle에 `implementation project(':exploration')` 등 허용된 의존을 추가하고, ArchUnit 규칙을 "다른 컨텍스트의 `api` 패키지 외 참조 금지" 형태(`..exploration..`은 `..exploration.api..`를 제외하고 타 컨텍스트에서 참조 불가)로 바꾼다. 둘 중 하나만 고치면 컴파일 불가 또는 ArchUnit 실패가 난다.
+- **공개 이벤트의 위치**: `RegionVisited` 같은 컨텍스트 간 이벤트는 그 컨텍스트의 `api` 패키지에 둔다. domain은 api를 참조할 수 없으므로, 애그리거트 커맨드는 계산 결과(지급 목록, isFirstInProvince 등)를 **결과 객체로 반환**하고, application 서비스가 이를 api의 공개 이벤트로 변환해 outbox에 적재한다.
+- **게임 규칙 값의 주입 경로**: domain은 Spring을 모르므로 `TerritoryProperties`를 직접 주입받을 수 없다. app-api의 `TerritoryProperties`는 바인딩만 담당하고, application 서비스가 그 값을 정책 VO(예: `CheckInPolicy{dailyCap, onboardingGraceHours}`)나 커맨드 인자로 변환해 애그리거트에 전달한다. domain에 숫자를 하드코딩하면 QA 결함이다.
+
+## 이벤트 통신 규칙
+
+1. 컨텍스트 간 호출은 `ApplicationEventPublisher` + outbox 테이블로만 한다. 동기 메서드 호출 금지. Kafka는 지금 안 붙인다(outbox 릴레이를 `@Scheduled`로).
+2. 트랜잭션은 커맨드를 받은 애그리거트 하나만 잠근다. 체크인이면 Territory만 커밋하고, `RegionVisited`를 같은 트랜잭션의 outbox에 쌓는다. 나머지 애그리거트는 이벤트를 구독해 각자 자기 트랜잭션에서 갱신한다.
+3. 이벤트에는 하류가 원본을 다시 읽지 않아도 되도록 계산된 값을 실어 보낸다(예: `RegionVisited`의 `isFirstInProvince`, `nth`, `isFirstClaim`).
+4. **모든 핸들러는 멱등하다.** `xp_ledger.ref_id` 같은 유니크 키로 중복 적용을 막는다. refId 형식: 기본 XP는 `region:{explorerId}:{code}`, 선점 보너스는 `claim:{mapId}:{code}:{explorerId}`(수령자를 포함해야 선점 이전 시 새 선점자 지급이 UNIQUE에 막히지 않는다).
+5. 순서가 중요한 연쇄(세트 완성 → 보상)는 2차 이벤트(`SetCompleted`)로 잇는다.
+
+## 일관성 3원칙
+
+1. 핸들러 멱등성 (위 4번).
+2. **취소의 비대칭성**: 체크인 취소는 지역 아이템과 기본 XP만 되돌린다. 세트 완성·뱃지·퀘스트 보상은 유지한다. 이유: 반복 획득은 이미 멱등성으로 막혀 있어 회수 로직의 복잡도를 들일 가치가 없다.
+3. **재계산 가능성**: 진행·도감·인벤토리는 Territory로부터 전부 재계산할 수 있어야 한다(RecalculateService — 정의 변경·버그 복구용 배치).
+
+## 구현 작업 절차
+
+1. `references/domain-model.md`에서 담당 애그리거트 섹션과 모듈 의존 매트릭스를 읽는다.
+2. domain부터 작성한다(순수 Java + 단위 테스트). 불변식은 애그리거트 메서드 안에서 지키고, 위반은 예외로 거부한다.
+3. application(커맨드 서비스·이벤트 핸들러) → infra(JPA 엔티티·Flyway 마이그레이션) → api(컨트롤러·공개 이벤트) 순서로 올라간다.
+4. 테이블은 domain-model.md의 스키마 요약을 따르고, Flyway 마이그레이션은 V1=1단계(카탈로그+탐험), V2=2단계(진행), V3=3단계(꾸미기), V4=5단계(소셜)로 추가한다 — 4단계(공유)는 마이그레이션이 없어 V 번호와 단계 번호가 끝에서 어긋난다. 1단계에서 app-api에 `flyway-core`(MySQL 전환 시 `flyway-mysql`도) 의존성을 추가하고, local 프로파일도 Flyway + `ddl-auto: validate`로 전환한다(create-drop 유지 금지 — 마이그레이션이 로컬에서 검증되지 않는다).
+5. `./gradlew build` 통과 확인. ArchUnit 포함.
+
+## 참조 데이터
+
+Region(250개)·ItemDefinition·CollectionSetDefinition·BadgeDefinition·QuestDefinition은 애그리거트가 아니다. catalog 모듈의 리소스 JSON으로 두고 시작 시 메모리에 올린다(단, ItemDefinition은 운영이 수시로 추가하므로 3단계(꾸미기)에서 DB 테이블로 옮긴다). Region에는 `countryCode`·`version`·`replacedBy`·`retiredAt`을 처음부터 넣고, RegionCode는 `KR-11010` 형식이다.
+
+## 게임 규칙 값
+
+하루 상한(5)·온보딩 예외(72h)·탈퇴 유예(7일)·카드 TTL(10분)은 코드에 박지 않는다. app-api의 `TerritoryProperties`(`territory.*`)에서 주입받는다.
