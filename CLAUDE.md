@@ -54,4 +54,4 @@ cd e2e && E2E_PORT=18080 npx playwright test                # if 8080 is taken b
 | 2026-10-03 | 리포지토리 어댑터 규칙 추가(애그리거트 단위 저장 유지, 어댑터는 저장 기술만 — 의도 분기·Clock·diff 금지, 재계산은 replace), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정(A안: JpaExplorerProgressRepository 리뷰) |
 | 2026-10-03 | class vs record 기준 추가(애그리거트·엔티티·일급 컬렉션·행동 있는 VO=class / 단순 VO·결과·정책·커맨드·이벤트·DTO·정의=record, 컬렉션 필드 copyOf), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정(도메인 record 리뷰) |
 | 2026-10-03 | domain 하위 패키지 구성 규칙 추가(애그리거트별 폴더, 리포지토리 포트 동거, 종류별 분류 금지), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 요청(domain 한눈에 보이게) |
-| 2026-10-03 | infra 하위 패키지 규칙 추가(infra/entity, infra/repository 2개로 종류별 분리 — 애그리거트 구분은 domain이 담당), QA 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정 |
+| 2026-10-03 | infra 하위 패키지 규칙 추가(infra/entity, infra/repository 2개로 종류별 분리 — 애그리거트 구분은 domain이 담당), QA 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정 || 2026-10-03 | 의존성 주입 규칙 명시(생성자 주입만), QA 점검 항목 추가 | implement-context, verify-architecture | 3단계 QA r3 P3-R3-5(DevController 필드 주입) |

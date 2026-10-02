@@ -43,6 +43,7 @@ curl localhost:8080/actuator/health
 - **domain 하위 패키지**(implement-context "domain 하위 패키지 구성"): `domain/` 바로 아래에 애그리거트 클래스가 흩어져 있거나, 종류별(`vo/`·`repository/`) 폴더면 P3. 애그리거트 폴더 간 내부 구현 참조(다른 애그리거트의 엔티티·일급 컬렉션 직접 사용)도 P3.
 - **class vs record 기준**(implement-context "class vs record 기준"): 애그리거트·엔티티·일급 컬렉션·행동 있는 값 객체가 record면 P3, 컬렉션 필드가 있는 record에 방어 복사(`copyOf`)가 없으면 P3. domain 패키지 `grep -rn "record "`로 전수 확인.
 - **infra 하위 패키지**: JPA 엔티티는 `infra/entity/`, Spring Data 리포지토리·어댑터는 `infra/repository/`에 있어야 한다(위반 P3). infra 엔티티·Spring Data 타입을 infra 밖(application·api)에서 참조하면 P2.
+- **생성자 주입**: main 코드에 `@Autowired` 필드·세터 주입이 있으면 P3(`grep -rn "@Autowired" */src/main`).
 - **리포지토리 어댑터 판단 금지**(implement-context "infra(JPA) 규칙"): 어댑터에 호출 의도 분기(`rebuilt()` 류 플래그), `Clock` 주입, 비즈니스 판단, 재계산용 diff 코드가 있으면 P3. 포트가 테이블 단위(`appendLedger` 등)로 쪼개져 서비스가 테이블 구조를 알게 되면 P3.
 - **명명 규칙**(implement-context "명명 규칙"): 한 글자 변수·파라미터·람다 파라미터(인덱스 루프 `i`/`j` 제외)와 JDK·Spring 타입과 같은 이름의 도메인 클래스는 P3 — 변경된 파일 전체를 grep으로 확인(예: `grep -rnE "\b[A-Z][A-Za-z]+ [a-z]\b[,)= ]"`, `-> ?[a-z] ?->`/`\b[a-z] ->`).
 - **application 서비스가 얇은가**: 서비스는 조회·저장·잠금·outbox·정책 VO 조립과 호출 순서만 가진다. 판단·계산·검증·분기(if/반복문으로 된 비즈니스 규칙)가 서비스에 있으면 P2 — 애그리거트·VO·도메인 서비스·일급 컬렉션으로 옮겨야 한다(implement-context 레이어 규칙).

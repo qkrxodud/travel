@@ -53,6 +53,10 @@ description: 나의 영토(territory) 바운디드 컨텍스트의 도메인 코
 - record에 컬렉션 필드가 있으면 compact constructor에서 `List.copyOf`/`Set.copyOf`/`Map.copyOf`로 방어 복사해 불변으로. 컬렉션을 감싸는 것 자체가 목적이면 record가 아니라 일급 컬렉션 class로.
 - 판단이 애매하면: "이 타입에 상태를 바꾸거나 다음 값을 계산하는 메서드가 있는가?" → 있으면 class.
 
+## 의존성 주입
+
+- 스프링 빈은 **생성자 주입**만 쓴다(`@Autowired` 필드·세터 주입 금지). 순환 의존이 생기면 주입 방식이 아니라 설계를 고친다. 선택적 빈은 생성자 파라미터의 `ObjectProvider<T>`로.
+
 ## infra(JPA) 규칙 (사용자 확정)
 
 - **엔티티 하나 = 파일 하나.** 여러 `@Entity`를 한 파일의 중첩 클래스로 묶지 않는다. Spring Data 리포지토리 인터페이스도 하나에 파일 하나(`XxxJpaRepository.java`). 가시성을 숨기고 싶으면 package-private 최상위 클래스로 둔다.
