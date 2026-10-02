@@ -22,7 +22,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 /**
- * Territory ↔ territory(루트 행)·visit 테이블 변환.
+ * Territory 저장소 어댑터 — territory(루트 행)·visit 테이블. 행 ↔ 도메인 변환은 엔티티(VisitJpaEntity·TerritoryJpaEntity)가 한다.
  * 커맨드는 territory 행을 PESSIMISTIC_WRITE(SELECT ... FOR UPDATE)로 먼저 잠가 같은 지도의 동시 체크인을 직렬화한다
  * (하루 상한·nth·isFirstInProvince·isFirstClaim 경합 방지). expedition_map 행은 잠그지 않는다(§2-9 분리).
  * save 는 로드 시점과 비교해 추가·수정·삭제(물리 삭제)를 반영한다.
@@ -42,7 +42,7 @@ class JpaTerritoryRepository implements TerritoryRepository {
 
     @Override
     public void create(MapId mapId, Instant createdAt) {
-        territories.save(new TerritoryJpaEntity(mapId.value(), createdAt));
+        territories.save(TerritoryJpaEntity.create(mapId, createdAt));
     }
 
     @Override
@@ -52,27 +52,26 @@ class JpaTerritoryRepository implements TerritoryRepository {
 
     @Override
     public Optional<MapId> lockPersonal(ExplorerId owner) {
-        return territories.lockPersonal(owner.value()).stream().findFirst().map(territoryEntity -> MapId.of(territoryEntity.getMapId()));
+        return territories.lockPersonal(owner.value()).stream().findFirst().map(TerritoryJpaEntity::mapId);
     }
 
     @Override
     public Territory load(MapId mapId) {
-        return Territory.restore(mapId, visits.findByMapId(mapId.value()).stream().map(this::toDomain).toList());
+        return Territory.restore(mapId, visits.findByMapId(mapId.value()).stream()
+            .map(visitEntity -> visitEntity.toDomain(regions.require(visitEntity.regionCode())))
+            .toList());
     }
 
     @Override
     public void save(Territory territory) {
-        String mapId = territory.mapId().value();
         Map<String, VisitJpaEntity> existing = new HashMap<>();
-        visits.findByMapId(mapId).forEach(visitEntity -> existing.put(key(visitEntity.getRegionCode(), visitEntity.getCheckedInBy()), visitEntity));
+        visits.findByMapId(territory.mapId().value()).forEach(visitEntity -> existing.put(visitEntity.identity(), visitEntity));
         for (Visit visit : territory.visits()) {
-            VisitJpaEntity row = existing.remove(key(visit.regionCode().value(), visit.checkedInBy().value()));
-            String photo = visit.photo() == null ? null : visit.photo().url();
-            if (row == null) {
-                visits.save(new VisitJpaEntity(mapId, visit.regionCode().value(), visit.checkedInBy().value(),
-                    visit.verification().name(), visit.visitDate().value(), visit.memo().value(), photo, visit.visitedAt()));
+            VisitJpaEntity visitEntity = existing.remove(VisitJpaEntity.identity(visit));
+            if (visitEntity == null) {
+                visits.save(VisitJpaEntity.from(territory.mapId(), visit));
             } else {
-                row.update(visit.visitDate().value(), visit.memo().value(), photo);
+                visitEntity.apply(visit);
             }
         }
         List<VisitJpaEntity> removed = List.copyOf(existing.values());
@@ -102,14 +101,4 @@ class JpaTerritoryRepository implements TerritoryRepository {
 
     /** V1 visit 테이블 UNIQUE 제약 이름. */
     static final String VISIT_UNIQUE = "uq_visit_map_region_member";
-
-    private Visit toDomain(VisitJpaEntity entity) {
-        return new Visit(regions.require(RegionCode.of(entity.getRegionCode())), ExplorerId.of(entity.getCheckedInBy()),
-            VisitDate.of(entity.getVisitDate()), Memo.of(entity.getMemo()), PhotoRef.ofNullable(entity.getPhotoUrl()),
-            Verification.valueOf(entity.getVerification()), entity.getVisitedAt());
-    }
-
-    private static String key(String regionCode, String explorerId) {
-        return regionCode + "|" + explorerId;
-    }
 }

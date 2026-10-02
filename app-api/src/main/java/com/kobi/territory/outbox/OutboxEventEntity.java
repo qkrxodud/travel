@@ -1,5 +1,6 @@
 package com.kobi.territory.outbox;
 
+import com.kobi.territory.common.event.DomainEvent;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -40,7 +41,12 @@ public class OutboxEventEntity {
     @Column(name = "published_at")
     private Instant publishedAt;
 
-    OutboxEventEntity(String aggregate, String aggregateId, String eventType, String payload, Instant createdAt) {
+    /** 공개 이벤트 한 건 → outbox 행(payload 는 호출자가 직렬화한 JSON, 이벤트 타입은 FQCN). */
+    static OutboxEventEntity from(String aggregate, String aggregateId, DomainEvent event, String payload, Instant createdAt) {
+        return new OutboxEventEntity(aggregate, aggregateId, event.getClass().getName(), payload, createdAt);
+    }
+
+    private OutboxEventEntity(String aggregate, String aggregateId, String eventType, String payload, Instant createdAt) {
         this.aggregate = aggregate;
         this.aggregateId = aggregateId;
         this.eventType = eventType;

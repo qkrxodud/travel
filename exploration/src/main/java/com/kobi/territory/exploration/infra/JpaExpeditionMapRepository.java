@@ -28,17 +28,14 @@ class JpaExpeditionMapRepository implements ExpeditionMapRepository {
 
     @Override
     public void save(ExpeditionMap map) {
-        MapSettings settings = map.settings();
-        maps.save(new ExpeditionMapJpaEntity(map.id().value(), map.name(), map.country().value(), map.inviteCode().value(),
-            map.ownerId().value(), map.kind().name(), settings.photoRequired(), settings.dailyCheckInCap(), settings.visibility().name(),
-            map.createdAt()));
-        var existing = members.findByMapId(map.id().value());
-        existing.stream()
-            .filter(memberEntity -> map.member(ExplorerId.of(memberEntity.getExplorerId())).isEmpty())
+        ExpeditionMapJpaEntity mapEntity = maps.findById(map.id().value())
+            .orElseGet(() -> ExpeditionMapJpaEntity.from(map));
+        mapEntity.apply(map);
+        maps.save(mapEntity);
+        members.findByMapId(map.id().value()).stream()
+            .filter(memberEntity -> map.member(memberEntity.explorerId()).isEmpty())
             .forEach(members::delete);
-        for (Member member : map.members()) {
-            members.save(new MapMemberJpaEntity(map.id().value(), member.explorerId().value(), member.role().name(), member.joinedAt()));
-        }
+        map.members().forEach(member -> members.save(MapMemberJpaEntity.from(map.id(), member)));
     }
 
     @Override
@@ -58,16 +55,10 @@ class JpaExpeditionMapRepository implements ExpeditionMapRepository {
 
     @Override
     public List<MapId> mapIdsOf(ExplorerId explorerId) {
-        return members.findByExplorerId(explorerId.value()).stream().map(memberEntity -> MapId.of(memberEntity.getMapId())).toList();
+        return members.findByExplorerId(explorerId.value()).stream().map(MapMemberJpaEntity::mapId).toList();
     }
 
-    private ExpeditionMap toDomain(ExpeditionMapJpaEntity entity) {
-        var memberList = members.findByMapId(entity.getId()).stream()
-            .map(memberEntity -> new Member(ExplorerId.of(memberEntity.getExplorerId()), MemberRole.valueOf(memberEntity.getRole()), memberEntity.getJoinedAt()))
-            .toList();
-        return ExpeditionMap.restore(MapId.of(entity.getId()), entity.getName(), new CountryCode(entity.getCountryCode()),
-            new InviteCode(entity.getInviteCode()), ExplorerId.of(entity.getOwnerId()), MapKind.valueOf(entity.getKind()),
-            new MapSettings(entity.isPhotoRequired(), entity.getDailyCheckInCap(), MapVisibility.valueOf(entity.getVisibility())),
-            entity.getCreatedAt(), memberList);
+    private ExpeditionMap toDomain(ExpeditionMapJpaEntity mapEntity) {
+        return mapEntity.toDomain(members.findByMapId(mapEntity.id()));
     }
 }

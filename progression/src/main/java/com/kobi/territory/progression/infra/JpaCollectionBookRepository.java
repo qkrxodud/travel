@@ -1,48 +1,40 @@
 package com.kobi.territory.progression.infra;
 
-import com.kobi.territory.common.model.RegionCode;
 import com.kobi.territory.progression.domain.CollectionBook;
 import com.kobi.territory.progression.domain.CollectionBookRepository;
 import com.kobi.territory.progression.domain.SetProgress;
-import com.kobi.territory.progression.infra.ProgressJpaEntities.SetRow;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Repository;
 
-/** CollectionBook(도감) ↔ set_progress(map_id, set_id, collected_codes, completed_at). collected_codes 는 쉼표 구분 문자열. */
+/** CollectionBook(도감) 저장소 어댑터 — set_progress. 행 ↔ 도메인 변환은 SetProgressJpaEntity 가 한다. */
 @Repository
 class JpaCollectionBookRepository implements CollectionBookRepository {
 
-    private final SetRowRepository setRows;
+    private final SetProgressJpaRepository setRows;
 
-    JpaCollectionBookRepository(SetRowRepository setRows) {
+    JpaCollectionBookRepository(SetProgressJpaRepository setRows) {
         this.setRows = setRows;
     }
 
     @Override
     public CollectionBook load(String mapId) {
-        return CollectionBook.restore(mapId, setRows.findByMapId(mapId).stream()
-            .map(setRow -> new SetProgress(setRow.getSetId(),
-                JpaExplorerProgressRepository.splitSet(setRow.getCollectedCodes()).stream()
-                    .map(RegionCode::of).collect(Collectors.toSet()),
-                setRow.getCompletedAt()))
-            .toList());
+        return SetProgressJpaEntity.toCollectionBook(mapId, setRows.findByMapId(mapId));
     }
 
     @Override
     public void save(CollectionBook collectionBook) {
-        Map<String, SetRow> existing = setRows.findByMapId(collectionBook.mapId()).stream()
-            .collect(Collectors.toMap(SetRow::getSetId, Function.identity()));
+        Map<String, SetProgressJpaEntity> stale = setRows.findByMapId(collectionBook.mapId()).stream()
+            .collect(Collectors.toMap(SetProgressJpaEntity::setId, Function.identity()));
         for (SetProgress setProgress : collectionBook.rows()) {
-            SetRow setRow = Optional.ofNullable(existing.remove(setProgress.setId()))
-                .orElseGet(() -> new SetRow(collectionBook.mapId(), setProgress.setId()));
-            setRow.setCollectedCodes(setProgress.collected().stream().map(RegionCode::value).sorted()
-                .collect(Collectors.joining(",")));
-            setRow.setCompletedAt(setProgress.completedAt());
-            setRows.save(setRow);
+            SetProgressJpaEntity setRow = stale.remove(setProgress.setId());
+            if (setRow == null) {
+                setRows.save(SetProgressJpaEntity.from(collectionBook.mapId(), setProgress));
+            } else {
+                setRow.apply(setProgress);
+            }
         }
-        setRows.deleteAll(existing.values()); // 재계산이 비운 세트
+        setRows.deleteAll(stale.values()); // 재계산이 비운 세트
     }
 }

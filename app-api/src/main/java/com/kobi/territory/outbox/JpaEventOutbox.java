@@ -27,7 +27,7 @@ public class JpaEventOutbox implements EventOutbox {
     @Transactional(propagation = Propagation.MANDATORY)
     public void append(String aggregateType, String aggregateId, DomainEvent event) {
         try {
-            repository.save(new OutboxEventEntity(aggregateType, aggregateId, event.getClass().getName(),
+            repository.save(OutboxEventEntity.from(aggregateType, aggregateId, event,
                 objectMapper.writeValueAsString(event), clock.instant()));
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("이벤트 직렬화 실패: " + event, exception);

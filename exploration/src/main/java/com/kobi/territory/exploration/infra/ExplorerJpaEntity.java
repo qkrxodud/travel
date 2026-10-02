@@ -1,17 +1,18 @@
 package com.kobi.territory.exploration.infra;
 
+import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.exploration.domain.Explorer;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AccessLevel;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/** explorer 테이블 ↔ Explorer(계정 루트). 변환은 이 엔티티가 가진다. */
 @Entity
 @Table(name = "explorer")
-@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class ExplorerJpaEntity {
 
@@ -26,9 +27,21 @@ class ExplorerJpaEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    ExplorerJpaEntity(String id, String handle, Instant createdAt) {
+    private ExplorerJpaEntity(String id, String handle, Instant createdAt) {
         this.id = id;
         this.handle = handle;
         this.createdAt = createdAt;
+    }
+
+    static ExplorerJpaEntity from(Explorer explorer) {
+        return new ExplorerJpaEntity(explorer.id().value(), explorer.handle(), explorer.createdAt());
+    }
+
+    ExplorerId explorerId() {
+        return ExplorerId.of(id);
+    }
+
+    Explorer toDomain() {
+        return Explorer.restore(explorerId(), handle, createdAt);
     }
 }

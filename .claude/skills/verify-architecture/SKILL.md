@@ -38,6 +38,8 @@ curl localhost:8080/actuator/health
 `.claude/skills/implement-context/references/domain-model.md`의 해당 애그리거트 섹션과 코드를 대조한다:
 
 - 불변식이 애그리거트 메서드 안에서 지켜지는가(서비스 레이어에서만 막고 있으면 규칙 위반).
+- **infra(JPA) 규칙**(implement-context "infra(JPA) 규칙"): 한 파일에 `@Entity`나 Spring Data 리포지토리가 2개 이상이면 P3, 리포지토리 어댑터에 필드 단위 도메인↔엔티티 매핑 코드가 있으면 P3(변환은 엔티티의 `from`/`apply`/`toDomain`). `grep -c "@Entity"`로 확인.
+- **일급 컬렉션 규칙**(implement-context "명명 규칙"): 컬렉션을 감싼 `record`(`grep -rnE "record [A-Za-z]+\((List|Set|Map)<"` in domain), 원본 컬렉션 반환 게터, 호출부의 `.xxx().stream().filter`, 클래스명과 다른 원소 복수형 변수명(`QuestRules quests`), 클래스명에 JDK 자료형 단어(`Set`, `List`, `Map`, `Collection` 등 — 예: `SetCatalog`)는 P3.
 - **명명 규칙**(implement-context "명명 규칙"): 한 글자 변수·파라미터·람다 파라미터(인덱스 루프 `i`/`j` 제외)와 JDK·Spring 타입과 같은 이름의 도메인 클래스는 P3 — 변경된 파일 전체를 grep으로 확인(예: `grep -rnE "\b[A-Z][A-Za-z]+ [a-z]\b[,)= ]"`, `-> ?[a-z] ?->`/`\b[a-z] ->`).
 - **application 서비스가 얇은가**: 서비스는 조회·저장·잠금·outbox·정책 VO 조립과 호출 순서만 가진다. 판단·계산·검증·분기(if/반복문으로 된 비즈니스 규칙)가 서비스에 있으면 P2 — 애그리거트·VO·도메인 서비스·일급 컬렉션으로 옮겨야 한다(implement-context 레이어 규칙).
 - domain 패키지에 Spring·JPA 어노테이션이 없는가 (ArchUnit이 잡지만 `jakarta.persistence` 규칙을 빼고 시작했을 수 있으니 grep으로도 확인).

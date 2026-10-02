@@ -49,3 +49,5 @@ cd e2e && E2E_PORT=18080 npx playwright test                # if 8080 is taken b
 | 2026-10-02 | 드라이런 교차 점검 결함 수정: 보고 파일명 컨벤션 통일({NN} zero-pad), 0단계 스킬 경로 명시, 의존 규칙 진화(api-예외) 정의, 공개 이벤트 위치(api)·설정값 주입 경로(정책 VO) 확정, claim refId에 수령자 추가, ExpeditionMap→exploration 소속·V1 포함, Flyway 단계 매핑·local 전환 명시 | 에이전트 2종 + 스킬 4종 전체 | 드라이런 점검에서 P1 4건·P2 8건 발견 |
 | 2026-10-03 | 얇은 application 서비스 규칙 추가(서비스=DB 접근·호출 순서만, 로직·흐름은 도메인+일급 컬렉션), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 설계 지시 |
 | 2026-10-03 | 명명 규칙 추가(한 글자 변수·람다 파라미터 금지, JDK 타입과 같은 도메인 클래스명 금지 → 도감 `Collection`을 `CollectionBook`으로), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 코드 리뷰 지적 |
+| 2026-10-03 | infra(JPA) 규칙 추가(엔티티·Spring Data 리포지토리 1개=파일 1개, 도메인↔엔티티 변환은 엔티티의 from/apply/toDomain), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 코드 리뷰 지적(ProgressJpaEntities 중첩 묶음) |
+| 2026-10-03 | 일급 컬렉션·클래스명 규칙 추가(클래스명에 JDK 자료형 단어 금지 → 세트 `SetCatalog`/`CollectionSet`/`SetProgress`를 `Themes`/`Theme`/`ThemeProgress`로, 변수·접근자명은 클래스명 따름, record 금지·원본 컬렉션 게터 금지), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 코드 리뷰 지적(`SetCatalog` 클래스명) |

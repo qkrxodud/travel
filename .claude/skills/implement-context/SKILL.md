@@ -27,7 +27,17 @@ description: 나의 영토(territory) 바운디드 컨텍스트의 도메인 코
 
 - **한 글자 변수·파라미터명 금지** — 지역 변수, 메서드 파라미터, 람다 파라미터 모두. 타입이나 역할을 드러내는 이름을 쓴다: `Collection c` ✗ → `CollectionBook collectionBook` ✓, `RegionVisited e` ✗ → `RegionVisited event` ✓, `forEach(s -> …)` ✗ → `forEach(completion -> …)` ✓. 특히 `e`는 예외로 읽히므로 이벤트에 쓰지 않는다. 예외는 숫자 인덱스 루프의 `i`/`j`뿐이다.
 - **JDK·Spring 타입과 같은 이름의 도메인 클래스 금지** (`Collection`, `List`, `Map`, `Optional`, `Event`, `Order` 등). 도메인 의미를 살려 구분한다 — 예: 도감은 `CollectionBook`. 설계 문서 용어와 다르게 지었으면 domain-model.md에 매핑을 적는다.
+- **클래스명에 JDK 자료형 단어 금지** (`Set`, `List`, `Map`, `Collection`, `Array`, `Queue` 등이 **자료형으로 읽히는 경우** — 예: `SetCatalog`은 "Set들의 카탈로그"로 읽힘. `CollectionBook`(도감)처럼 도메인 합성어로 의미가 분명하면 허용): `SetCatalog`·`CollectionSet`·`SetProgress` ✗ → 도메인 용어로(세트=테마: `Theme`, `Themes`, `ThemeProgress`) ✓. 공개 이벤트·테이블·API처럼 이미 커밋된 외부 계약 이름은 바꾸지 않고 domain-model.md에 매핑을 적는다(예: `SetCompleted`·`set_progress` = Theme).
+- **일급 컬렉션 변수·접근자 이름은 클래스명을 따른다**: `QuestRules quests` ✗ → `QuestRules questRules` ✓ (접근자도 `questRules()`). 원소 복수형은 `List`로 읽혀 일급 컬렉션임이 가려진다. 클래스명 자체가 복수 명사(`Visits`, `Members`, `Themes`)면 `visits`, `members`, `themes` 그대로.
+- **일급 컬렉션은 `record`로 만들지 않는다**: `final class` + `private final` 컬렉션, 원본 컬렉션을 반환하는 게터 금지. 밖에는 행동 메서드(`find`, `containing`, `byScope`, `count…`)만 공개하고, 꼭 순회가 필요하면 불변 뷰(`List.copyOf`)나 `stream()`만. 호출부에서 `xxx.list().stream().filter(...)`가 보이면 그 로직을 일급 컬렉션 안으로 옮긴다.
 - 이유: 코드만 보고 무엇인지 읽혀야 하고, import 충돌로 FQCN을 쓰게 되는 일을 막는다.
+
+## infra(JPA) 규칙 (사용자 확정)
+
+- **엔티티 하나 = 파일 하나.** 여러 `@Entity`를 한 파일의 중첩 클래스로 묶지 않는다. Spring Data 리포지토리 인터페이스도 하나에 파일 하나(`XxxJpaRepository.java`). 가시성을 숨기고 싶으면 package-private 최상위 클래스로 둔다.
+- 이름은 `{도메인개념}JpaEntity`(예: `ExplorerProgressJpaEntity`, `XpLedgerJpaEntity`), 복합키는 엔티티 안의 `Key` 또는 별도 `{이름}Key` 파일.
+- **도메인 ↔ 엔티티 변환은 그 엔티티가 가진다**: `static XxxJpaEntity from(도메인)`/`void apply(도메인)`(갱신), `도메인 toDomain()`. 리포지토리 어댑터(`JpaXxxRepository implements 도메인 포트`)는 조회·저장 호출과 엔티티 조합만 하고 필드 단위 매핑 코드를 갖지 않는다. 여러 엔티티로 하나의 애그리거트를 복원해야 하면 루트 엔티티의 `toDomain(자식 엔티티들)`로.
+- 이유: 테이블 하나를 볼 때 그 파일 하나만 열면 매핑까지 다 보이게.
 
 ## 이벤트 통신 규칙
 

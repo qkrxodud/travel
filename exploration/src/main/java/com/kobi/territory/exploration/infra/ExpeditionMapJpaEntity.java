@@ -1,17 +1,26 @@
 package com.kobi.territory.exploration.infra;
 
+import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.exploration.domain.CountryCode;
+import com.kobi.territory.exploration.domain.ExpeditionMap;
+import com.kobi.territory.exploration.domain.InviteCode;
+import com.kobi.territory.exploration.domain.MapId;
+import com.kobi.territory.exploration.domain.MapKind;
+import com.kobi.territory.exploration.domain.MapSettings;
+import com.kobi.territory.exploration.domain.MapVisibility;
+import com.kobi.territory.exploration.domain.Member;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.List;
 import lombok.AccessLevel;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/** expedition_map 테이블 ↔ ExpeditionMap 루트(멤버는 map_member 자식 행). 변환은 이 엔티티가 가진다. */
 @Entity
 @Table(name = "expedition_map")
-@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class ExpeditionMapJpaEntity {
 
@@ -46,17 +55,36 @@ class ExpeditionMapJpaEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    ExpeditionMapJpaEntity(String id, String name, String countryCode, String inviteCode, String ownerId, String kind,
-                           boolean photoRequired, int dailyCheckInCap, String visibility, Instant createdAt) {
-        this.id = id;
-        this.name = name;
-        this.countryCode = countryCode;
-        this.inviteCode = inviteCode;
-        this.ownerId = ownerId;
-        this.kind = kind;
-        this.photoRequired = photoRequired;
-        this.dailyCheckInCap = dailyCheckInCap;
-        this.visibility = visibility;
-        this.createdAt = createdAt;
+    static ExpeditionMapJpaEntity from(ExpeditionMap map) {
+        ExpeditionMapJpaEntity entity = new ExpeditionMapJpaEntity();
+        entity.id = map.id().value();
+        entity.apply(map);
+        return entity;
+    }
+
+    /** 바뀔 수 있는 값(이름·초대코드·소유자·설정)을 도메인 상태로 맞춘다. */
+    void apply(ExpeditionMap map) {
+        MapSettings settings = map.settings();
+        this.name = map.name();
+        this.countryCode = map.country().value();
+        this.inviteCode = map.inviteCode().value();
+        this.ownerId = map.ownerId().value();
+        this.kind = map.kind().name();
+        this.photoRequired = settings.photoRequired();
+        this.dailyCheckInCap = settings.dailyCheckInCap();
+        this.visibility = settings.visibility().name();
+        this.createdAt = map.createdAt();
+    }
+
+    String id() {
+        return id;
+    }
+
+    /** 루트 + 자식(map_member) 행으로 애그리거트를 복원한다. */
+    ExpeditionMap toDomain(List<MapMemberJpaEntity> memberRows) {
+        List<Member> members = memberRows.stream().map(MapMemberJpaEntity::toDomain).toList();
+        return ExpeditionMap.restore(MapId.of(id), name, new CountryCode(countryCode), new InviteCode(inviteCode),
+            ExplorerId.of(ownerId), MapKind.valueOf(kind),
+            new MapSettings(photoRequired, dailyCheckInCap, MapVisibility.valueOf(visibility)), createdAt, members);
     }
 }

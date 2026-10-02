@@ -1,18 +1,20 @@
 package com.kobi.territory.exploration.infra;
 
+import com.kobi.territory.exploration.domain.MapId;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AccessLevel;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** territory 테이블 — Territory 루트 행(지도 단위 직렬화 잠금 대상). */
+/**
+ * territory 테이블 — Territory 루트 행(지도 단위 직렬화 잠금 대상). 방문은 visit 자식 행이고, 애그리거트 복원은
+ * 방문 행만으로 한다(이 행은 잠금·존재 확인용).
+ */
 @Entity
 @Table(name = "territory")
-@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class TerritoryJpaEntity {
 
@@ -23,8 +25,14 @@ class TerritoryJpaEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    TerritoryJpaEntity(String mapId, Instant createdAt) {
-        this.mapId = mapId;
-        this.createdAt = createdAt;
+    static TerritoryJpaEntity create(MapId mapId, Instant createdAt) {
+        TerritoryJpaEntity entity = new TerritoryJpaEntity();
+        entity.mapId = mapId.value();
+        entity.createdAt = createdAt;
+        return entity;
+    }
+
+    MapId mapId() {
+        return MapId.of(mapId);
     }
 }

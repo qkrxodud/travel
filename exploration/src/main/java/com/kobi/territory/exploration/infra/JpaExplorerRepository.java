@@ -18,16 +18,16 @@ class JpaExplorerRepository implements ExplorerRepository {
 
     @Override
     public void save(Explorer explorer) {
-        jpa.save(new ExplorerJpaEntity(explorer.id().value(), explorer.handle(), explorer.createdAt()));
+        jpa.save(ExplorerJpaEntity.from(explorer));
     }
 
     @Override
     public List<ExplorerId> allIds() {
-        return jpa.findAll().stream().map(entity -> ExplorerId.of(entity.getId())).toList();
+        return jpa.findAll().stream().map(ExplorerJpaEntity::explorerId).toList();
     }
 
     @Override
     public Optional<Explorer> findById(ExplorerId id) {
-        return jpa.findById(id.value()).map(entity -> Explorer.restore(ExplorerId.of(entity.getId()), entity.getHandle(), entity.getCreatedAt()));
+        return jpa.findById(id.value()).map(ExplorerJpaEntity::toDomain);
     }
 }
