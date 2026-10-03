@@ -50,3 +50,7 @@ e2e/playwright-report/
 e2e/blob-report/
 e2e/playwright/.cache/
 .playwright-mcp/
+
+### Docker Compose 운영 ###
+.env
+backups/

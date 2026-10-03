@@ -34,6 +34,16 @@ cd e2e && npm install && npx playwright install chromium   # first time
 cd e2e && npm test                                          # all E2E tests (starts bootRun if not running)
 cd e2e && npm run test:stage0                               # stage 0 boot spec only
 cd e2e && E2E_PORT=18080 npx playwright test                # if 8080 is taken by another process
+
+# Docker Compose local operation (prod profile, MySQL 8.4, 127.0.0.1:18080) — see doc/operations.md "Docker Compose 로컬 운영"
+cp .env.example .env                                        # first time: fill secrets (.env is gitignored)
+docker compose up -d --build                                # start / redeploy (project: territory)
+docker compose logs -f app                                  # logs
+docker compose stop                                         # stop (volumes kept; never `down -v` in operation)
+scripts/backup.sh && scripts/restore.sh backups/<file>.sql.gz   # mysqldump backup / restore
+docker compose -p territory-e2e -f compose.yaml -f compose.e2e.yaml up -d --build --wait   # E2E on MySQL (dev endpoints, :18090)
+cd e2e && E2E_PORT=18090 npx playwright test
+docker compose -p territory-e2e -f compose.yaml -f compose.e2e.yaml down -v
 ```
 
 ## 하네스: 나의 영토(territory) 백엔드 구현

@@ -1,0 +1,26 @@
+# 빌드 컨텍스트에서 제외 — 이미지 안에서 다시 빌드한다.
+.git
+.gitignore
+.gradle
+**/build/
+**/out/
+**/bin/
+.idea
+*.iml
+.vscode
+.DS_Store
+_workspace/
+_workspace_prev/
+.playwright-mcp/
+.claude/
+e2e/
+http/
+doc/
+tools/
+backups/
+scripts/
+.env
+.env.*
+compose*.yaml
+Dockerfile
+HELP.md
