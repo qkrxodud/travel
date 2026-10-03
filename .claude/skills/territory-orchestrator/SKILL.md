@@ -47,7 +47,7 @@ description: 나의 영토(territory) 백엔드·웹 프론트엔드 구현 작�
 
 - 프론트 단계 번호는 백엔드 단계 다음 번호를 쓴다(예: React 이전 = `06`). 보고 파일 `_workspace/{NN}_frontend_report.md`, QA `_workspace/{NN}_qa_frontend.md`.
 - 완료 기준: `npm run check` + `./gradlew clean build`(프론트 빌드 포함) + E2E 전체 2회 연속 + (이전 작업이면) 프로토타입과 화면 동등성 확인.
-- 사용자 확인용 서버는 커밋 시점 worktree(`../travel-stageN`)에서 18090으로 띄운다. 운영 compose(`docker compose`, 18080)는 사용자가 띄워 둔 것일 수 있으니 재빌드·재시작 전에 사용자에게 알린다.
+- E2E·bootRun 포트는 18081~18089(18080은 운영 compose 자리). 사용자 확인용 서버는 커밋 시점 worktree(`../travel-stageN`)에서 18090으로 띄운다. 운영 compose(`docker compose`, 18080)는 사용자가 띄워 둔 것일 수 있으니 재빌드·재시작 전에 사용자에게 알린다.
 
 ## 데이터 전달 프로토콜
 

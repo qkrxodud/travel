@@ -32,4 +32,29 @@ public final class SharingDtos {
      * @param publiclyVisible 로그아웃 상태의 누구나 공개 프로필·카드를 볼 수 있는지(FRIENDS 는 5단계 전까지 false)
      */
     public record PrivacyResponse(String visibility, boolean publiclyVisible, Instant updatedAt) {}
+
+    /**
+     * GET /me/recap — 내 연간 리캡(고른 지도에서 내가 칠한 곳, 방문일 기준 그 해). 계산은 리캡 카드 PNG 와 같다. 문장은 화면 몫.
+     *
+     * @param mapId         기준 지도(요청에서 생략하면 개인 지도 id)
+     * @param newRegions    그 해에 방문일이 있는 영토 수
+     * @param monthCounts   1~12월 영토 수(항상 12칸)
+     * @param topProvince   가장 많이 간 시·도(동점이면 지역 코드가 작은 쪽), 그 해 방문이 없으면 null
+     * @param rarest        가장 희귀한 곳(동점이면 지역 코드가 작은 쪽), 그 해 방문이 없으면 null
+     * @param newProvinces  그 해에 처음 밟은 시·도 수(그 시·도의 내 방문이 모두 그 해)
+     * @param busiestMonth  가장 바쁜 달(동점이면 이른 달), 그 해 방문이 없으면 null
+     * @param setsCompleted 그 지도 도감에서 완성한 세트 수(연도 무관 누적)
+     */
+    public record RecapResponse(int year, String mapId, int newRegions, List<Integer> monthCounts,
+                                RecapProvinceResponse topProvince, RecapRegionResponse rarest, int newProvinces,
+                                RecapMonthResponse busiestMonth, int setsCompleted) {}
+
+    /** @param count 그 해 그 시·도에서 칠한 영토 수 */
+    public record RecapProvinceResponse(String provinceCode, String provinceName, int count) {}
+
+    /** @param rarity COMMON | RARE | LEGEND */
+    public record RecapRegionResponse(String regionCode, String name, String provinceCode, String provinceName, String rarity) {}
+
+    /** @param month 1~12 */
+    public record RecapMonthResponse(int month, int count) {}
 }

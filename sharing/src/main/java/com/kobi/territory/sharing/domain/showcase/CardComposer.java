@@ -64,8 +64,8 @@ public final class CardComposer {
             .collect(Collectors.toUnmodifiableSet());
         MapPaint paint = MapPaint.builder().paint(earlier, Tone.FADED).paint(thisYear, Tone.MINE).build();
         List<CardContent.Stat> stats = new ArrayList<>();
-        stats.add(new CardContent.Stat("가장 많이 간 시·도", orDash(recap.topProvince())));
-        stats.add(new CardContent.Stat("가장 희귀한 곳", orDash(recap.rarest())));
+        stats.add(new CardContent.Stat("가장 많이 간 시·도", orDash(topProvinceLabel(recap.topProvince()))));
+        stats.add(new CardContent.Stat("가장 희귀한 곳", orDash(rarestLabel(recap.rarest()))));
         return new CardContent.Recap(footerOf(showcase), paint, showcase.displayName() + "의 " + recap.year() + " 리캡",
             recap.newRegions(), "올해 새로 밟은 땅 · 시·도 " + recap.newProvinces() + "곳 신규", recap.monthCounts(), stats);
     }
@@ -90,6 +90,16 @@ public final class CardComposer {
 
     private static String footerOf(Showcase showcase) {
         return showcase.footer();
+    }
+
+    /** "서울 3곳" — 그 해 방문이 없으면 null. */
+    static String topProvinceLabel(YearRecap.ProvinceTally topProvince) {
+        return topProvince == null ? null : topProvince.provinceName() + " " + topProvince.count() + "곳";
+    }
+
+    /** "울릉군 (전설)" — 그 해 방문이 없으면 null. */
+    static String rarestLabel(RegionInfo rarest) {
+        return rarest == null ? null : rarest.name() + " (" + RarityLabel.of(rarest.rarity()) + ")";
     }
 
     private static String orDash(String value) {

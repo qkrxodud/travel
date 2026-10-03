@@ -60,8 +60,34 @@ docker compose down                             # 컨테이너·네트워크 제
 # docker compose down -v                        # !! 볼륨까지 삭제 = 데이터 전부 삭제 — 운영에서 쓰지 않는다
 ```
 
-**업데이트(새 코드 배포)**: `git pull` → `./gradlew clean build`(테스트) → `scripts/backup.sh` → `docker compose up -d --build`(app 만 재생성 — Flyway 가 새 마이그레이션 적용) → `docker compose logs app | grep -E "Migrating|Started|ERROR"`. 배포 직후 해야 할 운영 작업(예: 5단계 `POST /admin/rebuild/feed`)은 각 절 참고:
+**업데이트(새 코드 배포)**: `git pull` → `./gradlew clean build`(테스트 — 웹 프론트 `npm ci`·`npm run check`·`npm run build` 포함) → `scripts/backup.sh` → **지금 이미지를 `prev` 로 태깅**(아래) → `docker compose up -d --build`(app 만 재생성 — Flyway 가 새 마이그레이션 적용, 이미지 빌드 스테이지가 프론트도 빌드) → `docker compose logs app | grep -E "Migrating|Started|ERROR"` → 브라우저로 `http://localhost:18080/` 를 열어 화면(지도 칠해짐·탭 전환)을 한 번 확인. 배포 직후 해야 할 운영 작업(예: 5단계 `POST /admin/rebuild/feed`)은 각 절 참고:
 `curl -X POST -H "X-Admin-Token: $TOKEN" localhost:18080/admin/rebuild/feed`.
+
+```bash
+# 업데이트 직전(빌드 전에) — compose 는 territory-app:latest 를 --build 로 덮어쓰므로 지금 돌고 있는 이미지에 이름을 하나 더 붙여 둔다
+docker image inspect territory-app:latest > /dev/null 2>&1 && docker tag territory-app:latest territory-app:prev   # 첫 배포면 건너뛴다
+scripts/backup.sh                               # 같은 시점의 DB 덤프(마이그레이션이 있는 배포를 되돌릴 때 필요)
+docker compose up -d --build
+```
+
+**롤백(직전 이미지로 되돌리기)**: 새 버전에서 화면·API 문제가 나면 코드를 고치기 전에 먼저 되돌린다.
+
+```bash
+docker tag territory-app:prev territory-app:latest   # latest 를 직전 이미지로 되돌린다
+docker compose up -d --no-build app                  # 다시 빌드하지 않고 그 이미지로 app 만 재생성
+docker compose ps && curl -s localhost:18080/health  # healthy · {"service":"territory",...}
+docker image ls territory-app                        # latest 와 prev 가 같은 IMAGE ID 인지 확인
+```
+
+- 되돌린 배포가 **새 Flyway 마이그레이션을 적용했다면** 옛 이미지는 모르는 마이그레이션을 건너뛰고(Flyway 기본 `*:future` 무시) 뜨지만, 스키마가 옛 코드와 맞지 않을 수 있다. 그때는 업데이트 직전 덤프로 DB 도 되돌린다: `scripts/restore.sh backups/territory-<업데이트 직전>.sql.gz`(app 중지 → 복원 → app 기동). 덤프 이후에 들어온 방문 기록은 사라지므로 롤백 시각을 기록해 둔다.
+- 문제를 고친 새 버전을 다시 배포할 때도 위 업데이트 절차(태깅 → 빌드)를 그대로 밟는다. `prev` 는 한 단계만 남는다 — 더 오래 남기려면 `territory-app:<날짜>` 처럼 태그를 하나 더 붙인다.
+
+### 웹 프론트(React, 6단계)
+
+- 화면은 `frontend/`(Vite + React + TypeScript) 다. 산출물(`frontend/dist`)은 git 에 없고, `./gradlew build`·`bootRun`·`docker build` 가 매번 만든다(`processResources` 가 `static/` 으로 복사). Node 는 Gradle node 플러그인이 받는다(로컬 `.gradle/nodejs`, 이미지 빌드 스테이지 안) — 호스트·이미지에 Node 를 설치하지 않는다.
+- 이미지 빌드에 npm 레지스트리·nodejs.org 접근이 필요하다(의존성 레이어는 `frontend/package-lock.json` 이 그대로면 캐시). 오프라인 빌드가 필요하면 미리 받은 레이어 캐시를 쓴다.
+- 화면 문제 롤백: 직전 이미지로 되돌리는 것이 기본이다(위 "롤백" — 업데이트 전에 `territory-app:prev` 태깅). React 이전 전 화면(바닐라 JS)은 비교·긴급 롤백용으로 `doc/legacy-index.html` 에 보존 — `app-api/src/main/resources/static/index.html` 로 되돌려 넣고 app-api `build.gradle` 의 `processResources { from(frontendBuild) … }` 를 빼면 예전 화면으로 빌드된다(서버 API 는 그대로 호환).
+- 프론트만 고칠 때: Spring 을 빈 포트로 띄우고(`./gradlew :app-api:bootRun --args='--server.port=18081'`) `cd frontend && npm run dev`. Vite 프록시 기본 대상은 `http://localhost:18081` 이고 다른 포트면 `VITE_API_TARGET=http://localhost:18082 npm run dev` 로 바꾼다(API 경로는 `vite.config.ts` 의 `API_PATHS` 한 곳에서 Spring 으로 프록시). 기본값을 bootRun 기본 포트 8080 으로 두지 않은 것은 이 PC 에서 8080 을 다른 앱이 쓰기 때문이다(env 없이 띄우면 남의 앱으로 프록시된다).
 
 ### 백업·복원
 

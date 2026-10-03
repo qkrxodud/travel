@@ -14,6 +14,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kobi.territory.exploration.api.event.MemberJoined;
+import com.kobi.territory.sharing.application.ShowcaseReader;
+import com.kobi.territory.sharing.domain.card.CardKind;
+import com.kobi.territory.sharing.domain.showcase.CardComposer;
+import com.kobi.territory.sharing.domain.showcase.CardContent;
 import com.kobi.territory.support.IntegrationTest;
 import com.kobi.territory.support.MutableClock;
 import java.awt.image.BufferedImage;
@@ -21,6 +25,7 @@ import java.io.ByteArrayInputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Year;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +59,7 @@ class SharingIntegrationTest {
     @Autowired ObjectMapper om;
     @Autowired MutableClock clock;
     @Autowired JdbcTemplate jdbc;
+    @Autowired ShowcaseReader showcases;
 
     record Anonymous(String id, String token, String personalMapId) {}
 
@@ -399,5 +405,108 @@ class SharingIntegrationTest {
         assertThat(legacy.invitedBy()).isNull();
         assertThat(om.readValue(om.writeValueAsString(new MemberJoined("m", "e", "MEMBER", Instant.EPOCH, false, "h")),
             MemberJoined.class).invitedBy()).isEqualTo("h");
+    }
+
+    // ---- 연간 리캡 JSON(06 QA P2-1) -----------------------------------------------------------------------------
+
+    private void checkInOn(Anonymous who, String mapId, String code, LocalDate date) throws Exception {
+        clock.advance(Duration.ofSeconds(1));
+        mvc.perform(post("/visits").header(H, who.token()).contentType(MediaType.APPLICATION_JSON)
+            .content(om.writeValueAsString(Map.of("regionCode", code, "visitDate", date.toString(), "memo", MEMO, "mapId", mapId))))
+            .andExpect(status().isCreated());
+    }
+
+    private JsonNode recap(Anonymous who, String query) throws Exception {
+        return json(mvc.perform(get("/me/recap" + query).header(H, who.token())).andExpect(status().isOk()));
+    }
+
+    @Test
+    void 리캡_JSON_은_개인_지도_기준이_기본이고_리캡_카드_PNG_와_같은_값이다() throws Exception {
+        Anonymous me = anonymous();
+        LocalDate today = LocalDate.now(clock);
+        LocalDate lastYear = today.minusYears(1).withMonth(6).withDayOfMonth(1);
+        checkIn(me, "KR-11020", today, MEMO);  // 칠한 순서는 중구가 먼저 — 동점은 지역 코드(종로구)로 가른다
+        checkIn(me, "KR-11010", today, MEMO);
+        checkIn(me, "KR-37430", lastYear, MEMO);
+
+        JsonNode recap = recap(me, "");
+        assertThat(recap.get("year").asInt()).isEqualTo(today.getYear());
+        assertThat(recap.get("mapId").asText()).isEqualTo(me.personalMapId());
+        assertThat(recap.get("newRegions").asInt()).isEqualTo(2);
+        assertThat(recap.get("monthCounts")).hasSize(12);
+        assertThat(recap.get("monthCounts").get(today.getMonthValue() - 1).asInt()).isEqualTo(2);
+        assertThat(recap.get("topProvince").get("provinceCode").asText()).isEqualTo("KR-11");
+        assertThat(recap.get("topProvince").get("provinceName").asText()).isEqualTo("서울");
+        assertThat(recap.get("topProvince").get("count").asInt()).isEqualTo(2);
+        assertThat(recap.get("rarest").get("regionCode").asText()).isEqualTo("KR-11010");
+        assertThat(recap.get("rarest").get("rarity").asText()).isEqualTo("COMMON");
+        assertThat(recap.get("newProvinces").asInt()).isEqualTo(1); // 서울 — 경북은 작년 방문
+        assertThat(recap.get("busiestMonth").get("month").asInt()).isEqualTo(today.getMonthValue());
+        assertThat(recap.get("busiestMonth").get("count").asInt()).isEqualTo(2);
+        assertThat(recap.get("setsCompleted").asInt()).isZero();
+        assertThat(recap.toString()).doesNotContain(MEMO).doesNotContain("photo").doesNotContain(today.toString());
+
+        JsonNode previous = recap(me, "?year=" + lastYear.getYear() + "&mapId=" + me.personalMapId());
+        assertThat(previous.get("newRegions").asInt()).isEqualTo(1);
+        assertThat(previous.get("rarest").get("regionCode").asText()).isEqualTo("KR-37430");
+        assertThat(previous.get("rarest").get("rarity").asText()).isEqualTo("LEGEND");
+        assertThat(previous.get("newProvinces").asInt()).isEqualTo(1); // 경북(방문이 모두 작년)
+        JsonNode empty = recap(me, "?year=2001");
+        assertThat(empty.get("newRegions").asInt()).isZero();
+        assertThat(empty.get("topProvince").isNull()).isTrue();
+        assertThat(empty.get("rarest").isNull()).isTrue();
+        assertThat(empty.get("busiestMonth").isNull()).isTrue();
+
+        // PNG 카드는 같은 계산(PublicVisits.recap) — 카드 내용과 JSON 값이 같다
+        CardContent.Recap card = (CardContent.Recap) CardComposer.compose(CardKind.RECAP, showcases.read(me.id(), null),
+            Year.of(today.getYear()));
+        assertThat(card.newRegions()).isEqualTo(recap.get("newRegions").asInt());
+        assertThat(card.monthCounts()).isEqualTo(om.convertValue(recap.get("monthCounts"), List.class));
+        assertThat(card.subline()).contains("시·도 " + recap.get("newProvinces").asInt() + "곳 신규");
+        assertThat(card.stats()).containsExactly(
+            new CardContent.Stat("가장 많이 간 시·도", recap.get("topProvince").get("provinceName").asText() + " "
+                + recap.get("topProvince").get("count").asInt() + "곳"),
+            new CardContent.Stat("가장 희귀한 곳", "종로구 (일반)"));
+        mvc.perform(get("/me/cards/recap.png").header(H, me.token())).andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.IMAGE_PNG));
+    }
+
+    @Test
+    void 리캡_JSON_은_공유_지도를_고르면_그_지도에서_내가_칠한_곳만_세고_비멤버는_거부한다() throws Exception {
+        Anonymous owner = anonymous();
+        Anonymous friend = anonymous();
+        JsonNode map = json(mvc.perform(post("/maps").header(H, owner.token()).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"name\":\"리캡 원정대\"}")).andExpect(status().isCreated()));
+        String mapId = map.get("mapId").asText();
+        String inviteCode = map.get("inviteCode").asText();
+        mvc.perform(post("/maps/join").header(H, friend.token()).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"inviteCode\":\"" + inviteCode + "\"}")).andExpect(status().isOk());
+        LocalDate today = LocalDate.now(clock);
+        checkIn(owner, "KR-11010", today, MEMO);                // 개인 지도
+        checkInOn(owner, mapId, "KR-26010", today);             // 공유 지도 — 내 것
+        checkInOn(owner, mapId, "KR-26020", today);
+        checkInOn(friend, mapId, "KR-37430", today);            // 공유 지도 — 친구 것(내 리캡에 안 셈)
+
+        JsonNode shared = recap(owner, "?mapId=" + mapId);
+        assertThat(shared.get("mapId").asText()).isEqualTo(mapId);
+        assertThat(shared.get("newRegions").asInt()).isEqualTo(2);
+        assertThat(shared.get("topProvince").get("provinceCode").asText()).isEqualTo("KR-26");
+        assertThat(shared.get("rarest").get("regionCode").asText()).isEqualTo("KR-26010");
+        JsonNode personal = recap(owner, "");
+        assertThat(personal.get("newRegions").asInt()).isEqualTo(1);
+        assertThat(personal.get("topProvince").get("provinceCode").asText()).isEqualTo("KR-11");
+        assertThat(recap(friend, "?mapId=" + mapId).get("rarest").get("rarity").asText()).isEqualTo("LEGEND");
+
+        Anonymous stranger = anonymous();
+        mvc.perform(get("/me/recap").param("mapId", mapId).header(H, stranger.token()))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("NOT_A_MEMBER"));
+        mvc.perform(get("/me/recap").param("mapId", UUID.randomUUID().toString()).header(H, stranger.token()))
+            .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MAP_NOT_FOUND"));
+        mvc.perform(get("/me/recap").param("year", "0").header(H, owner.token()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_YEAR"));
+        mvc.perform(get("/me/recap").param("year", "올해").header(H, owner.token()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("BAD_PARAMETER"));
+        mvc.perform(get("/me/recap")).andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("EXPLORER_TOKEN_REQUIRED"));
     }
 }

@@ -28,6 +28,7 @@ frontend/
    │  ├─ queries.ts            # 그 기능의 useQuery/useMutation 훅과 쿼리 키
    │  └─ model/                # 그 기능의 순수 TS 표시 로직(포맷·정렬 보조) — React 무의존
    ├─ shared/
+   │  ├─ queries/              # 여러 기능이 함께 쓰는 쿼리 훅·키 팩토리(예: territory, progress, recap)
    │  ├─ ui/                   # 공용 프레젠테이션 컴포넌트(모달·토스트·바)
    │  └─ lib/                  # D3 지도 엔진, 픽셀 페인터, 지역 코드 변환 등 순수 모듈
    ├─ store/                   # zustand 스토어 (화면 상태만)
@@ -35,12 +36,13 @@ frontend/
 ```
 
 - 기능 폴더 구분은 백엔드 컨텍스트가 아니라 **화면 기능** 기준이다. 이유: 탭 하나가 여러 컨텍스트 API를 쓰고(예: 가방 = wardrobe + catalog), 화면을 고칠 때 한 폴더만 열면 되게 하려는 것 — 백엔드 domain을 애그리거트별로 나눈 것과 같은 이유다.
-- 기능 폴더끼리는 서로의 `components/`를 import하지 않는다. 함께 쓰는 것은 `shared/`로 올린다.
+- 기능 폴더끼리는 서로의 `components/`·`model/`·`queries`를 import하지 않는다. 함께 쓰는 것은 `shared/`로 올린다. 이 경계와 `fetch` 위치(`window.fetch`·`globalThis.fetch` 포함)는 eslint 규칙으로 강제한다(`frontend/eslint.config.js`).
+- 에러 코드 목록(`api/types/common.ts`)은 백엔드 실제 코드와 일치해야 하며, 백엔드 소스를 읽어 대조하는 단위 테스트가 이를 지킨다.
 
 ## 계층 규칙
 
 1. **서버 호출은 `api/`에만.** 컴포넌트·훅에서 `fetch`를 직접 부르지 않는다. 인증 헤더(`X-Explorer-Token`), 세션 쿠키, CSRF(`XSRF-TOKEN` 쿠키 → `X-XSRF-TOKEN` 헤더), 지역 코드 변환(`KR-11010` ↔ `11010`), 에러 변환은 `client.ts` 한 곳에서. 이유: 인증·CSRF 규칙이 바뀌어도 한 파일만 고치면 된다(프로토타입의 `api` 객체가 이미 이 역할이었다).
-2. **서버 상태는 TanStack Query만 갖는다.** 서버 응답을 zustand나 컴포넌트 state에 복사하지 않는다. 쿼리 키는 `features/*/queries.ts`의 키 팩토리에서만 만든다.
+2. **서버 상태는 TanStack Query만 갖는다.** 서버 응답을 zustand나 컴포넌트 state에 복사하지 않는다. 쿼리 키는 키 팩토리에서만 만든다 — 한 기능만 쓰면 `features/*/queries.ts`, 여러 기능이 쓰면 `shared/queries/`.
 3. **zustand는 화면 상태만**: 현재 탭, 선택 지역, 하이라이트, 칠하기/기록 모드, 지금 보는 지도(mapId), 열린 모달. 이유: 서버 상태를 두 군데 두면 어긋난다.
 4. **비동기 반영(outbox)은 쿼리 무효화 + 짧은 재조회 창**으로 처리한다 — 체크인·취소 같은 mutation의 `onSuccess`에서 관련 쿼리를 무효화하고, 반영 대기가 필요한 쿼리는 일정 시간 `refetchInterval`을 켰다가 끈다. `setTimeout` 체인으로 직접 다시 그리지 않는다. 이유: 프로토타입에서 수동 재조회가 전체 재렌더를 연달아 일으켜 캐릭터 이동이 끊겼다(2026-10-03 수정 건).
 5. **서버가 계산하는 값은 다시 계산하지 않는다**(XP·레벨·정복률·랭킹·보상·꾸미기 점수). 화면은 표시 포맷만.
@@ -72,6 +74,7 @@ frontend/
 
 ## 테스트
 
+- **테스트 이름은 도메인 문장으로**(백엔드 implement-context "테스트 작성 규칙"과 같은 원칙): Vitest `describe`는 개념·상황("체크인 미리보기", "시·도 첫 방문일 때"), `it`은 결과 문장("보너스 줄을 보여 준다"). Playwright `test.describe`/`test` 제목도 사용자 이야기("익명으로 칠한 영토는 로그인해도 그대로 남는다"). QA 번호·컴포넌트/함수 이름·구현 용어(쿼리 키, refetch, 프레임, 선택자, 상태 코드)는 제목에 넣지 않는다. 기능 폴더마다 화면 규칙을 빠짐없이 덮고, 같은 기능의 테스트는 한 파일에 이야기 순서로 모은다.
 - 단위(Vitest): `api/client.ts`(헤더·CSRF·에러 변환·코드 변환), `features/*/model/` 순수 함수, `shared/lib`(투영·페인터 메모이즈), 핵심 훅(mutation 후 무효화).
 - E2E(Playwright, `e2e/`): 기존 스펙 전체가 회귀 기준. 새 화면 동작에는 스펙을 추가한다.
 - 성능 회귀 감시: 체크인 후 캐릭터 이동 중 역행 0회(프레임 샘플링) 같은 측정 스펙을 유지한다.

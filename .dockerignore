@@ -3,6 +3,10 @@
 .gitignore
 .gradle
 **/build/
+# 프론트 의존성·산출물 — 이미지 안에서 npm ci·빌드한다
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
 **/out/
 **/bin/
 .idea

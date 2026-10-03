@@ -182,3 +182,52 @@ X-XSRF-TOKEN: {{xsrf}}
 Content-Type: application/json
 
 {"visibility": "PUBLIC"}
+
+### ---- 연간 리캡 JSON(06단계 QA P2-1) — GET /me/recap?year=&mapId= : 본인 전용(세션 또는 익명 토큰), 메모·사진 없음 ----
+### 계산은 리캡 카드 PNG 와 같다(PublicVisits.recap). PNG 는 개인 지도 기준, JSON 은 mapId 로 지도를 고를 수 있다(생략 = 개인 지도).
+### 동점: 가장 많이 간 시·도·가장 희귀한 곳은 지역 코드가 작은 쪽, 가장 바쁜 달은 이른 달. 문장("서울 3곳")은 화면 몫.
+
+### 25. 내 리캡(세션, 개인 지도, 올해) → 200 {year, mapId:개인, newRegions:1, monthCounts[12], topProvince{KR-11,서울,1}, rarest{KR-11010,종로구,…,COMMON}, newProvinces:1, busiestMonth{9,1}, setsCompleted}
+GET {{host}}/me/recap
+
+### 26. 작년 → 200 {newRegions:0, topProvince:null, rarest:null, busiestMonth:null}
+GET {{host}}/me/recap?year=2025
+
+### 27. 공유 지도에 내 체크인(세션) → 201
+POST {{host}}/visits
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"regionCode": "KR-26010", "visitDate": "2026-10-01", "mapId": "{{mapId}}"}
+
+### 28. 공유 지도 기준 내 리캡 → 200 {mapId:{{mapId}}, newRegions:1, topProvince{KR-26,울산,1}, busiestMonth{10,1}} (개인 지도 KR-11010 은 안 셈)
+GET {{host}}/me/recap?year=2026&mapId={{mapId}}
+
+### 29. 멤버(합류한 익명 탐험가) — 그 지도에서 자기가 칠한 곳만 → 200 {newRegions:0}
+GET {{host}}/me/recap?mapId={{mapId}}
+Cookie: JSESSIONID=none
+X-Explorer-Token: {{guestToken}}
+
+### 30. 비멤버(새 익명 탐험가) → 201 → 403 NOT_A_MEMBER
+POST {{host}}/explorers
+Cookie: JSESSIONID=none
+
+> {% client.global.set("strangerToken", response.body.accessToken); %}
+
+###
+GET {{host}}/me/recap?mapId={{mapId}}
+Cookie: JSESSIONID=none
+X-Explorer-Token: {{strangerToken}}
+
+### 31. 없는 지도 → 404 MAP_NOT_FOUND
+GET {{host}}/me/recap?mapId=00000000-0000-0000-0000-000000000000
+
+### 32. 잘못된 연도 → 400 INVALID_YEAR / 숫자 아님 → 400 BAD_PARAMETER
+GET {{host}}/me/recap?year=0
+
+###
+GET {{host}}/me/recap?year=abc
+
+### 33. 인증 없음 → 401 EXPLORER_TOKEN_REQUIRED
+GET {{host}}/me/recap
+Cookie: JSESSIONID=none

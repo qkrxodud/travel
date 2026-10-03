@@ -54,3 +54,8 @@ e2e/playwright/.cache/
 ### Docker Compose 운영 ###
 .env
 backups/
+
+### 웹 프론트(frontend/) — 빌드 산출물·의존성은 커밋하지 않는다(./gradlew build 가 만든다) ###
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/

@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Year;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -22,6 +23,8 @@ public final class PublicVisits {
 
     private static final Comparator<Entry> LATEST_FIRST = Comparator.comparing(Entry::visitDate)
         .thenComparing(Entry::visitedAt).reversed();
+
+    private static final Comparator<Entry> BY_REGION_CODE = Comparator.comparing(entry -> entry.region().code());
 
     private final List<Entry> entries;
 
@@ -97,27 +100,40 @@ public final class PublicVisits {
             .collect(Collectors.toUnmodifiableSet());
     }
 
-    /** 연간 리캡(프로토타입 recap()과 같은 규칙, 방문일 기준). */
+    /**
+     * 연간 리캡(프로토타입 recap()과 같은 규칙, 방문일 기준) — 카드 PNG·리캡 JSON 이 함께 쓰는 유일한 계산(06 QA P2-1).
+     * 동점: 가장 많이 간 시·도·가장 희귀한 곳은 지역 코드가 작은 쪽(프로토타입은 지역 코드 순으로 돌았다), 가장 바쁜 달은 이른 달.
+     */
     public YearRecap recap(Year year) {
-        List<Entry> inYear = entries.stream().filter(entry -> entry.in(year)).toList();
-        List<Integer> months = new ArrayList<>(List.of(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        inYear.forEach(entry -> months.set(entry.visitDate().getMonthValue() - 1, months.get(entry.visitDate().getMonthValue() - 1) + 1));
-        String topProvince = countByProvince(inYear).entrySet().stream()
-            .max(Map.Entry.<String, Long>comparingByValue())
-            .map(top -> provinceNameOf(inYear, top.getKey()) + " " + top.getValue() + "곳").orElse(null);
-        String rarest = inYear.stream().max(Comparator.comparing((Entry entry) -> entry.region().rarity())
-                .thenComparing(Entry::nth, Comparator.reverseOrder()))
-            .map(entry -> entry.region().name() + " (" + RarityLabel.of(entry.region().rarity()) + ")").orElse(null);
+        List<Entry> inYear = entries.stream().filter(entry -> entry.in(year)).sorted(BY_REGION_CODE).toList();
+        int[] months = new int[12];
+        inYear.forEach(entry -> months[entry.visitDate().getMonthValue() - 1]++);
+        YearRecap.ProvinceTally topProvince = topProvinceOf(inYear);
+        RegionInfo rarest = inYear.stream()
+            .max(Comparator.comparing((Entry entry) -> entry.region().rarity()).thenComparing(BY_REGION_CODE.reversed()))
+            .map(Entry::region).orElse(null);
         Map<String, List<Entry>> byProvince = entries.stream()
             .collect(Collectors.groupingBy(entry -> entry.region().provinceCode()));
         int newProvinces = (int) byProvince.values().stream()
             .filter(visits -> visits.stream().allMatch(entry -> entry.in(year))).count();
         int busiestIndex = 0;
-        for (int i = 1; i < months.size(); i++) {
-            if (months.get(i) > months.get(busiestIndex)) busiestIndex = i;
+        for (int i = 1; i < months.length; i++) {
+            if (months[i] > months[busiestIndex]) busiestIndex = i;
         }
-        String busiest = months.get(busiestIndex) == 0 ? null : (busiestIndex + 1) + "월 " + months.get(busiestIndex) + "곳";
-        return new YearRecap(year.getValue(), inYear.size(), months, topProvince, rarest, newProvinces, busiest);
+        YearRecap.MonthTally busiest = months[busiestIndex] == 0 ? null
+            : new YearRecap.MonthTally(busiestIndex + 1, months[busiestIndex]);
+        List<Integer> monthCounts = Arrays.stream(months).boxed().toList();
+        return new YearRecap(year.getValue(), inYear.size(), monthCounts, topProvince, rarest, newProvinces, busiest);
+    }
+
+    /** 가장 많이 간 시·도 — 동점이면 그 해 방문 중 가장 작은 지역 코드를 가진 시·도(inYear 는 지역 코드 순). */
+    private static YearRecap.ProvinceTally topProvinceOf(List<Entry> inYearByCode) {
+        Map<String, Long> counts = countByProvince(inYearByCode);
+        long most = counts.values().stream().mapToLong(Long::longValue).max().orElse(0);
+        return counts.entrySet().stream().filter(count -> count.getValue() == most).findFirst()
+            .map(top -> new YearRecap.ProvinceTally(top.getKey(), provinceNameOf(inYearByCode, top.getKey()),
+                Math.toIntExact(top.getValue())))
+            .orElse(null);
     }
 
     /**

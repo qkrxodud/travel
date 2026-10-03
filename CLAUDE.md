@@ -9,11 +9,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Modules (`settings.gradle`):
 - `common` — shared kernel (`common.event.DomainEvent`); only `spring-context`.
 - `catalog`, `exploration`, `progression`, `wardrobe`, `social`, `sharing` — bounded contexts (`java-library`, no bootJar). Each has fixed packages `api / application / domain / infra` under `com.kobi.territory.<module>`. `domain` stays pure Java (no Spring/JPA).
-- `app-api` — the only Spring Boot app (`TerritoryApplication`, bootJar `territory.jar`). Holds `TerritoryProperties` (`territory.*` in `application.yml`), `HealthController` (`GET /health`), `DevController` (`@Profile("local")`: `DELETE /dev/reset`, `POST /dev/seed`), `ArchitectureTest` (ArchUnit module-boundary rules), and the prototype UI at `src/main/resources/static/index.html` (copy of `doc/나의 영토.html`, served at `GET /`).
+- `app-api` — the only Spring Boot app (`TerritoryApplication`, bootJar `territory.jar`). Holds `TerritoryProperties` (`territory.*` in `application.yml`), `HealthController` (`GET /health`), `DevController` (`@Profile("local")`: `DELETE /dev/reset`, `POST /dev/seed`), `ArchitectureTest` (ArchUnit module-boundary rules), and serves the web UI at `GET /` — the React app in `frontend/` (Vite + React + TypeScript), built by Gradle and copied into `static/` at build time (never committed). The pre-React vanilla UI is kept for comparison/rollback at `doc/legacy-index.html`.
 
 Dependency rules (stage 0): every domain module → `common`; `exploration`, `wardrobe` → `catalog` (read-only); `app-api` → all. Cross-context references are otherwise forbidden and enforced by `ArchitectureTest`; from stage 1 they evolve to "api-package only" (see `implement-context` skill).
 
 Profiles: `local` (default, H2 in-memory, `/h2-console`) / `prod` (needs `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`; fails to start without them).
+
+Frontend: `frontend/` (React 18 · TanStack Query · zustand · D3 7 · Vitest). `./gradlew build` runs `npm ci` → `npm run build` (Node 24.7.0 downloaded by the Gradle node plugin into `.gradle/nodejs`) and `npm run check` (tsc + eslint + vitest) as part of `check`; `processResources` copies `frontend/dist` → `static/`. Rules: `implement-frontend` skill.
 
 E2E: `e2e/` is a Playwright (TypeScript, chromium) project. Its `webServer` starts `./gradlew :app-api:bootRun` and waits on `/health`; every test calls `DELETE /dev/reset` first (`e2e/fixtures.ts`). Manual requests: `http/stage0.http`.
 
@@ -28,6 +30,15 @@ E2E: `e2e/` is a Playwright (TypeScript, chromium) project. Its `webServer` star
 ./gradlew :app-api:test --tests "com.kobi.territory.ArchitectureTest"   # single test class
 ./gradlew :app-api:test --tests "*DevControllerLocalProfileTest.*"     # single test method/pattern
 java -jar app-api/build/libs/territory.jar --spring.profiles.active=prod  # prod (needs DB_* env)
+
+# Frontend (frontend/ — Vite + React + TypeScript). ./gradlew build already builds it; these are for front-only work
+cd frontend && npm ci                                       # first time (or use ./gradlew :app-api:npmInstall)
+cd frontend && npm run dev                                  # Vite :5173, API paths proxied to Spring (VITE_API_TARGET, default http://localhost:18081)
+cd frontend && VITE_API_TARGET=http://localhost:18081 npm run dev   # when the API server runs on another port
+cd frontend && npm run check                                # tsc --noEmit + eslint + vitest run
+cd frontend && npx vitest run src/api/client.test.ts        # single unit test file
+cd frontend && npm run build                                # frontend/dist only (Gradle copies it into app-api static/)
+./gradlew :app-api:frontendBuild                            # same via Gradle (Node downloaded by the node plugin)
 
 # E2E (Playwright)
 cd e2e && npm install && npx playwright install chromium   # first time
@@ -67,3 +78,4 @@ docker compose -p territory-e2e -f compose.yaml -f compose.e2e.yaml down -v
 | 2026-10-03 | infra 하위 패키지 규칙 추가(infra/entity, infra/repository 2개로 종류별 분리 — 애그리거트 구분은 domain이 담당), QA 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정 |
 | 2026-10-03 | 의존성 주입 규칙 명시(생성자 주입만), QA 점검 항목 추가 | implement-context, verify-architecture | 3단계 QA r3 P3-R3-5(DevController 필드 주입) |
 | 2026-10-03 | 프론트엔드 확장: 에이전트 frontend-builder, 스킬 implement-frontend(Vite+React+TS, API 계층 단일화, TanStack Query/zustand, D3 엔진 통합, 빌드 산출물 app-api static 통합), verify-architecture에 "프론트엔드 검증" 절(API↔TS 타입 교차 비교), 오케스트레이터에 프론트 작업 흐름 | agents/frontend-builder, skills/implement-frontend, verify-architecture, architecture-qa, territory-orchestrator | 사용자 결정(프론트 React 이전 + 프론트 규칙) |
+| 2026-10-04 | 테스트 작성 규칙 추가(DisplayName·describe·E2E 제목은 도메인 문장, QA 번호·구현 용어 금지, @Nested 이야기 구조, 불변식·커맨드별 빠짐없는 대응), QA 점검 항목 추가 | implement-context, implement-frontend, verify-architecture | 사용자 지시(테스트가 문서처럼 읽히게, 띄엄띄엄한 구성 개선) |

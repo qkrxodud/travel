@@ -142,10 +142,10 @@ class PrivacyAndShowcaseTest {
         YearRecap recap = mine.recap(Year.of(2026));
         assertThat(recap.newRegions()).isEqualTo(2);
         assertThat(recap.monthCounts().get(2)).isEqualTo(2);
-        assertThat(recap.topProvince()).isEqualTo("서울 2곳");
+        assertThat(recap.topProvince()).isEqualTo(new YearRecap.ProvinceTally("KR-11", "서울", 2));
         assertThat(recap.newProvinces()).isEqualTo(1); // 서울(모두 2026) — 경북은 2025 방문
-        assertThat(recap.busiestMonth()).isEqualTo("3월 2곳");
-        assertThat(mine.recap(Year.of(2025)).rarest()).isEqualTo("울릉군 (전설)");
+        assertThat(recap.busiestMonth()).isEqualTo(new YearRecap.MonthTally(3, 2));
+        assertThat(mine.recap(Year.of(2025)).rarest().code()).isEqualTo("KR-37430");
 
         PublicVisits theirs = PublicVisits.of(List.of(fact("KR-11010", "2026-01-01", 1), fact("KR-37010", "2026-01-02", 2)), ATLAS);
         var tally = mine.versus(theirs);
@@ -178,5 +178,49 @@ class PrivacyAndShowcaseTest {
         CardContent.Recent empty = (CardContent.Recent) CardComposer.compose(CardKind.RECENT, anonymous, Year.of(2026));
         assertThat(empty.regionName()).isNull();
         assertThat(empty.headline()).startsWith("나의 최근 여행");
+    }
+
+    @Test
+    void 리캡_동점은_지역_코드_순_바쁜_달은_이른_달_06_QA_P2_1() {
+        // 칠한 순서는 경북 포항(1) → 서울 중구(2) → 서울 종로(3, 작년) — 순서가 아니라 지역 코드로 동점을 가른다
+        PublicVisits visits = PublicVisits.of(List.of(fact("KR-37010", "2026-05-01", 1), fact("KR-11020", "2026-02-01", 2),
+            fact("KR-11010", "2025-01-01", 3)), ATLAS);
+        YearRecap recap = visits.recap(Year.of(2026));
+        assertThat(recap.newRegions()).isEqualTo(2);
+        assertThat(recap.topProvince()).isEqualTo(new YearRecap.ProvinceTally("KR-11", "서울", 1));
+        assertThat(recap.rarest().code()).isEqualTo("KR-11020");
+        assertThat(recap.busiestMonth()).isEqualTo(new YearRecap.MonthTally(2, 1));
+        assertThat(recap.newProvinces()).isEqualTo(1); // 경북만(서울은 작년 방문이 있다)
+
+        PublicVisits sameRarity = PublicVisits.of(List.of(fact("KR-11020", "2026-03-01", 1), fact("KR-11010", "2026-03-02", 2)), ATLAS);
+        assertThat(sameRarity.recap(Year.of(2026)).rarest().code()).isEqualTo("KR-11010");
+
+        YearRecap empty = PublicVisits.empty().recap(Year.of(2026));
+        assertThat(empty.topProvince()).isNull();
+        assertThat(empty.rarest()).isNull();
+        assertThat(empty.busiestMonth()).isNull();
+        assertThat(empty.monthCounts()).hasSize(12).containsOnly(0);
+    }
+
+    @Test
+    void 리캡_카드_문구는_같은_리캡_값에서_나온다() {
+        PublicVisits visits = PublicVisits.of(List.of(fact("KR-11010", "2026-03-01", 1), fact("KR-11020", "2026-03-09", 2),
+            fact("KR-37430", "2026-08-01", 3)), ATLAS);
+        Showcase showcase = new Showcase("kim", ATLAS, visits, ShowcaseProgress.start(9), ShowcaseScene.empty());
+        YearRecap recap = visits.recap(Year.of(2026));
+        CardContent.Recap card = (CardContent.Recap) CardComposer.compose(CardKind.RECAP, showcase, Year.of(2026));
+        assertThat(card.newRegions()).isEqualTo(recap.newRegions());
+        assertThat(card.monthCounts()).isEqualTo(recap.monthCounts());
+        assertThat(card.subline()).isEqualTo("올해 새로 밟은 땅 · 시·도 " + recap.newProvinces() + "곳 신규");
+        assertThat(card.stats()).containsExactly(new CardContent.Stat("가장 많이 간 시·도", "서울 2곳"),
+            new CardContent.Stat("가장 희귀한 곳", "울릉군 (전설)"));
+    }
+
+    @Test
+    void 리캡_연도는_생략하면_올해_범위_밖은_INVALID_YEAR() {
+        assertThat(YearRecap.yearOf(null, Year.of(2026))).isEqualTo(Year.of(2026));
+        assertThat(YearRecap.yearOf(2025, Year.of(2026))).isEqualTo(Year.of(2025));
+        assertThatThrownBy(() -> YearRecap.yearOf(0, Year.of(2026))).hasFieldOrPropertyWithValue("code", "INVALID_YEAR");
+        assertThatThrownBy(() -> YearRecap.yearOf(10000, Year.of(2026))).hasFieldOrPropertyWithValue("code", "INVALID_YEAR");
     }
 }

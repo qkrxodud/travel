@@ -1,0 +1,80 @@
+import type { MouseEvent } from 'react';
+import type { SceneRequest } from '../../../api/types/wardrobe';
+import { SLOT_NAME, SLOT_TO_SERVER, type DisplayItem } from '../../../shared/lib/item/displayItem';
+import { ItemImage } from '../../../shared/ui/ItemImage';
+import { toast, toastError } from '../../../store/toastStore';
+import { useUiStore } from '../../../store/uiStore';
+import { BAG_FILTERS, filterAndSort, isSetReward } from '../model/bag';
+import { useFavorite } from '../queries';
+
+const MAX_PROPS = 3;
+
+interface InventoryPanelProps {
+  items: DisplayItem[];
+  sceneProps: string[];
+  onEdit: (body: SceneRequest) => void;
+}
+
+/** 특산물 아이템(필터 + 타일). 누르면 착용 · 다시 누르면 해제, ★ 즐겨찾기 */
+export function InventoryPanel({ items, sceneProps, onEdit }: InventoryPanelProps) {
+  const filter = useUiStore(state => state.bagFilter);
+  const setBagFilter = useUiStore(state => state.setBagFilter);
+  const favorite = useFavorite();
+  const list = filterAndSort(items, filter);
+
+  const toggle = (item: DisplayItem) => {
+    if (item.slot === 'prop') {
+      const props = [...sceneProps];
+      const at = props.indexOf(item.code);
+      if (at >= 0) props.splice(at, 1);
+      else if (props.length < MAX_PROPS) props.push(item.code);
+      else {
+        toast('!', '장식은 3개까지', '하나를 벗고 다시 눌러주세요');
+        return;
+      }
+      onEdit({ props });
+      return;
+    }
+    const slot = SLOT_TO_SERVER[item.slot];
+    if (!slot) return;
+    if (item.equipped) onEdit({ unequip: [slot] });
+    else onEdit({ equip: { [slot]: item.code } });
+  };
+  const star = (event: MouseEvent, item: DisplayItem) => {
+    event.stopPropagation();
+    favorite.mutateAsync({ itemId: item.code, favorite: !item.favorite }).catch(error => toastError(error));
+  };
+
+  return (
+    <div className="card">
+      <h2>특산물 아이템 <span>누르면 착용 · 다시 누르면 해제</span></h2>
+      <div className="filters" id="bag-filters">
+        {BAG_FILTERS.map(([key, label]) => (
+          <button key={key} data-filter={key} aria-pressed={filter === key} onClick={() => setBagFilter(key)}>{label}</button>
+        ))}
+      </div>
+      <div id="bag-inv">
+        {list.length ? (
+          <div className="inv">
+            {list.map(item => (
+              <button
+                key={item.code}
+                className={`item ${item.tier} ${item.equipped ? 'on' : ''} ${isSetReward(item) ? 'set' : ''}`}
+                data-equip={item.code}
+                title={`${item.name} · ${item.from}`}
+                onClick={() => toggle(item)}
+              >
+                <ItemImage item={item} />
+                <span className="sb">{SLOT_NAME[item.slot]}</span>
+                <span className="n">{item.name}</span>
+                <span className={`fav ${item.favorite ? 'on' : ''}`} data-fav={item.code} role="button" aria-pressed={item.favorite} title="즐겨찾기" aria-label="즐겨찾기" onClick={event => star(event, item)}>
+                  {item.favorite ? '★' : '☆'}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : <p className="empty">아직 이 종류의 장비가 없어요. 지도를 더 칠해보세요.</p>}
+      </div>
+    </div>
+  );
+}

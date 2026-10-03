@@ -2,6 +2,8 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.6' apply false
     id 'io.spring.dependency-management' version '1.1.7' apply false
+    // 웹 프론트(frontend/, Vite + React) 빌드 — Node 를 Gradle 이 받아 npm ci·build 를 돌린다(app-api 가 적용)
+    id 'com.github.node-gradle.node' version '7.1.0' apply false
 }
 
 // 루트는 빌드 설정만 가진다. 루트 jar(빈 territory-0.0.1-SNAPSHOT.jar)가 territory.jar와 헷갈리지 않게 끈다.

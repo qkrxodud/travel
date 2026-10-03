@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 /**
  * 상류 공개 Query(탐험·카탈로그·진행·꾸미기) → 공유 도메인의 공개 정보(Showcase) 변환 어댑터(Anti-Corruption Layer).
  * 탐험의 방문 이력은 처음부터 메모·사진을 싣지 않는다 — 여기서도 지역 코드·방문일·처리 시각만 옮긴다.
- * 카드·공개 프로필은 그 탐험가의 개인 지도 기준이다(4단계 범위).
+ * 카드·공개 프로필은 그 탐험가의 개인 지도 기준이다(4단계 범위). 연간 리캡 JSON 만 지도를 고를 수 있다({@link #visitsOn}).
  */
 @Component
 public class ShowcaseReader {
@@ -65,8 +65,15 @@ public class ShowcaseReader {
     }
 
     private PublicVisits visitsOf(String explorerId) {
-        String personalMapId = territories.personalMapId(explorerId);
-        List<VisitFact> facts = territories.visitHistory(personalMapId).stream()
+        return visitsOn(explorerId, territories.personalMapId(explorerId));
+    }
+
+    /**
+     * 이 탐험가가 그 지도에 칠한 방문(공유 지도면 그가 체크인한 것만 — 숨긴 방문 제외). 접근 확인(멤버인지)은 호출자가
+     * {@link TerritoryQuery#resolveMapId} 로 먼저 한다. 연간 리캡 JSON(06 QA P2-1)이 카드와 같은 변환을 쓰려고 연다.
+     */
+    public PublicVisits visitsOn(String explorerId, String mapId) {
+        List<VisitFact> facts = territories.visitHistory(mapId).stream()
             .filter(visit -> visit.explorerId().equals(explorerId))
             .map(visit -> new VisitFact(visit.regionCode(), visit.visitDate(), visit.visitedAt()))
             .toList();

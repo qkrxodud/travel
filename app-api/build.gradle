@@ -1,5 +1,8 @@
+import com.github.gradle.node.npm.task.NpmTask
+
 plugins {
     id 'org.springframework.boot'
+    id 'com.github.node-gradle.node'
 }
 
 dependencies {
@@ -35,3 +38,51 @@ dependencies {
 }
 
 bootJar { archiveFileName = 'territory.jar' }
+
+// ---- 웹 프론트(frontend/, Vite + React + TypeScript) ----
+// ./gradlew build 가 프론트 빌드(npm ci → npm run build)를 포함하고, 결과(frontend/dist)를 빌드 시점에 static/ 으로 복사한다
+// (산출물은 git 에 커밋하지 않는다). 그래서 jar·Docker 이미지·bootRun·E2E 가 정적 화면을 그대로 낸다.
+// Node 는 플러그인이 받는다(로컬·Docker 빌드 스테이지 모두 — 설치된 Node 에 기대지 않는다).
+def frontendDir = rootProject.file('frontend')
+
+node {
+    version = '24.7.0'
+    download = true
+    workDir = rootProject.file('.gradle/nodejs')
+    npmWorkDir = rootProject.file('.gradle/npm')
+    nodeProjectDir = frontendDir
+    npmInstallCommand = 'ci'
+}
+
+def frontendSources = {
+    it.inputs.dir(new File(frontendDir, 'src')).withPropertyName('frontendSrc')
+    it.inputs.files(['index.html', 'vite.config.ts', 'tsconfig.json', 'eslint.config.js', 'package.json', 'package-lock.json']
+        .collect { name -> new File(frontendDir, name) }).withPropertyName('frontendConfig')
+}
+
+def frontendBuild = tasks.register('frontendBuild', NpmTask) {
+    group = 'build'
+    description = '웹 프론트 빌드(npm run build → frontend/dist)'
+    dependsOn tasks.named('npmInstall')
+    npmCommand = ['run', 'build']
+    frontendSources(it)
+    outputs.dir(new File(frontendDir, 'dist'))
+}
+
+// tsc + eslint + vitest — check(=build) 에 포함. 통과하면 표식 파일을 남겨 입력이 그대로면 다시 돌지 않는다.
+def frontendCheck = tasks.register('frontendCheck', NpmTask) {
+    group = 'verification'
+    description = '웹 프론트 검사(npm run check: 타입·린트·단위 테스트)'
+    dependsOn tasks.named('npmInstall')
+    npmCommand = ['run', 'check']
+    frontendSources(it)
+    def marker = layout.buildDirectory.file('frontend-check/passed')
+    outputs.file(marker)
+    doLast { marker.get().asFile.text = new Date().toString() }
+}
+
+tasks.named('processResources') {
+    from(frontendBuild) { into 'static' }
+}
+
+tasks.named('check') { dependsOn frontendCheck }
