@@ -390,7 +390,7 @@ class WardrobeApiTest {
     }
 
     @Test
-    @DisplayName("아이템 안내는 저장된 정의 기준으로 지역 특산물과 테마 배경을 지급 규칙과 함께 보여 준다")
+    @DisplayName("아이템 안내는 운영이 등록한 정의 기준으로 지역 특산물과 테마 배경을 지급 규칙과 함께 보여 준다")
     void catalogItemsFromDatabase() throws Exception {
         JsonNode items = json(mvc.perform(get("/catalog/items")).andExpect(status().isOk()));
         assertThat(items.size()).isGreaterThanOrEqualTo(259);

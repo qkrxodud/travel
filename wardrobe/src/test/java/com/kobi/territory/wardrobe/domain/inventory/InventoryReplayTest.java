@@ -61,7 +61,7 @@ class InventoryReplayTest {
     class Replay {
 
         @Test
-        @DisplayName("이벤트로 쌓은 가방과 같은 아이템이 된다")
+        @DisplayName("그동안 체크인 하나하나로 쌓아 온 가방과 같아진다")
         void sameAsAccumulated() {
             Inventory accumulated = accumulated();
             Inventory replayed = replayBothMaps(accumulated, 10);

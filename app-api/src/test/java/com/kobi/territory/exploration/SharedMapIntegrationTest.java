@@ -483,8 +483,37 @@ class SharedMapIntegrationTest {
                 map.mapId(), map.leaver().id())).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND explorer_id = ?", Integer.class,
                 map.mapId(), map.leaver().id())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND explorer_id = ? AND left_at IS NULL",
+                Integer.class, map.mapId(), map.owner().id())).as("남은 지도장은 그대로다").isEqualTo(1);
+            call(map.owner(), get("/maps/" + map.mapId()), null)
+                .andExpect(jsonPath("$.members.length()").value(1))
+                .andExpect(jsonPath("$.departing").value(0));
+            call(map.owner(), get("/territory").param("mapId", map.mapId()), null).andExpect(jsonPath("$.visits.length()").value(1));
             assertThat(활성_지역_수(map.leaver())).isEqualTo(2);
             recalculate.recalculate(ExplorerId.of(map.leaver().id()));
+            assertThat(xp(map.leaver())).isEqualTo(map.leaverXp());
+        }
+
+        @Test
+        @DisplayName("다시 합류했다가 다시 떠난 멤버도 유예가 끝나면 지워진다")
+        void rejoinedThenLeftIsPurged() throws Exception {
+            Departure map = 떠날_멤버가_있는_지도();
+            떠난다(map);
+            clock.advance(Duration.ofMinutes(1));
+            call(map.leaver(), post("/maps/join"), Map.of("inviteCode", 초대코드(map.owner(), map.mapId()))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.rejoined").value(true));
+            explorers.전달이_끝날_때까지(map.mapId());
+            떠난다(map);
+            clock.advance(Duration.ofDays(8));
+            assertThat(purgeJob.run()).isGreaterThanOrEqualTo(1);
+            explorers.전달이_끝날_때까지(map.mapId());
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE map_id = ? AND checked_in_by = ?", Integer.class,
+                map.mapId(), map.leaver().id())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND explorer_id = ?", Integer.class,
+                map.mapId(), map.leaver().id())).isZero();
+            call(map.owner(), get("/maps/" + map.mapId()), null)
+                .andExpect(jsonPath("$.members.length()").value(1))
+                .andExpect(jsonPath("$.departing").value(0));
             assertThat(xp(map.leaver())).isEqualTo(map.leaverXp());
         }
     }

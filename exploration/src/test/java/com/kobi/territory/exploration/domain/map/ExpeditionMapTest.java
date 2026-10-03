@@ -95,7 +95,7 @@ class ExpeditionMapTest {
         }
 
         @Test
-        @DisplayName("멤버가 둘인 개인 지도 기록은 불러오지 않는다")
+        @DisplayName("멤버가 둘인 개인 지도 기록은 거절된다")
         void twoMembersRefused() {
             var two = List.of(new Member(ME, MemberRole.OWNER, NOON), new Member(FRIEND, MemberRole.MEMBER, NOON));
             assertThatThrownBy(() -> restored(MapKind.PERSONAL, two)).isInstanceOf(ExplorationException.class);
@@ -136,7 +136,7 @@ class ExpeditionMapTest {
         }
 
         @Test
-        @DisplayName("멤버는 칠할 수 있는 사람으로 확인된다")
+        @DisplayName("멤버는 그 지도에 칠할 수 있다")
         void memberAllowed() {
             assertThat(personalMap().requireMember(ME).joinedAt()).isEqualTo(NOON);
         }
@@ -322,16 +322,22 @@ class ExpeditionMapTest {
         }
     }
 
-    @Test
-    @DisplayName("유예가 끝난 탈퇴 기록만 정리된다")
-    void purgeExpired() {
-        ExpeditionMap map = sharedMap();
-        map.join(FRIEND, NOON, GRACE);
-        map.join(THIRD, NOON, GRACE);
-        map.leave(FRIEND, NOON);
-        map.leave(THIRD, NOON.plus(Duration.ofDays(3)));
-        assertThat(map.purgeExpired(NOON.plus(GRACE), GRACE)).extracting(Departure::explorerId).containsExactly(FRIEND);
-        assertThat(map.departures()).extracting(Departure::explorerId).containsExactly(THIRD);
+    @Nested
+    @DisplayName("탈퇴 유예가 끝나면")
+    class GraceExpired {
+
+        @Test
+        @DisplayName("유예가 끝난 탈퇴 기록만 지워지고 유예 중인 기록과 남은 멤버는 그대로다")
+        void purgeExpired() {
+            ExpeditionMap map = sharedMap();
+            map.join(FRIEND, NOON, GRACE);
+            map.join(THIRD, NOON, GRACE);
+            map.leave(FRIEND, NOON);
+            map.leave(THIRD, NOON.plus(Duration.ofDays(3)));
+            assertThat(map.purgeExpired(NOON.plus(GRACE), GRACE)).extracting(Departure::explorerId).containsExactly(FRIEND);
+            assertThat(map.departures()).extracting(Departure::explorerId).containsExactly(THIRD);
+            assertThat(map.members()).extracting(Member::explorerId).containsExactly(ME);
+        }
     }
 
     @Nested
@@ -431,7 +437,7 @@ class ExpeditionMapTest {
         }
 
         @Test
-        @DisplayName("멤버가 아니면 지도장 일을 할 수 없다고 하기 전에 멤버가 아니라고 알린다")
+        @DisplayName("멤버가 아닌 사람이 지도장 일을 하려 하면 멤버가 아니라고 거절된다")
         void nonMember() {
             assertThat(refusal(() -> sharedMap().requireOwner(FRIEND))).isEqualTo(ExplorationError.NOT_A_MEMBER);
         }
@@ -536,11 +542,11 @@ class ExpeditionMapTest {
     }
 
     @Nested
-    @DisplayName("저장된 지도를 불러올 때")
+    @DisplayName("기록된 지도도 같은 멤버 규칙을 따른다")
     class Restore {
 
         @Test
-        @DisplayName("멤버 넷까지는 불러온다")
+        @DisplayName("멤버 넷인 기록은 그대로 읽힌다")
         void four() {
             List<Member> four = new ArrayList<>(List.of(new Member(ME, MemberRole.OWNER, NOON)));
             for (int i = 0; i < 3; i++) four.add(new Member(ExplorerId.newId(), MemberRole.MEMBER, NOON));
@@ -548,7 +554,7 @@ class ExpeditionMapTest {
         }
 
         @Test
-        @DisplayName("멤버가 다섯이면 지도가 가득 찼다고 거절된다")
+        @DisplayName("멤버가 다섯인 기록은 지도가 가득 찼다고 거절된다")
         void fiveRefused() {
             List<Member> five = new ArrayList<>(List.of(new Member(ME, MemberRole.OWNER, NOON)));
             for (int i = 0; i < 4; i++) five.add(new Member(ExplorerId.newId(), MemberRole.MEMBER, NOON));
@@ -556,14 +562,14 @@ class ExpeditionMapTest {
         }
 
         @Test
-        @DisplayName("지도장이 둘이면 불러오지 않는다")
+        @DisplayName("지도장이 둘인 기록은 거절된다")
         void twoOwners() {
             var twoOwners = List.of(new Member(ME, MemberRole.OWNER, NOON), new Member(FRIEND, MemberRole.OWNER, NOON));
             assertThatThrownBy(() -> restored(MapKind.SHARED, twoOwners)).isInstanceOf(ExplorationException.class);
         }
 
         @Test
-        @DisplayName("같은 사람이 두 번 있으면 이미 멤버라고 거절된다")
+        @DisplayName("같은 사람이 두 번 있는 기록은 이미 멤버라고 거절된다")
         void duplicate() {
             var dup = List.of(new Member(ME, MemberRole.OWNER, NOON), new Member(ME, MemberRole.MEMBER, NOON));
             assertThat(refusal(() -> restored(MapKind.SHARED, dup))).isEqualTo(ExplorationError.ALREADY_MEMBER);

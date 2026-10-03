@@ -111,7 +111,7 @@ class FollowingsTest {
         }
 
         @Test
-        @DisplayName("저장된 관계라도 자기 자신을 팔로우할 수는 없다")
+        @DisplayName("기록된 관계라도 자기 자신을 팔로우할 수는 없다")
         void selfRestored() {
             assertThatThrownBy(() -> follows(ME, ME)).hasFieldOrPropertyWithValue("code", "CANNOT_FOLLOW_SELF");
         }

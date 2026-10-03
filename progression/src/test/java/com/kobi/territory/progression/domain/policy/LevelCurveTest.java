@@ -32,7 +32,7 @@ class LevelCurveTest {
     }
 
     @Test
-    @DisplayName("0부터 20000 XP까지 프로토타입 공식과 같은 레벨을 준다")
+    @DisplayName("0부터 20000 XP까지 기획한 레벨 공식대로 레벨을 준다")
     void matchesPrototypeFormula() {
         for (int xp = 0; xp <= 20_000; xp++) {
             int proto = (int) Math.floor((1 + Math.sqrt(1 + xp / 5.0)) / 2);

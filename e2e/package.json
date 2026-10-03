@@ -5,9 +5,9 @@
   "description": "나의 영토(territory) Playwright E2E 테스트",
   "scripts": {
     "test": "playwright test",
-    "test:stage0": "playwright test tests/stage0-boot.spec.ts",
-    "test:stage1": "playwright test tests/stage1-map.spec.ts",
-    "test:stage2": "playwright test tests/stage2-progress.spec.ts"
+    "test:app-shell": "playwright test tests/app-shell.spec.ts",
+    "test:map-check-in": "playwright test tests/map-check-in.spec.ts",
+    "test:progress": "playwright test tests/progress.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

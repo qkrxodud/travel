@@ -17,7 +17,7 @@ describe('아이템 출처', () => {
     expect(itemOrigin('region:KR-11010', CATALOG, setName)).toBe('서울 종로구');
   });
 
-  it('세트 보상은 세트 이름으로, 이름을 모르면 세트 id 로 알려 준다', () => {
+  it('세트 보상은 세트 이름으로, 이름을 모르면 세트 코드로 알려 준다', () => {
     expect(itemOrigin('set:jiri', CATALOG, setName)).toBe('지리산 둘레 세트 완성 보상');
     expect(itemOrigin('set:unknown', CATALOG, setName)).toBe('unknown 세트 완성 보상');
   });
@@ -34,7 +34,7 @@ describe('아이템 표시', () => {
     expect(SLOT_NAME[shown.slot]).toBe('배낭');
   });
 
-  it('정의가 사라진 아이템은 선물 상자와 id 로 보인다', () => {
+  it('카탈로그에서 사라진 아이템은 선물 상자와 아이템 코드로 보인다', () => {
     expect(toDisplayItem(served('gone', { name: '', emoji: '' }), '')).toMatchObject({ emoji: '🎁', name: 'gone' });
   });
 

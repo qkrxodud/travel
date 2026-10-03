@@ -14,7 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** 공개 주소에 쓰는 핸들. 회귀 출처: 4단계 사용자 결정 Q1. */
-@DisplayName("핸들")
+@DisplayName("handle")
 class HandleTest {
 
     @Nested
@@ -39,7 +39,7 @@ class HandleTest {
             assertThat(Handle.of("kim-lee").value()).isEqualTo("kim-lee");
         }
 
-        @ParameterizedTest(name = "\"{0}\"은 핸들로 쓸 수 없다")
+        @ParameterizedTest(name = "\"{0}\"은 handle로 쓸 수 없다")
         @ValueSource(strings = {"ab", "_kim", "-kim", "kim.lee", "kim lee", "aaaaaaaaaaaaaaaaaaaaa"})
         @DisplayName("3~20자, 첫 글자 영숫자, 소문자·숫자·밑줄·하이픈이 아니면 쓸 수 없다")
         void invalid(String raw) {
@@ -64,7 +64,7 @@ class HandleTest {
         }
 
         @Test
-        @DisplayName("주소로 찾을 때 금칙어와 잘못된 형식은 없는 핸들로 다룬다")
+        @DisplayName("프로필 링크로 찾을 때 금칙어와 잘못된 형식은 없는 handle로 다룬다")
         void lookupTreatsAsMissing() {
             assertThat(Handle.parse("admin")).isEmpty();
             assertThat(Handle.parse("bad handle!")).isEmpty();
@@ -73,7 +73,7 @@ class HandleTest {
     }
 
     @Nested
-    @DisplayName("처음 로그인할 때 자동으로 받는 핸들")
+    @DisplayName("처음 로그인할 때 자동으로 받는 handle")
     class Random {
 
         @Test
@@ -84,7 +84,7 @@ class HandleTest {
         }
 
         @Test
-        @DisplayName("같은 난수열이면 같은 핸들이다 — 이메일을 입력으로 쓰지 않는다")
+        @DisplayName("이메일이 달라도 뽑는 방식이 같으면 같은 handle이 나온다")
         void deterministic() {
             assertThat(Handle.random(new java.util.Random(7), candidate -> false))
                 .isEqualTo(Handle.random(new java.util.Random(7), candidate -> false));

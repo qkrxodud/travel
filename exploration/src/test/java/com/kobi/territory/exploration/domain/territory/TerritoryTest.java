@@ -1047,11 +1047,11 @@ class TerritoryTest {
     }
 
     @Nested
-    @DisplayName("저장된 영토를 불러올 때")
+    @DisplayName("기록된 영토도 같은 방문 규칙을 따른다")
     class Restore {
 
         @Test
-        @DisplayName("같은 멤버의 같은 지역 방문이 둘이면 불러오지 않는다")
+        @DisplayName("같은 멤버의 같은 지역 방문이 둘인 기록은 거절된다")
         void duplicateRefused() {
             Visit visit = new Visit(JONGNO, ME, VisitDate.of(TODAY), Memo.EMPTY, null, Verification.NONE, NOON);
             Visit dup = new Visit(JONGNO, ME, VisitDate.of(TODAY), Memo.EMPTY, null, Verification.NONE, NOON);

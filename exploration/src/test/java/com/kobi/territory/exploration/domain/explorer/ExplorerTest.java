@@ -26,7 +26,7 @@ class ExplorerTest {
     class Link {
 
         @Test
-        @DisplayName("핸들이 생기고 공개 프로필을 가진 계정 탐험가가 된다")
+        @DisplayName("handle이 생기고 공개 프로필을 가진 계정 탐험가가 된다")
         void becomesAccountExplorer() {
             Explorer explorer = anonymous(ME);
             assertThat(explorer.linkable()).isTrue();
@@ -86,11 +86,11 @@ class ExplorerTest {
     }
 
     @Nested
-    @DisplayName("핸들을 바꿀 때")
+    @DisplayName("handle을 바꿀 때")
     class ChangeHandle {
 
         @Test
-        @DisplayName("새 핸들로 바뀌고 이전 핸들을 알려준다")
+        @DisplayName("새 handle로 바뀌고 이전 handle을 알려준다")
         void changes() {
             Explorer explorer = linked(FRIEND, "lee");
             Optional<Explorer.HandleChange> change = explorer.changeHandle(new Handle("lee_2"), NOON, RESERVE, handle -> false);
@@ -99,7 +99,7 @@ class ExplorerTest {
         }
 
         @Test
-        @DisplayName("같은 핸들로 바꾸면 아무 변화가 없다")
+        @DisplayName("같은 handle로 바꾸면 아무 변화가 없다")
         void same() {
             assertThat(linked(FRIEND, "lee").changeHandle(new Handle("lee"), NOON, RESERVE, handle -> true)).isEmpty();
         }
@@ -112,14 +112,14 @@ class ExplorerTest {
         }
 
         @Test
-        @DisplayName("다른 탐험가가 쓰는 핸들로는 바꿀 수 없다")
+        @DisplayName("다른 탐험가가 쓰는 handle로는 바꿀 수 없다")
         void takenRefused() {
             assertThat(refusal(() -> linked(FRIEND, "lee").changeHandle(new Handle("park"), NOON, RESERVE, handle -> true)))
                 .isEqualTo(ExplorationError.HANDLE_TAKEN);
         }
 
         @Nested
-        @DisplayName("놓은 핸들은")
+        @DisplayName("놓은 handle은")
         class Reservation {
 
             @Test
@@ -141,7 +141,7 @@ class ExplorerTest {
             }
 
             @Test
-            @DisplayName("본인은 되돌릴 수 있고 그러면 방금 놓은 핸들이 예약된다")
+            @DisplayName("본인은 되돌릴 수 있고 그러면 방금 놓은 handle이 예약된다")
             void ownerCanRevert() {
                 Explorer explorer = linked(FRIEND, "lee");
                 explorer.changeHandle(new Handle("lee_2"), NOON, RESERVE, handle -> false);

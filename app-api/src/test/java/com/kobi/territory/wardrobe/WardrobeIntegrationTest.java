@@ -241,9 +241,10 @@ class WardrobeIntegrationTest {
             String me = register();
             checkIn(me, null, "KR-36330");   // 구례 비니(HAT 희귀)
             awaitSlot(me, "SLOT_HAT", "region:KR-36330");
-            checkIn(me, null, "KR-37040");   // 안동 하회탈(HAT 일반)
-            checkIn(me, null, "KR-38070");   // 가야 왕관(HAT 일반)
-            awaitOwned(me, "region:KR-37040", "region:KR-36330", "region:KR-38070");
+            checkIn(me, null, "KR-36360");   // 보성 녹차 삿갓(HAT 희귀) — 같은 희귀도
+            checkIn(me, null, "KR-37040");   // 안동 하회탈(HAT 일반) — 덜 희귀
+            checkIn(me, null, "KR-38070");   // 가야 왕관(HAT 일반) — 덜 희귀
+            awaitOwned(me, "region:KR-37040", "region:KR-36330", "region:KR-36360", "region:KR-38070");
             await().pollDelay(Duration.ofMillis(800)).atMost(WAIT)
                 .untilAsserted(() -> assertThat(scene(me).get("SLOT_HAT")).isEqualTo("region:KR-36330"));
         }

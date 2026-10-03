@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 describe('알림', () => {
-  it('알림은 3.2초 동안 보였다가 사라진다', () => {
+  it('알림은 잠깐 보였다가 저절로 사라진다', () => {
     vi.useFakeTimers();
     toast('✓', '영토에서 제거', '종로구');
     expect(useToastStore.getState().toasts).toMatchObject([{ icon: '✓', title: '영토에서 제거', sub: '종로구' }]);
@@ -43,7 +43,7 @@ describe('알림', () => {
 });
 
 describe('늦은 반영 기다리기', () => {
-  it('변경 직후 4.5초 동안만 진행·도감·가방을 0.5초마다 다시 읽는다', () => {
+  it('변경 직후 잠깐 동안만 진행·도감·가방을 짧은 주기로 다시 읽는다', () => {
     vi.useFakeTimers();
     useSyncStore.getState().begin(true);
     expect(settleInterval()).toBe(SETTLE_INTERVAL_MS);
@@ -51,7 +51,7 @@ describe('늦은 반영 기다리기', () => {
     expect(settleInterval()).toBe(false);
   });
 
-  it('평소에는 영토를 주기적으로 다시 읽지 않고, 로그인으로 방문을 옮기는 동안만 1초마다 읽는다', () => {
+  it('평소에는 영토를 주기적으로 다시 읽지 않고, 로그인으로 방문을 옮기는 동안에만 잠깐 다시 읽는다', () => {
     vi.useFakeTimers();
     expect(territorySettleInterval()).toBe(false);
     useSyncStore.getState().beginTerritory();

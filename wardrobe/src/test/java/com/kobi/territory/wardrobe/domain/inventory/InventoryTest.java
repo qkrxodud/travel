@@ -266,7 +266,7 @@ class InventoryTest {
         }
 
         @Test
-        @DisplayName("방금 얻은 아이템을 바로 즐겨찾기해도 새 아이템 한 건으로 기록된다")
+        @DisplayName("방금 얻은 아이템을 바로 즐겨찾기해도 가방에는 새로 얻은 한 개로 남는다")
         void newItemFavoriteRecordedOnce() {
             Inventory inventory = bag();
             inventory.applyCheckIn(checkIn(PERSONAL_MAP, JONGNO).giving(LANTERN));
@@ -288,7 +288,7 @@ class InventoryTest {
     }
 
     @Nested
-    @DisplayName("저장된 가방을 다시 불러와 바꾸면")
+    @DisplayName("전에 쌓인 가방에서 바꾸면")
     class Restored {
 
         Inventory restored() {

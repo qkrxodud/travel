@@ -205,7 +205,7 @@ class AccountLoginIntegrationTest {
         }
 
         @Test
-        @DisplayName("공개 주소는 이메일과 무관한 무작위 이름으로 정해지고 그 이름으로 찾을 수 있다")
+        @DisplayName("handle은 이메일과 무관한 무작위 이름으로 정해지고 그 이름으로 찾을 수 있다")
         void randomHandle() throws Exception {
             Linked linked = 종로를_칠한_기기로_로그인();
             String handle = linked.session().handle();
@@ -244,7 +244,7 @@ class AccountLoginIntegrationTest {
         }
 
         @Test
-        @DisplayName("기기 없이 처음 로그인하면 새 탐험가가 생기고, 이메일 앞부분이 같아도 공개 주소는 서로 다르다")
+        @DisplayName("기기 없이 처음 로그인하면 새 탐험가가 생기고, 이메일 앞부분이 같아도 handle은 서로 다르다")
         void createsNewExplorerWithDistinctHandles() throws Exception {
             String local = unique("dup");
             Session first = 로그인(local + "@a.example", null);
@@ -590,7 +590,7 @@ class AccountLoginIntegrationTest {
     }
 
     @Nested
-    @DisplayName("공개 주소를 바꿀 때")
+    @DisplayName("handle을 바꿀 때")
     class Handle {
 
         @Test
@@ -686,7 +686,7 @@ class AccountLoginIntegrationTest {
         }
 
         @Test
-        @DisplayName("계정이 있으면 그 탐험가로 들어가고 로그인 상태와 공개 주소가 보인다")
+        @DisplayName("계정이 있으면 그 탐험가로 들어가고 로그인 상태와 handle이 보인다")
         void accountFindsExplorer() throws Exception {
             String sub = unique("1098");
             AccountService.LoginOutcome created = accounts.login(new AccountIdentity("google", sub, "oidc." + sub + "@gmail.com"), null);

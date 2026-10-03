@@ -33,7 +33,7 @@ class ProgressionDataTest {
     }
 
     @Test
-    @DisplayName("레벨 곡선 계수는 5이고 레벨 칭호는 프로토타입의 여섯 단계다")
+    @DisplayName("레벨 곡선 계수는 5이고 레벨 칭호는 기획한 여섯 단계다")
     void levels() {
         assertThat(카탈로그.levelDivisor()).isEqualTo(5);
         assertThat(카탈로그.levelTitles()).extracting(ProgressionRules.LevelTitleView::name)
@@ -71,7 +71,7 @@ class ProgressionDataTest {
     }
 
     @Test
-    @DisplayName("뱃지는 열두 개이고 조건이 프로토타입과 같다")
+    @DisplayName("뱃지는 열두 개이고 조건은 기획한 그대로다")
     void badges() {
         assertThat(카탈로그.badges()).hasSize(12);
         Map<String, ProgressionRules.BadgeView> byId = 카탈로그.badges().stream()

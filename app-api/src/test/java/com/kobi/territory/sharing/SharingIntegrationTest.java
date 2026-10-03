@@ -284,7 +284,7 @@ class SharingIntegrationTest {
         }
 
         @Test
-        @DisplayName("내 카드 목록에 공개 프로필과 카드의 공개 주소가 보인다")
+        @DisplayName("내 카드 목록에 handle과 공개 프로필·카드 링크가 보인다")
         void myCardsShowPublicUrls() throws Exception {
             Session owner = 공개한_주인();
             세션으로(owner, get("/me/cards")).andExpect(jsonPath("$.handle").value(owner.handle()))
@@ -339,7 +339,7 @@ class SharingIntegrationTest {
         }
 
         @Test
-        @DisplayName("둘 다 공개면 그려 주되 저장하지 않는다")
+        @DisplayName("둘 다 공개면 비교 카드를 보여 주지만 내 카드로 남기지는 않는다")
         void drawnWithoutStoring() throws Exception {
             Pair pair = 둘_다_공개한_탐험가();
             MvcResult result = mvc.perform(get("/u/" + pair.mine().handle() + "/vs/" + pair.theirs().handle() + ".png"))
@@ -570,7 +570,7 @@ class SharingIntegrationTest {
         }
 
         @Test
-        @DisplayName("로그인 직후 공개 카드는 익명 때 그린 카드가 아니라 공개 주소가 담긴 카드로 10분을 기다리지 않고 다시 그려진다")
+        @DisplayName("로그인 직후 공개 카드는 익명 때 그린 카드가 아니라 handle이 담긴 카드로 10분을 기다리지 않고 다시 그려진다")
         void handleChangeRedrawsImmediately() throws Exception {
             Anonymous device = 기기();
             칠한다(device, "KR-11010", LocalDate.now(clock), null);

@@ -27,6 +27,7 @@ E2E: `e2e/` is a Playwright (TypeScript, chromium) project. Its `webServer` star
 ./gradlew :app-api:bootRun               # run on :8080 with local profile
 ./gradlew :app-api:bootRun --args='--server.port=18080'   # run on another port
 ./gradlew test                           # run all tests
+./gradlew testDocs                       # rule docs from test sources in declaration order (+ ✓/✗ from last results) → build/reports/test-docs/{module}.md, index.md
 ./gradlew :app-api:test --tests "com.kobi.territory.ArchitectureTest"   # single test class
 ./gradlew :app-api:test --tests "*DevControllerLocalProfileTest.*"     # single test method/pattern
 java -jar app-api/build/libs/territory.jar --spring.profiles.active=prod  # prod (needs DB_* env)
@@ -43,7 +44,7 @@ cd frontend && npm run build                                # frontend/dist only
 # E2E (Playwright)
 cd e2e && npm install && npx playwright install chromium   # first time
 cd e2e && npm test                                          # all E2E tests (starts bootRun if not running)
-cd e2e && npm run test:stage0                               # stage 0 boot spec only
+cd e2e && npm run test:app-shell                            # app shell spec only (tests/<domain>.spec.ts: app-shell, map-check-in, progress, wardrobe, shared-map, account, sharing, social, character-move)
 cd e2e && E2E_PORT=18080 npx playwright test                # if 8080 is taken by another process
 
 # Docker Compose local operation (prod profile, MySQL 8.4, 127.0.0.1:18080) — see doc/operations.md "Docker Compose 로컬 운영"

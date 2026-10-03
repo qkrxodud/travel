@@ -126,7 +126,7 @@ class RegionDataTest {
     }
 
     @Test
-    @DisplayName("체크인 보상 수치는 프로토타입과 같다(일반 10·희귀 20·전설 50, 시·도 첫 발 15, 테마 100, 선점 10)")
+    @DisplayName("체크인 보상 수치는 기획한 값이다(일반 10·희귀 20·전설 50, 시·도 첫 발 15, 테마 100, 선점 10)")
     void rewardNumbers() {
         var rules = 카탈로그.rewardRules();
 

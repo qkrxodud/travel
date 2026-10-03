@@ -688,7 +688,7 @@ class ExplorerProgressTest {
         }
 
         @Test
-        @DisplayName("저장된 장부에 같은 보상이 두 번 있으면 불러오지 않는다")
+        @DisplayName("같은 보상이 두 번 적힌 장부는 거절된다")
         void corruptedLedgerRejected() {
             XpLedgerEntry entry = new XpLedgerEntry(XpSource.QUEST, 60, "quest:x", 기준시각);
 
@@ -728,7 +728,7 @@ class ExplorerProgressTest {
     }
 
     @Nested
-    @DisplayName("재계산 출발점을 만들면")
+    @DisplayName("처음부터 다시 셀 때")
     class RebuildBase {
 
         @Test

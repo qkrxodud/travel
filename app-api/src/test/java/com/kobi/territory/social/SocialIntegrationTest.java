@@ -168,7 +168,7 @@ class SocialIntegrationTest {
         }
 
         @Test
-        @DisplayName("공개 주소로 팔로우하면 앞의 @와 대소문자를 가리지 않고, 상대의 내부 식별자는 드러나지 않는다")
+        @DisplayName("handle로 팔로우하면 앞의 @와 대소문자를 가리지 않고, 상대의 내부 식별자는 드러나지 않는다")
         void followByHandle() throws Exception {
             Pair p = 김과_공개한_이();
             세션으로(p.kim(), post("/friends/@" + p.lee().handle().toUpperCase())).andExpect(status().isCreated())
@@ -373,7 +373,7 @@ class SocialIntegrationTest {
             }
 
             @Test
-            @DisplayName("이미 있는 팔로우를 다시 저장하려 하면 중복으로 알려 숨은 대상이면 없는 사람 답으로 바꿀 수 있다")
+            @DisplayName("숨은 사람에게 보낸 팔로우는 한 번만 남는다")
             void duplicateSaveIsReported() throws Exception {
                 Session hidden = 로그인();
                 Session racer = 로그인();

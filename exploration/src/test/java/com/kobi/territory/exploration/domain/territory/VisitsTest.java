@@ -70,7 +70,7 @@ class VisitsTest {
         }
 
         @Test
-        @DisplayName("같은 멤버의 같은 지역 방문이 둘인 기록은 불러오지 않는다")
+        @DisplayName("같은 멤버의 같은 지역 방문이 둘인 기록은 거절된다")
         void duplicateRestoreRefused() {
             assertThatThrownBy(() -> Visits.of(List.of(visit(JONGNO, ME, 0, NOON), visit(JONGNO, ME, 2, NOON))))
                 .isInstanceOf(IllegalStateException.class);

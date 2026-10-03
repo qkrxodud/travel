@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /** 두 탐험가가 동시에 같은 핸들로 바꾼 경우의 저장소 번역(MySQL·H2 메시지). 회귀 출처: QA P3-13. */
-@DisplayName("두 탐험가가 동시에 같은 핸들로 바꿀 때")
+@DisplayName("두 탐험가가 동시에 같은 handle로 바꿀 때")
 class HandleTakenTranslationTest {
 
     static final Explorer KIM = Explorer.restore(ExplorerId.of("11111111-1111-1111-1111-111111111111"), new Handle("kim"), null,
@@ -26,7 +26,7 @@ class HandleTakenTranslationTest {
         null, null, List.of());
 
     @Test
-    @DisplayName("운영 데이터베이스에서 겹치면 늦은 쪽은 이미 쓰는 핸들이라고 거절된다")
+    @DisplayName("운영 데이터베이스에서 겹치면 늦은 쪽은 이미 쓰는 handle이라고 거절된다")
     void mysql() {
         var mysql = new DataIntegrityViolationException("x", new SQLIntegrityConstraintViolationException(
             "Duplicate entry 'kim' for key 'explorer.uq_explorer_handle'"));
@@ -34,7 +34,7 @@ class HandleTakenTranslationTest {
     }
 
     @Test
-    @DisplayName("로컬 데이터베이스에서 겹쳐도 이미 쓰는 핸들이라고 거절된다")
+    @DisplayName("로컬 데이터베이스에서 겹쳐도 이미 쓰는 handle이라고 거절된다")
     void h2() {
         var h2 = new DataIntegrityViolationException("x", new RuntimeException(
             "Unique index or primary key violation: \"PUBLIC.UQ_EXPLORER_HANDLE_INDEX_8 ON PUBLIC.EXPLORER(HANDLE)\""));

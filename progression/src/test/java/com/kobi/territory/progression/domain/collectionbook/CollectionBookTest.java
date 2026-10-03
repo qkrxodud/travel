@@ -266,7 +266,7 @@ class CollectionBookTest {
     }
 
     @Nested
-    @DisplayName("재계산 출발점을 만들면")
+    @DisplayName("처음부터 다시 셀 때")
     class RebuildBase {
 
         @Test

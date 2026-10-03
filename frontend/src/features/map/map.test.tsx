@@ -161,8 +161,10 @@ describe('지역 누르기', () => {
 });
 
 describe('체크인 모달', () => {
-  it('방문 날짜는 오늘(내 기기 날짜)로 채워 둔다', () => {
+  it('방문 날짜는 내 기기 달력의 날짜로 적어, 자정 직후나 밤늦게 열어도 그날이다', () => {
     expect(localIsoDate(new Date(2026, 0, 5))).toBe('2026-01-05');
+    expect(localIsoDate(new Date(2026, 0, 5, 0, 30))).toBe('2026-01-05');
+    expect(localIsoDate(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
   });
 
   describe('도감 세트 칩', () => {

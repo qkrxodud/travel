@@ -193,7 +193,7 @@ class ItemDefinitionsTest {
         }
 
         @Test
-        @DisplayName("색은 #rrggbb 형식이어야 한다")
+        @DisplayName("색이 올바른 색상 값이 아니면 정의를 받지 않는다")
         void colorFormat() {
             assertThatThrownBy(() -> new ItemDefinition.Look("lantern", "red", "#ffffff")).hasMessageContaining("#rrggbb");
         }

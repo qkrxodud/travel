@@ -139,7 +139,7 @@ class Java2dCardRendererTest {
         }
 
         @Test
-        @DisplayName("아래에 공개 주소 막대를 그린다")
+        @DisplayName("아래에 공개 프로필 링크 막대를 그린다")
         void footerBar() throws IOException {
             renderAll().forEach((name, image) ->
                 assertThat(countPixels(image, 640, 548, 644, 582, Java2dCardRenderer.MINE)).as(name).isGreaterThan(100));
