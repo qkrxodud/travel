@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import type { InventoryResponse, ItemResponse, SceneResponse } from '../../../api/types/wardrobe';
 import { CATALOG } from '../../../test/fixtures';
-import { catalogItem, itemOrigin, SLOT_NAME, toDisplayItem } from './displayItem';
+import { achievementOf, catalogItem, itemOrigin, SLOT_NAME, toDisplayItem } from './displayItem';
 import { inventoryItems, sceneEquipment } from './equipment';
 
 const served = (itemId: string, overrides: Partial<ItemResponse> = {}): ItemResponse =>
@@ -20,6 +20,22 @@ describe('아이템 출처', () => {
   it('세트 보상은 세트 이름으로, 이름을 모르면 세트 코드로 알려 준다', () => {
     expect(itemOrigin('set:jiri', CATALOG, setName)).toBe('지리산 둘레 세트 완성 보상');
     expect(itemOrigin('set:unknown', CATALOG, setName)).toBe('unknown 세트 완성 보상');
+  });
+
+  it('시·도 정복 대표 장식은 정복한 시·도 이름으로, 이름을 모르면 시·도 코드로 알려 준다', () => {
+    expect(itemOrigin('conquest:KR-11', CATALOG, setName)).toBe('서울 정복 보상');
+    expect(itemOrigin('conquest:KR-29', CATALOG, setName)).toBe('KR-29 정복 보상');
+    expect(achievementOf('conquest:KR-11')).toBe('conquest');
+  });
+
+  it('연속 탐험 마일스톤 아이템은 몇 개월 연속 탐험 보상인지 알려 준다', () => {
+    expect(itemOrigin('streak:3', CATALOG, setName)).toBe('3개월 연속 탐험 보상');
+    expect(achievementOf('streak:12')).toBe('streak');
+  });
+
+  it('지역·세트 아이템은 업적 보상으로 표시하지 않는다', () => {
+    expect(achievementOf('region:KR-11010')).toBeNull();
+    expect(achievementOf('set:jiri')).toBeNull();
   });
 
   it('그 밖의 아이템은 이벤트 보상이다', () => {

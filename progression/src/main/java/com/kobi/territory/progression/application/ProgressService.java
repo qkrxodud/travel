@@ -10,6 +10,9 @@ import com.kobi.territory.exploration.api.event.VisitCancelled;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
 import com.kobi.territory.progression.api.event.BadgeEarned;
 import com.kobi.territory.progression.api.event.LevelUp;
+import com.kobi.territory.progression.api.event.MysteryBonusEarned;
+import com.kobi.territory.progression.api.event.ProvinceConquered;
+import com.kobi.territory.progression.api.event.StreakMilestoneReached;
 import com.kobi.territory.progression.api.event.QuestCompleted;
 import com.kobi.territory.progression.api.event.SetCompleted;
 import com.kobi.territory.progression.domain.progress.ExplorerProgress;
@@ -17,7 +20,10 @@ import com.kobi.territory.progression.domain.progress.ExplorerProgressRepository
 import com.kobi.territory.progression.domain.progress.ProgressChange;
 import com.kobi.territory.progression.domain.progress.ProgressVisit;
 import com.kobi.territory.progression.domain.quest.QuestPeriod;
+import com.kobi.territory.catalog.api.query.MysteryWeekView;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,7 +61,7 @@ public class ProgressService {
     @Transactional
     public void onRegionVisited(RegionVisited event) {
         ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
-        ProgressChange change = progress.applyVisit(visitOf(event), catalog.policy());
+        ProgressChange change = progress.applyVisit(visitWithMystery(event), catalog.policy());
         progresses.save(progress);
         publish(progress, change);
     }
@@ -115,6 +121,42 @@ public class ProgressService {
         return load(explorerId);
     }
 
+    /**
+     * GET /mystery/this-week — 이번 주 미스터리 지역(없으면 카탈로그가 골라 기록)과 내가 이번 주 보너스를 받았는지(8단계).
+     * 탐험가가 없으면 404 EXPLORER_NOT_FOUND.
+     */
+    @Transactional(readOnly = true)
+    public ThisWeekMystery mysteryThisWeek(ExplorerId explorerId) {
+        territories.personalMapId(explorerId.value());
+        MysteryWeekView week = catalog.mysteryThisWeek();
+        ExplorerProgress progress = load(explorerId);
+        return new ThisWeekMystery(week, progress.mysteryFoundAt(week.weekId()).orElse(null), progress.mysteryFoundCount(),
+            clock.instant());
+    }
+
+    /**
+     * 이번 주 미스터리 현황.
+     *
+     * @param receivedAt 이번 주 보너스를 받은 시각, 아직이면 null
+     * @param foundCount 지금까지 보너스를 받은 주 수
+     */
+    public record ThisWeekMystery(MysteryWeekView week, Instant receivedAt, int foundCount, Instant now) {
+        /** 이번 주 보너스를 받았는지. */
+        public boolean received() {
+            return receivedAt != null;
+        }
+
+        /** 지역 이름을 바로 공개하는지 — 이번 주 보너스를 받았으면(직접 찾아 칠했다). */
+        public boolean revealed() {
+            return received();
+        }
+
+        /** 이번 주가 끝날 때까지 남은 초(0 이상). */
+        public long remainingSeconds() {
+            return Math.max(0, Duration.between(now, week.endsAt()).getSeconds());
+        }
+    }
+
     /** PUT /progress/title — 얻은 칭호만(null 이면 선택 해제). 탐험가 확인은 트랜잭션 밖에서 먼저 해 갱신 트랜잭션을 짧게 둔다. */
     public ExplorerProgress selectTitle(ExplorerId explorerId, String titleId) {
         territories.personalMapId(explorerId.value());
@@ -126,9 +168,18 @@ public class ProgressService {
         });
     }
 
+    /** 체크인 사실(미스터리 지역 모름 — 퀘스트 집계용). */
     static ProgressVisit visitOf(RegionVisited event) {
         return new ProgressVisit(event.mapId(), RegionCode.of(event.regionCode()), event.provinceCode(), event.rarity(),
             event.visitedAt(), event.isFirstClaim(), event.visitGeneration());
+    }
+
+    /**
+     * 체크인 사실 + 처리 시각이 속한 주의 미스터리 지역(8단계 — 기록이 없는 지난 주는 비어 있어 보너스가 없다). 이벤트 처리와 재계산이 같이 쓴다.
+     */
+    ProgressVisit visitWithMystery(RegionVisited event) {
+        return new ProgressVisit(event.mapId(), RegionCode.of(event.regionCode()), event.provinceCode(), event.rarity(),
+            event.visitedAt(), event.isFirstClaim(), event.visitGeneration(), catalog.mysteryOf(event.visitedAt()).orElse(null));
     }
 
     private ExplorerProgress load(ExplorerId explorerId) {
@@ -150,5 +201,11 @@ public class ProgressService {
             outbox.append(AGGREGATE, explorerId, new LevelUp(explorerId, level, progress.xp(), change.at())));
         change.badgesEarned().forEach(badge ->
             outbox.append(AGGREGATE, explorerId, new BadgeEarned(explorerId, badge, change.at())));
+        change.milestonesReached().forEach(months -> outbox.append(AGGREGATE, explorerId, new StreakMilestoneReached(explorerId,
+            months, catalog.policy().streakRules().find(months).orElseThrow().xp(), change.at())));
+        change.provincesConquered().forEach(province -> outbox.append(AGGREGATE, explorerId,
+            new ProvinceConquered(explorerId, province, catalog.provinceConquest(), change.at())));
+        change.mysteryFound().ifPresent(mystery -> outbox.append(AGGREGATE, explorerId, new MysteryBonusEarned(explorerId,
+            mystery.weekId(), mystery.region().value(), catalog.mysteryBonus(), change.at())));
     }
 }

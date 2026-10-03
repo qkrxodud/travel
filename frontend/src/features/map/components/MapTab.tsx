@@ -7,6 +7,11 @@ import { useCollection, useSetNameLookup } from '../../../shared/queries/collect
 import { claimMaps, latestVisitCode, regionTip } from '../model/territory';
 import { useMyTerritory } from '../../../shared/queries/territory';
 import { useMapActions } from '../queries';
+import { toClientCode } from '../../../api/client';
+import { conqueredProvinceCodes } from '../../../shared/lib/progress/news';
+import { useMysteryThisWeek } from '../../../shared/queries/mystery';
+import { useProgress } from '../../../shared/queries/progress';
+import { MysteryCard } from './MysteryCard';
 import { ExplorationLog } from './ExplorationLog';
 import { MapTools } from './MapTools';
 import { MapView } from './MapView';
@@ -28,18 +33,28 @@ export function MapTab({ mapCard }: { mapCard: ReactNode }) {
   const equipment = useEquipment(catalog, setName);
   useSyncExternalStore(sprites.subscribe, sprites.version);
   const { clickRegion } = useMapActions(catalog, visits, mapId);
+  const { data: progress } = useProgress();
+  const { data: mysteryWeek } = useMysteryThisWeek();
+  const revealMystery = useUiStore(state => state.revealMystery);
 
   const mine = useMemo(() => (visits ? new Set(visits.keys()) : EMPTY), [visits]);
   const claims = useMemo(() => claimMaps(territory, detail), [territory, detail]);
   const paint = useMemo(() => ({ mine, selected, highlight, claimColor: claims.color, claimer: claims.claimer }), [mine, selected, highlight, claims]);
   const sets = collection?.sets;
+  // 정복 테두리(탐험가 단위 정복 기록 — 시·도 이름으로 그린다). 같은 목록이면 같은 키라 엔진이 다시 그리지 않는다.
+  const conqueredKey = [...conqueredProvinceCodes(progress?.provinces)].map(code => catalog?.provinceByCode.get(code) ?? code).sort().join('|');
+  const conqueredProvinces = useMemo(() => new Set(conqueredKey ? conqueredKey.split('|') : []), [conqueredKey]);
+  const mysteryCode = mysteryWeek ? toClientCode(mysteryWeek.region.code) : null;
+  const mysteryReceived = !!mysteryWeek?.received;
+  const mystery = useMemo(() => (mysteryCode ? { code: mysteryCode, received: mysteryReceived } : null), [mysteryCode, mysteryReceived]);
   const handlers = useMemo(() => ({
     onRegionClick: clickRegion,
+    onMysteryClick: revealMystery,
     describe: (code: string) => {
       const feature = catalog?.byCode.get(code);
       return feature ? regionTip(feature, mine.has(code), sets ?? []) : code;
     },
-  }), [clickRegion, catalog, mine, sets]);
+  }), [clickRegion, revealMystery, catalog, mine, sets]);
   // 캐릭터 그림은 렌더러가 착용 조합 키로 메모이즈한다(같은 조합이면 같은 문자열 → 엔진이 갈아 끼우지 않는다).
   // 스프라이트가 로드되면(useSyncExternalStore) 다시 그린다.
   const characterLook = pixelRenderer.characterMarkup(equipment);
@@ -54,12 +69,13 @@ export function MapTab({ mapCard }: { mapCard: ReactNode }) {
 
   return (
     <section id="tab-map" className="main" hidden={tab !== 'map'}>
-      <MapView catalog={catalog} paint={paint} characterCode={characterCode} characterLook={characterLook} handlers={handlers}>
+      <MapView catalog={catalog} paint={paint} characterCode={characterCode} characterLook={characterLook} handlers={handlers} conqueredProvinces={conqueredProvinces} mystery={mystery}>
         <MapTools />
-        <div className="maplegend"><span>미탐험</span><span className="a">내 영토</span><span className="l">전설 풍경 지역</span></div>
+        <div className="maplegend"><span>미탐험</span><span className="a">내 영토</span><span className="l">전설 풍경 지역</span><span className="q">❓ 이번 주 미스터리</span><span className="c">정복한 시·도</span></div>
       </MapView>
       <aside className="side">
         {mapCard}
+        <MysteryCard />
         <RegionDetail />
         <ProvinceProgress />
         <ExplorationLog />

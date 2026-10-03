@@ -76,6 +76,19 @@ public class ItemCatalogService implements ItemCatalog {
             .map(ItemViews::of).toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ItemView> grantedByProvinceConquest(String provinceCode, Instant conqueredAt) {
+        return cache.current().grantedByProvinceConquest(provinceCode, dayOf(conqueredAt), conqueredAt).stream()
+            .map(ItemViews::of).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ItemView> grantedByStreakMilestone(int months, Instant reachedAt) {
+        return cache.current().grantedByStreakMilestone(months, dayOf(reachedAt), reachedAt).stream().map(ItemViews::of).toList();
+    }
+
     private LocalDate dayOf(Instant at) {
         return LocalDate.ofInstant(at, clock.getZone());
     }

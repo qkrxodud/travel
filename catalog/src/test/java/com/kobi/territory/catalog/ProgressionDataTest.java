@@ -10,6 +10,7 @@ import com.kobi.territory.catalog.domain.catalog.Catalog;
 import com.kobi.territory.catalog.infra.repository.JsonCatalogRepository;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
@@ -71,9 +72,9 @@ class ProgressionDataTest {
     }
 
     @Test
-    @DisplayName("뱃지는 열두 개이고 조건은 기획한 그대로다")
+    @DisplayName("뱃지는 열다섯 개(기획 열두 개 + 미스터리 탐험가 세 단계)이고 조건은 기획한 그대로다")
     void badges() {
-        assertThat(카탈로그.badges()).hasSize(12);
+        assertThat(카탈로그.badges()).hasSize(15);
         Map<String, ProgressionRules.BadgeView> byId = 카탈로그.badges().stream()
             .collect(Collectors.toMap(ProgressionRules.BadgeView::id, badge -> badge));
         assertThat(byId.get("ten").condition()).extracting("type", "min").containsExactly("REGION_COUNT", 10);
@@ -81,6 +82,9 @@ class ProgressionDataTest {
         assertThat(byId.get("samnam").condition().groups()).hasSize(3);
         assertThat(byId.get("half").condition().ratio()).isEqualTo(0.5);
         assertThat(byId.get("streak3").condition().type()).isEqualTo("STREAK_MONTHS");
+        assertThat(List.of(byId.get("mystery1"), byId.get("mystery5"), byId.get("mystery10")))
+            .extracting(badge -> badge.condition().type() + ":" + badge.condition().min())
+            .containsExactly("MYSTERY_FOUND:1", "MYSTERY_FOUND:5", "MYSTERY_FOUND:10");
     }
 
     @Test
@@ -94,12 +98,48 @@ class ProgressionDataTest {
     }
 
     @Test
-    @DisplayName("칭호는 레벨 6·테마 9·상시 도전 3·시·도 17개다")
+    @DisplayName("칭호는 레벨 6·테마 9·상시 도전 3·연속 탐험 4·시·도 17개다")
     void titles() {
-        assertThat(카탈로그.titles()).hasSize(6 + 9 + 3 + 17);
+        assertThat(카탈로그.titles()).hasSize(6 + 9 + 3 + 4 + 17);
         assertThat(카탈로그.titles()).extracting(ProgressionRules.TitleView::id)
-            .contains("lv1", "lv16", "set-jiri", "long-leg5", "own-KR-11");
+            .contains("lv1", "lv16", "set-jiri", "long-leg5", "streak-3", "streak-24", "own-KR-11");
         assertThat(카탈로그.titles().stream().filter(title -> title.id().equals("own-KR-11")).findFirst().orElseThrow().name())
             .isEqualTo("서울의 주인");
+    }
+
+    @Nested
+    @DisplayName("8단계 게임 규칙 값")
+    class GameRules {
+
+        @Test
+        @DisplayName("보호권은 최대 두 개이고 한 달 월간 퀘스트를 모두 받으면 하나다")
+        void freeze() {
+            assertThat(카탈로그.streakRules().freezeMaxHeld()).isEqualTo(2);
+            assertThat(카탈로그.streakRules().monthlyQuestsFreezes()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("연속 탐험 마일스톤은 3·6·12·24개월에 XP 50·100·200·400과 보호권 하나다")
+        void milestones() {
+            assertThat(카탈로그.streakRules().milestones())
+                .extracting(milestone -> milestone.months() + ":" + milestone.xp() + ":" + milestone.freezes() + ":" + milestone.titleId())
+                .containsExactly("3:50:1:streak-3", "6:100:1:streak-6", "12:200:1:streak-12", "24:400:1:streak-24");
+        }
+
+        @Test
+        @DisplayName("이번 주 미스터리 보너스는 50, 시·도 정복 보상은 300이다")
+        void bonuses() {
+            assertThat(카탈로그.mysteryBonus()).isEqualTo(new RewardLineView("MYSTERY_BONUS", 50));
+            assertThat(카탈로그.provinceConquest()).isEqualTo(new RewardLineView("PROVINCE_CONQUEST", 300));
+            assertThat(카탈로그.checkIn(Rarity.LEGEND, false, false, true)).extracting(RewardLineView::source)
+                .containsExactly("REGION_BASE", "MYSTERY_BONUS");
+        }
+
+        @Test
+        @DisplayName("미스터리 지역은 희귀·전설에서 방문자 비율 하위 30% 안에서 고른다")
+        void mysteryRules() {
+            assertThat(데이터.mystery().rarities()).containsExactlyInAnyOrder(Rarity.RARE, Rarity.LEGEND);
+            assertThat(데이터.mystery().bottomFraction()).isEqualTo(0.3);
+        }
     }
 }

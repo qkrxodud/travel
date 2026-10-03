@@ -139,6 +139,64 @@ class ItemDefinitionsTest {
     }
 
     @Nested
+    @DisplayName("시·도를 정복하면")
+    class ProvinceConquest {
+
+        private final ItemDefinition 서울_기념비 = 아이템("conquest:KR-11", ItemSlot.PROP, new GrantRule.ProvinceComplete("KR-11"), null);
+        private final ItemDefinition 운영_서울_깃발 = 아이템("event:seoul-flag", ItemSlot.HAND, new GrantRule.ProvinceComplete("KR-11"),
+            null);
+        private final ItemDefinitions 정복보상 = ItemDefinitions.of(List.of(서울_기념비, 운영_서울_깃발, 종로_청사초롱));
+
+        @Test
+        @DisplayName("그 시·도의 대표 장식만 받는다")
+        void onlyThatProvince() {
+            assertThat(정복보상.grantedByProvinceConquest("KR-21", 십월삼일, 정오(십월삼일))).isEmpty();
+            assertThat(정복보상.grantedByProvinceConquest("KR-11", 십월삼일, 정오(십월삼일))).extracting(ItemDefinition::itemId)
+                .containsExactly("conquest:KR-11", "event:seoul-flag");
+        }
+
+        @Test
+        @DisplayName("운영이 나중에 더한 정복 보상은 정의가 생긴 뒤의 정복에만 준다")
+        void operatorAddedNotRetroactive() {
+            LocalDate 시월일일 = LocalDate.of(2026, 10, 1);
+
+            assertThat(정복보상.grantedByProvinceConquest("KR-11", 시월일일, 정오(시월일일))).extracting(ItemDefinition::itemId)
+                .containsExactly("conquest:KR-11");
+        }
+
+        @Test
+        @DisplayName("체크인으로는 정복 보상을 받지 않는다")
+        void notByCheckIn() {
+            assertThat(정복보상.grantedByCheckIn(종로구, "KR-11", 십월삼일, 정오(십월삼일))).extracting(ItemDefinition::itemId)
+                .containsExactly("region:KR-11010");
+        }
+    }
+
+    @Nested
+    @DisplayName("연속 탐험 마일스톤에 닿으면")
+    class StreakMilestone {
+
+        private final ItemDefinitions 마일스톤보상 = ItemDefinitions.of(List.of(
+            아이템("streak:3", ItemSlot.BADGE, new GrantRule.StreakMilestone(3), null),
+            아이템("streak:6", ItemSlot.HAND, new GrantRule.StreakMilestone(6), null)));
+
+        @Test
+        @DisplayName("그 개월 수의 한정 아이템만 받는다")
+        void onlyThatMilestone() {
+            assertThat(마일스톤보상.grantedByStreakMilestone(3, 십월삼일, 정오(십월삼일))).extracting(ItemDefinition::itemId)
+                .containsExactly("streak:3");
+        }
+
+        @Test
+        @DisplayName("마일스톤 규칙의 대상은 1 이상의 개월 수다")
+        void monthsRequired() {
+            assertThatThrownBy(() -> GrantRule.of(GrantRule.Type.STREAK_MILESTONE, "three"))
+                .isInstanceOf(TerritoryException.class);
+            assertThatThrownBy(() -> GrantRule.of(GrantRule.Type.STREAK_MILESTONE, "0")).isInstanceOf(TerritoryException.class);
+        }
+    }
+
+    @Nested
     @DisplayName("정의 목록은")
     class Definitions {
 
@@ -196,6 +254,23 @@ class ItemDefinitionsTest {
         @DisplayName("색이 올바른 색상 값이 아니면 정의를 받지 않는다")
         void colorFormat() {
             assertThatThrownBy(() -> new ItemDefinition.Look("lantern", "red", "#ffffff")).hasMessageContaining("#rrggbb");
+        }
+
+        @Test
+        @DisplayName("시·도 정복·연속 탐험 아이템 id 는 이관 데이터 전용이라 운영이 쓸 수 없다")
+        void reservedPrefixes() {
+            ItemDefinitions 비어있음 = ItemDefinitions.of(List.of());
+
+            assertThatThrownBy(() -> 비어있음.requireRegistrable(아이템("conquest:KR-99", ItemSlot.PROP,
+                new GrantRule.ProvinceComplete("KR-11"), null))).isInstanceOf(TerritoryException.class);
+            assertThatThrownBy(() -> 비어있음.requireRegistrable(아이템("streak:36", ItemSlot.HAT,
+                new GrantRule.StreakMilestone(36), null))).isInstanceOf(TerritoryException.class);
+        }
+
+        @Test
+        @DisplayName("시·도 정복 보상은 시·도 코드를 가리켜야 한다")
+        void conquestNeedsProvince() {
+            assertThatThrownBy(() -> GrantRule.of(GrantRule.Type.PROVINCE_COMPLETE, "seoul")).isInstanceOf(TerritoryException.class);
         }
 
         @Test

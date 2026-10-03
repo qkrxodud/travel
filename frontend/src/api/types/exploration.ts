@@ -36,7 +36,7 @@ export interface VisitResponse {
   generation: number;
 }
 
-export type XpSource = 'REGION_BASE' | 'PROVINCE_FIRST' | 'FIRST_CLAIM';
+export type XpSource = 'REGION_BASE' | 'PROVINCE_FIRST' | 'FIRST_CLAIM' | 'MYSTERY_BONUS';
 
 export interface XpLineResponse {
   source: XpSource;

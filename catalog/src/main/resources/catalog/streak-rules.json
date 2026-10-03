@@ -1,0 +1,12 @@
+{
+ "freeze": {
+  "maxHeld": 2,
+  "monthlyQuestsReward": 1
+ },
+ "milestones": [
+  {"months": 3, "xp": 50, "freezes": 1, "title": "꾸준한 탐험가"},
+  {"months": 6, "xp": 100, "freezes": 1, "title": "반년의 발자국"},
+  {"months": 12, "xp": 200, "freezes": 1, "title": "한 해의 개척자"},
+  {"months": 24, "xp": 400, "freezes": 1, "title": "두 해의 전설"}
+ ]
+}

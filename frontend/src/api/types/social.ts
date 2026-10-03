@@ -16,7 +16,7 @@ export interface FriendsResponse {
   people: FriendResponse[];
 }
 
-export type FeedKind = 'VISIT' | 'THEME_COMPLETED' | 'LEVEL_UP' | 'BADGE_EARNED';
+export type FeedKind = 'VISIT' | 'THEME_COMPLETED' | 'LEVEL_UP' | 'BADGE_EARNED' | 'STREAK_MILESTONE' | 'PROVINCE_CONQUERED' | 'MYSTERY_FOUND';
 
 export interface FeedItemResponse {
   handle: string | null;
@@ -28,6 +28,12 @@ export interface FeedItemResponse {
   badgeId: string | null;
   daysAgo: number;
   when: string;
+  /** PROVINCE_CONQUERED(KR-11) */
+  provinceCode: string | null;
+  /** STREAK_MILESTONE */
+  months: number | null;
+  /** MYSTERY_FOUND(yyyy-MM-dd) */
+  weekStart: string | null;
 }
 
 /** GET /feed — FeedResponse */

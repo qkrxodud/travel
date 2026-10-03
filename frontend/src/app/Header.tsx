@@ -3,6 +3,7 @@ import { useProgress } from '../shared/queries/progress';
 import { usePercentile } from '../shared/queries/social';
 import { useCatalog } from '../shared/queries/catalog';
 import { Bar } from '../shared/ui/Bar';
+import { freezeBadge } from '../shared/lib/progress/freeze';
 
 const LEVEL_ONE_TITLE = '초보 탐험가';
 
@@ -12,6 +13,7 @@ export function Header() {
   const { territory } = useMyTerritory();
   const { data: progress } = useProgress();
   const { data: percentile } = usePercentile();
+  const freeze = freezeBadge(progress?.streakFreeze);
   const conquest = territory?.conquest ?? { visited: 0, total: catalog?.features.length ?? 0, percent: 0 };
   const xp = progress?.xp ?? 0;
   const level = progress?.level ?? 1;
@@ -44,7 +46,10 @@ export function Header() {
         </div>
         <div className="stat">
           <div className="k">탐험 스트릭</div>
-          <div className="v"><span id="s-streak">{progress?.streak.months ?? 0}</span><em>개월 연속</em></div>
+          <div className="v">
+            <span id="s-streak">{progress?.streak.months ?? 0}</span><em>개월 연속</em>
+            <em id="s-freeze" className={`freeze ${freeze.empty ? 'dim' : ''}`} title={freeze.hint} aria-label={`스트릭 보호권 ${progress?.streakFreeze.held ?? 0}개`} data-held={progress?.streakFreeze.held ?? 0}><span className="ico" aria-hidden="true">{freeze.icon}</span>{freeze.count}</em>
+          </div>
         </div>
         <div className="stat">
           <div className="k">탐험 XP</div>

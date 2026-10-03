@@ -8,6 +8,7 @@ import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
 import com.kobi.territory.progression.api.query.CollectionBookQuery;
 import com.kobi.territory.progression.api.query.CompletedSetView;
+import com.kobi.territory.progression.api.query.ProgressQuery;
 import com.kobi.territory.wardrobe.api.event.SceneChanged;
 import com.kobi.territory.wardrobe.domain.inventory.CheckInGrant;
 import com.kobi.territory.wardrobe.domain.inventory.Inventory;
@@ -35,7 +36,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 인벤토리 재계산 배치(일관성 원칙 3, QA P2-1) — progression RecalculateService 와 같은 틀:
  * 루트 행 선잠금(findLocked) → 재생(InventoryReplay) → replace(자식 행 지우고 다시 넣기, 루트 version 강제 증가),
  * 미전달 이벤트가 남은 탐험가는 보류(deferred), 탐험가별 트랜잭션·재시도·실패 격리.
- * 입력: 탐험 Query 의 방문 이력(지금 멤버인 모든 지도), 진행 Query 의 완성 테마, 카탈로그 아이템 정의·지급 규칙.
+ * 입력: 탐험 Query 의 방문 이력(지금 멤버인 모든 지도), 진행 Query 의 완성 테마·업적(8단계 시·도 정복·마일스톤), 카탈로그 아이템 정의·지급 규칙.
  * 장면은 착용 선택을 유지하고 가방에 없게 된 아이템만 벗긴다(바뀌면 SceneChanged). 아이템 이벤트(ItemGranted·ItemRevoked)는
  * 내지 않는다 — 재계산으로 돌아온 아이템을 자동 착용하지 않게.
  * 진입점: local POST /dev/recalculate(진행 다음에 함께 실행), 운영은 기동 인자 recalculate-on-startup(진행 다음).
@@ -54,6 +55,7 @@ public class InventoryRecalculateService {
     private final SceneRepository scenes;
     private final TerritoryQuery territories;
     private final CollectionBookQuery collectionBooks;
+    private final ProgressQuery progresses;
     private final WardrobeCatalog catalog;
     private final EventBacklog backlog;
     private final EventOutbox outbox;
@@ -61,12 +63,14 @@ public class InventoryRecalculateService {
     private final TransactionTemplate perExplorerTx;
 
     public InventoryRecalculateService(InventoryRepository inventories, SceneRepository scenes, TerritoryQuery territories,
-                                       CollectionBookQuery collectionBooks, WardrobeCatalog catalog, EventBacklog backlog,
+                                       CollectionBookQuery collectionBooks, ProgressQuery progresses, WardrobeCatalog catalog,
+                                       EventBacklog backlog,
                                        EventOutbox outbox, Clock clock, PlatformTransactionManager transactionManager) {
         this.inventories = inventories;
         this.scenes = scenes;
         this.territories = territories;
         this.collectionBooks = collectionBooks;
+        this.progresses = progresses;
         this.catalog = catalog;
         this.backlog = backlog;
         this.outbox = outbox;
@@ -109,7 +113,7 @@ public class InventoryRecalculateService {
         mapIds.forEach(mapId -> completedSets.addAll(collectionBooks.completedSets(mapId)));
 
         Inventory rebuilt = InventoryReplay.replay(current, mapIds, visits, catalog.grantedByThemeCompletions(completedSets),
-            clock.instant());
+            catalog.grantedByAchievements(progresses.achievementsOf(explorerId.value())), clock.instant());
 
         inventories.replace(rebuilt);
         Scene scene = scenes.find(explorerId).orElseGet(() -> Scene.blank(explorerId, clock.instant()));

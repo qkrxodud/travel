@@ -2,6 +2,8 @@ package com.kobi.territory.dev;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.kobi.territory.catalog.api.query.MysteryRegionQuery;
+import com.kobi.territory.catalog.application.MysteryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +20,8 @@ import org.springframework.test.context.ActiveProfiles;
     "DB_USERNAME=sa",
     "DB_PASSWORD=",
     "TERRITORY_ADMIN_TOKEN=prod-profile-test-token",
-    "TERRITORY_PUBLIC_BASE_URL=https://territory.example"
+    "TERRITORY_PUBLIC_BASE_URL=https://territory.example",
+    "TERRITORY_MYSTERY_SALT=prod-profile-test-salt"
 })
 @ActiveProfiles("prod")
 @DisplayName("운영 환경")
@@ -32,5 +35,13 @@ class DevControllerProdProfileTest {
         assertThat(context.getBeansOfType(DevController.class)).isEmpty();
         assertThat(context.containsBean("devController")).isFalse();
         assertThat(context.getEnvironment().getProperty("territory.dev.enabled")).isNull(); // local 파일에만 있다
+    }
+
+    @Test
+    @DisplayName("미스터리 지역을 고정하는 개발용 어댑터가 없어 원래 주차 선택 그대로이고, 시드 비밀값은 환경변수에서 온다")
+    void noMysteryPin() {
+        assertThat(context.getBeansOfType(PinnableMysteryRegionQuery.class)).isEmpty();
+        assertThat(context.getBean(MysteryRegionQuery.class)).isInstanceOf(MysteryService.class);
+        assertThat(context.getEnvironment().getProperty("territory.mystery.salt")).isEqualTo("prod-profile-test-salt");
     }
 }

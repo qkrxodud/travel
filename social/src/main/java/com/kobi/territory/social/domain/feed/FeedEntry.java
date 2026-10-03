@@ -53,6 +53,24 @@ public record FeedEntry(String refId, ExplorerId actorId, String mapId, FeedKind
             FeedDetail.badge(badgeId), at);
     }
 
+    /** 연속 탐험 마일스톤(StreakMilestoneReached, 8단계) — 탐험가당 마일스톤당 한 번(진행 refId milestone:{e}:{n} 과 같은 단위). */
+    public static FeedEntry milestoneReached(ExplorerId actor, int months, Instant at) {
+        return new FeedEntry("milestone:" + actor.value() + ":" + months, actor, null, FeedKind.STREAK_MILESTONE,
+            FeedDetail.milestone(months), at);
+    }
+
+    /** 시·도 정복(ProvinceConquered, 8단계) — 탐험가당 시·도당 한 번. */
+    public static FeedEntry provinceConquered(ExplorerId actor, String provinceCode, Instant at) {
+        return new FeedEntry("conquest:" + actor.value() + ":" + provinceCode, actor, null, FeedKind.PROVINCE_CONQUERED,
+            FeedDetail.conquest(provinceCode), at);
+    }
+
+    /** 이번 주 미스터리 지역 발견(MysteryBonusEarned, 8단계) — 탐험가당 주당 한 번. */
+    public static FeedEntry mysteryFound(ExplorerId actor, String regionCode, String weekStart, Instant at) {
+        return new FeedEntry("mystery:" + actor.value() + ":" + weekStart, actor, null, FeedKind.MYSTERY_FOUND,
+            FeedDetail.mystery(regionCode, weekStart), at);
+    }
+
     /** 체크인 소식의 멱등 키(같은 체크인 이벤트가 두 번 와도 한 행). 취소는 refId 가 아니라 (주인, 지도, 지역)으로 거둔다(병합 대응). */
     public static String visitRef(ExplorerId actor, String mapId, String regionCode, int generation, Instant at) {
         String round = generation > 0 ? "#" + generation : "@" + at.toEpochMilli();

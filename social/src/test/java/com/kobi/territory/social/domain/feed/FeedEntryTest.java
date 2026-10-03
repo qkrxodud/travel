@@ -92,6 +92,42 @@ class FeedEntryTest {
     }
 
     @Nested
+    @DisplayName("연속 탐험·시·도 정복·미스터리 소식")
+    class GameNews {
+
+        @Test
+        @DisplayName("같은 마일스톤은 한 번만 소식이 되고 개월 수를 담는다")
+        void milestone() {
+            FeedEntry first = FeedEntry.milestoneReached(KIM, 3, T0);
+
+            assertThat(FeedEntry.milestoneReached(KIM, 3, T0.plusSeconds(9)).refId()).isEqualTo(first.refId());
+            assertThat(first.kind()).isEqualTo(FeedKind.STREAK_MILESTONE);
+            assertThat(first.detail().months()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("같은 시·도 정복은 한 번만 소식이 되고 시·도를 담는다")
+        void conquest() {
+            FeedEntry seoul = FeedEntry.provinceConquered(KIM, "KR-11", T0);
+
+            assertThat(FeedEntry.provinceConquered(KIM, "KR-11", T0.plusSeconds(9)).refId()).isEqualTo(seoul.refId());
+            assertThat(FeedEntry.provinceConquered(KIM, "KR-29", T0).refId()).isNotEqualTo(seoul.refId());
+            assertThat(seoul.detail().provinceCode()).isEqualTo("KR-11");
+        }
+
+        @Test
+        @DisplayName("미스터리 소식은 주마다 하나이고 지역과 주를 담는다")
+        void mystery() {
+            FeedEntry thisWeek = FeedEntry.mysteryFound(KIM, "KR-37430", "2026-09-28", T0);
+
+            assertThat(FeedEntry.mysteryFound(KIM, "KR-37430", "2026-10-05", T0).refId()).isNotEqualTo(thisWeek.refId());
+            assertThat(thisWeek.detail().regionCode()).isEqualTo("KR-37430");
+            assertThat(thisWeek.detail().weekStart()).isEqualTo("2026-09-28");
+            assertThat(thisWeek.mapId()).isNull();
+        }
+    }
+
+    @Nested
     @DisplayName("익명 탐험가가 계정으로 합쳐지면")
     class Merge {
 
@@ -108,6 +144,6 @@ class FeedEntryTest {
     @DisplayName("소식에는 메모·사진·방문일이 담길 자리가 없다")
     void noPrivateFields() {
         assertThat(Arrays.stream(FeedDetail.class.getRecordComponents()).map(RecordComponent::getName))
-            .containsExactly("regionCode", "rarity", "themeId", "level", "badgeId");
+            .containsExactly("regionCode", "rarity", "themeId", "level", "badgeId", "provinceCode", "months", "weekStart");
     }
 }

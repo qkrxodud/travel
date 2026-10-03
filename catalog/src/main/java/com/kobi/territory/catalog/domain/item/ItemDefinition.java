@@ -5,6 +5,7 @@ import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -34,6 +35,8 @@ public record ItemDefinition(
     private static final Pattern ITEM_ID = Pattern.compile("^[a-z][a-z0-9_-]{0,15}:[A-Za-z0-9_-]{1,40}$");
     private static final Pattern THEME = Pattern.compile("^[a-z][a-z0-9_-]{0,19}$");
     static final int NAME_MAX = 40;
+    /** 이관 데이터 id 접두어 — V3_1 지역 특산물·세트 배경, V4_1 초대 보상, V6 시·도 정복(conquest:)·연속 탐험 마일스톤(streak:). */
+    static final List<String> MIGRATED_PREFIXES = List.of("region:", "set:", "invite:", "conquest:", "streak:");
     static final int EMOJI_MAX = 16;
 
     public ItemDefinition {
@@ -63,7 +66,7 @@ public record ItemDefinition(
      * 쓸 수 없다(dev 초기화가 운영 추가분만 골라 지우는 기준).
      */
     public boolean migrated() {
-        return itemId.startsWith("region:") || itemId.startsWith("set:") || itemId.startsWith("invite:");
+        return MIGRATED_PREFIXES.stream().anyMatch(itemId::startsWith);
     }
 
     /** 지역 방문 규칙이면 그 지역(표시용 출처), 아니면 null. */
@@ -88,6 +91,21 @@ public record ItemDefinition(
     public boolean grantedByThemeCompletion(String themeId, LocalDate day, Instant completedAt) {
         return grantRule.matchesThemeCompletion(themeId) && validPeriod.contains(day)
             && (migrated() || !completedAt.isBefore(createdAt));
+    }
+
+    /**
+     * 정복 시각 conqueredAt(그 날짜 day)의 시·도 정복으로 지급되는지(8단계). 운영이 나중에 추가한 정복 아이템은 정의가 생긴 뒤의 정복에만
+     * (테마 완성과 같은 기준 — 소급 없음), 이관 데이터(conquest:)는 처음부터 있던 보상이라 예외.
+     */
+    public boolean grantedByProvinceConquest(String provinceCode, LocalDate day, Instant conqueredAt) {
+        return grantRule.matchesProvinceConquest(provinceCode) && validPeriod.contains(day)
+            && (migrated() || !conqueredAt.isBefore(createdAt));
+    }
+
+    /** 도달 시각 reachedAt(그 날짜 day)의 연속 탐험 마일스톤으로 지급되는지(8단계, 기준은 시·도 정복과 같다). */
+    public boolean grantedByStreakMilestone(int months, LocalDate day, Instant reachedAt) {
+        return grantRule.matchesStreakMilestone(months) && validPeriod.contains(day)
+            && (migrated() || !reachedAt.isBefore(createdAt));
     }
 
     /** 이 날짜의 초대 합류에서 그 쪽(HOST·GUEST)이 받는지(한정 아이템 — 유효 기간으로 연다·닫는다). */

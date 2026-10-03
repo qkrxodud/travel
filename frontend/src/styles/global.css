@@ -13,8 +13,10 @@ img{max-width:100%}
   --accent:#0f8f7e; --accent-soft:#d6f1ec; --accent-deep:#0b6b5f;
   --gold:#d99a1b; --gold-soft:#fbefd4; --legend:#8b4bd6; --legend-soft:#efe4fb;
   --danger:#c0392b;
-  --display:"Do Hyeon","Noto Sans KR",system-ui,sans-serif;
-  --body:"Noto Sans KR",system-ui,-apple-system,sans-serif;
+  --display:"Do Hyeon","Noto Sans KR",system-ui,sans-serif,var(--emoji);
+  --body:"Noto Sans KR",system-ui,-apple-system,sans-serif,var(--emoji);
+  /* 이모지(🧊·👑·❓)는 글자 글꼴에 없으면 컬러 이모지 글꼴로(글꼴이 적은 헤드리스·리눅스에서 빈 상자 방지) */
+  --emoji:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";
   --radius:10px;
 }
 @media (prefers-color-scheme: dark){
@@ -354,3 +356,44 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
   .region,.bar i,.prov .b i{transition:none}
   .ping,.toast,.stamp .ring,.char .aura,.char .spin,.char .spin2,.loot .e{animation:none}
 }
+
+/* 8단계 — 게임 요소: 스트릭 보호권 · 연속 탐험 마일스톤 · 이번 주 미스터리 · 시·도 정복 */
+.stat .v em.freeze{margin-left:8px;font-size:13px;color:#3b82c4;font-weight:700;cursor:help}
+.freeze.dim{opacity:.5;filter:saturate(.35)}
+.freeze .ico{font-family:var(--emoji),sans-serif;font-style:normal}
+.streak span.frz{background:#d8ecfa;color:#3b82c4;font-size:15px}
+.freeze-line{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12px;color:var(--muted)}
+.freeze-line .freeze{font-weight:700;color:#3b82c4;font-size:13px}
+.milestones{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:grid;gap:8px}
+.milestone{display:grid;grid-template-columns:44px 1fr auto;grid-template-areas:"m bar st" "rw rw rw";gap:2px 10px;align-items:center;font-size:12px}
+.milestone .m{grid-area:m;font-family:var(--display);font-size:15px}
+.milestone .bar{grid-area:bar;margin-top:0}
+.milestone .bar i{background:var(--accent)}
+.milestone .st{grid-area:st;color:var(--muted);font-variant-numeric:tabular-nums;min-width:62px;text-align:right}
+.milestone .rw{grid-area:rw;color:var(--muted);font-size:11px;padding-left:54px}
+.milestone.done .bar i{background:var(--gold)}
+.milestone.done .st{color:var(--gold);font-weight:700}
+.maplegend .q::before{display:none}
+.maplegend .c::before{background:var(--unvisited);border:2px solid var(--gold);box-sizing:border-box}
+.mystery-mark{cursor:pointer}
+.mystery-mark circle{fill:#fff;stroke:var(--gold);stroke-width:2}
+.mystery-mark text{font-size:11px;pointer-events:none;user-select:none}
+.mystery-mark.received circle{fill:var(--accent);stroke:#fff}
+.mystery-mark.received text{fill:#fff;font-weight:700}
+.conquest path{fill:none;stroke:var(--gold);stroke-width:4;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.conquest.flash path{animation:conquest-flash .8s ease-in-out 3}
+@keyframes conquest-flash{0%,100%{stroke-width:4;stroke-opacity:1}50%{stroke-width:12;stroke-opacity:.55}}
+.card.mystery{border-color:var(--gold);background:linear-gradient(135deg,var(--gold-soft),var(--panel) 70%)}
+.card.mystery.received{border-color:var(--accent);background:linear-gradient(135deg,var(--accent-soft),var(--panel) 70%)}
+.mystery-body{all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;width:100%;box-sizing:border-box}
+.mystery-body .q{width:38px;height:38px;border-radius:50%;background:var(--panel);border:2px solid var(--gold);display:grid;place-items:center;font-size:18px;flex:none}
+.card.mystery.received .mystery-body .q{border-color:var(--accent);color:var(--accent-deep);font-weight:700}
+.mystery-body .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mystery-body .t b{font-family:var(--display);font-weight:400;font-size:17px}
+.mystery-body .t small{font-size:11px;color:var(--muted)}
+.mystery-body .x{font-family:var(--display);color:var(--gold);font-size:16px;white-space:nowrap}
+.card.mystery.received .mystery-body .x{color:var(--accent-deep);font-size:13px}
+.gains .mystery span{color:var(--gold)}
+.prov .crown{font-style:normal;margin-right:3px}
+.item .ach{position:absolute;right:4px;bottom:3px;font-size:11px;line-height:1}
+@media (prefers-reduced-motion:reduce){.conquest.flash path{animation:none}}

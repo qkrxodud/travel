@@ -33,4 +33,10 @@ public interface ItemCatalog {
      * @param side HOST(초대한 탐험가) | GUEST(초대받아 합류한 탐험가)
      */
     List<ItemView> grantedByInvitation(String side, Instant joinedAt);
+
+    /** 시·도 정복(8단계, PROVINCE_COMPLETE 규칙)으로 받는 아이템. 기간은 정복 시각의 날짜로 본다. 회수 없음. */
+    List<ItemView> grantedByProvinceConquest(String provinceCode, Instant conqueredAt);
+
+    /** 연속 탐험 마일스톤(8단계, STREAK_MILESTONE 규칙)으로 받는 아이템. 기간은 도달 시각의 날짜로 본다. 회수 없음. */
+    List<ItemView> grantedByStreakMilestone(int months, Instant reachedAt);
 }

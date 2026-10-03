@@ -34,7 +34,7 @@ export const ITEMS: ItemView[] = [
   item('region:KR-37430', 'KR-37430', '울릉 독도 바다 풍경', '🌊', 'BG', 'LEGEND', null, 'dokdo'),
 ];
 
-export const RULES: RewardRulesView = { xpByRarity: { COMMON: 10, RARE: 20, LEGEND: 50 }, provinceFirstBonus: 15, setCompleteBonus: 100, claimBonus: 10 };
+export const RULES: RewardRulesView = { xpByRarity: { COMMON: 10, RARE: 20, LEGEND: 50 }, provinceFirstBonus: 15, setCompleteBonus: 100, claimBonus: 10, mysteryBonus: 50, provinceConquestBonus: 300 };
 
 export const CATALOG = buildCatalog(GEO, PROVINCES, ITEMS, RULES);
 

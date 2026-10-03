@@ -5,6 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.kobi.territory.catalog.api.query.MysteryRegionQuery;
+import com.kobi.territory.catalog.application.MysteryService;
 import com.kobi.territory.exploration.application.ExplorationDevService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,10 +31,12 @@ class DevControllerDisabledTest {
     @Autowired MockMvc mvc;
 
     @Test
-    @DisplayName("개발용 로그인과 초기화 입구가 아예 없다")
+    @DisplayName("개발용 로그인과 초기화 입구가 아예 없고 미스터리 지역은 원래 주차 선택 그대로다")
     void devEntrancesDoNotExist() throws Exception {
         assertThat(context.getBeansOfType(DevController.class)).isEmpty();
         assertThat(context.getBeansOfType(ExplorationDevService.class)).isEmpty();
+        assertThat(context.getBeansOfType(PinnableMysteryRegionQuery.class)).isEmpty();
+        assertThat(context.getBean(MysteryRegionQuery.class)).isInstanceOf(MysteryService.class);
         mvc.perform(post("/dev/login").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"x@example.com\"}"))
             .andExpect(status().isNotFound());
         mvc.perform(delete("/dev/reset")).andExpect(status().isNotFound());

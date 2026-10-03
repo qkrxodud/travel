@@ -114,7 +114,7 @@ test.describe('XP와 레벨, 도감, 퀘스트', () => {
 
     await test.step('프로필에는 얻은 뱃지가 보이고, 얻은 칭호 가운데 하나를 골라 달면 새로고침해도 남는다', async () => {
       await tab(page, 'profile');
-      await expect(page.locator('#b-cnt')).toHaveText('2 / 12');
+      await expect(page.locator('#b-cnt')).toHaveText('2 / 15');
       await expect(page.locator('.badge[data-badge="first"]')).toHaveClass(/\bgot\b/);
       await expect(page.locator('.badge[data-badge="set1"]')).toHaveClass(/\bgot\b/);
       await expect(page.locator('.badge[data-badge="ten"]')).not.toHaveClass(/\bgot\b/);
@@ -152,14 +152,15 @@ test.describe('XP와 레벨, 도감, 퀘스트', () => {
       await page.click('#t-sample');
       await expect(page.locator('#s-cnt')).toHaveText('45 / 250');
       await expect(page.locator('#s-streak')).toHaveText('20', LATE); // 19개월 전 ~ 이번 달 매달 1곳 이상
-      await expect(page.locator('#lv')).toHaveText('Lv.8', LATE);
+      // 8단계부터 20개월 연속은 연속 탐험 마일스톤 3·6·12개월(+350), 예시가 다 칠한 세종·제주는 시·도 정복(+300씩)도 받는다
+      await expect(page.locator('#lv')).toHaveText('Lv.11', LATE);
       await tab(page, 'quests');
       await expect(page.locator('.quest[data-quest="m3"] .st')).toHaveText('1/3', LATE); // 이번 달은 뚝섬 1곳
       await expect(page.locator('#streak span.on')).toHaveCount(12);
       await tab(page, 'sets');
       await expect(page.locator('.set[data-set="sea"]')).toHaveClass(/\bdone\b/, LATE);
       await tab(page, 'profile');
-      await expect(page.locator('#b-cnt')).toHaveText('6 / 12', LATE);
+      await expect(page.locator('#b-cnt')).toHaveText('6 / 15', LATE);
       await expect(page.locator('.badge[data-badge="streak3"]')).toHaveClass(/\bgot\b/);
     });
 

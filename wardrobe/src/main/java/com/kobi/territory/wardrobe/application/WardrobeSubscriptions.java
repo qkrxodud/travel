@@ -6,7 +6,9 @@ import com.kobi.territory.exploration.api.event.MapCreated;
 import com.kobi.territory.exploration.api.event.MemberJoined;
 import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.event.VisitCancelled;
+import com.kobi.territory.progression.api.event.ProvinceConquered;
 import com.kobi.territory.progression.api.event.SetCompleted;
+import com.kobi.territory.progression.api.event.StreakMilestoneReached;
 import com.kobi.territory.wardrobe.api.event.InviteRewardOwed;
 import com.kobi.territory.wardrobe.api.event.ItemGranted;
 import com.kobi.territory.wardrobe.api.event.ItemRevoked;
@@ -24,7 +26,8 @@ public class WardrobeSubscriptions {
 
     /**
      * Inventory: 체크인(지급)·취소(근거가 모두 사라지면 회수)·세트 완성(수령자에게 세트 배경, 완성 직후 합류자에게는 ThemeRewardOwed)·ThemeRewardOwed(그 멤버에게 세트 배경)·지도 합류(이미 완성된
-     * 세트 배경 + 초대받은 첫 합류면 초대 보상 — 초대자 몫은 InviteRewardOwed)·지도 생성(개인 지도면 루트 행 선생성)·계정 병합(익명 탐험가의 재생 불가 아이템·초대 기록 이전).
+     * 세트 배경 + 초대받은 첫 합류면 초대 보상 — 초대자 몫은 InviteRewardOwed)·지도 생성(개인 지도면 루트 행 선생성)·계정 병합(익명 탐험가의 재생 불가 아이템·초대 기록 이전)·
+     * 시·도 정복과 연속 탐험 마일스톤(8단계 — 한정 아이템, 회수 없음).
      */
     @Bean
     EventSubscriber inventorySubscriber(InventoryService inventories) {
@@ -37,6 +40,8 @@ public class WardrobeSubscriptions {
             .on(ThemeRewardOwed.class, inventories::onThemeRewardOwed)
             .on(InviteRewardOwed.class, inventories::onInviteRewardOwed)
             .on(ExplorerMerged.class, inventories::onExplorerMerged)
+            .on(ProvinceConquered.class, inventories::onProvinceConquered)
+            .on(StreakMilestoneReached.class, inventories::onStreakMilestoneReached)
             .build();
     }
 

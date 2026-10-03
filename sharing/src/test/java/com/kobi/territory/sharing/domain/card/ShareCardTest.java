@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.kobi.territory.sharing.domain.showcase.CardComposer;
 import com.kobi.territory.sharing.domain.showcase.Showcase;
+import com.kobi.territory.sharing.domain.showcase.ShowcaseProgress;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -182,6 +183,23 @@ class ShareCardTest {
             Showcase moved = new Showcase("kim", KIM.atlas(), visits(visit(JONGNO, "2025-03-01", 0)), KIM.progress(), KIM.scene());
 
             assertThat(moved.summaryHash(TERRITORY_2026)).isNotEqualTo(KIM.summaryHash(TERRITORY_2026));
+        }
+
+        @Test
+        @DisplayName("보이는 연속 탐험 개월이 바뀌면(보호권으로 지킨 연속 포함) 기준이 다르다")
+        void differsByStreak() {
+            ShowcaseProgress kept = new ShowcaseProgress(KIM.progress().level(), KIM.progress().titleName(),
+                KIM.progress().streakMonths() + 3, KIM.progress().themesCompleted(), KIM.progress().themeTotal());
+            Showcase longer = new Showcase("kim", KIM.atlas(), KIM.visits(), kept, KIM.scene());
+
+            assertThat(longer.summaryHash(TERRITORY_2026)).isNotEqualTo(KIM.summaryHash(TERRITORY_2026));
+        }
+
+        @Test
+        @DisplayName("연속 탐험 마일스톤 칭호를 고르면 기준이 다르다")
+        void differsByMilestoneTitle() {
+            assertThat(showcase("kim").title("꾸준한 탐험가").painted(JONGNO).summaryHash(TERRITORY_2026))
+                .isNotEqualTo(KIM.summaryHash(TERRITORY_2026));
         }
 
         @Test

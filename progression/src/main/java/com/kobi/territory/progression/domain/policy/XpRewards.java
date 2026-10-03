@@ -10,6 +10,12 @@ public interface XpRewards {
 
     List<XpAward> checkIn(Rarity rarity, boolean firstInProvince, boolean firstClaim);
 
+    /** 체크인 보상 + 이번 주 미스터리 지역이면 미스터리 보너스 줄(8단계). */
+    List<XpAward> checkIn(Rarity rarity, boolean firstInProvince, boolean firstClaim, boolean mysteryOfWeek);
+
     /** 도감 테마(세트) 완성 보너스. */
     int themeComplete();
+
+    /** 시·도 정복 보상(8단계). */
+    int provinceConquest();
 }

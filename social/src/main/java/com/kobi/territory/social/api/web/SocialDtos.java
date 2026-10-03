@@ -42,14 +42,17 @@ public final class SocialDtos {
 
     /**
      * 친구 소식 한 건. 종류별로 쓰는 값만 채운다(VISIT = regionCode·rarity, THEME_COMPLETED = themeId, LEVEL_UP = level,
-     * BADGE_EARNED = badgeId). when = 상대 시각("오늘"·"어제"·"3일 전"…).
+     * BADGE_EARNED = badgeId, 8단계: STREAK_MILESTONE = months, PROVINCE_CONQUERED = provinceCode, MYSTERY_FOUND = regionCode·weekStart).
+     * when = 상대 시각("오늘"·"어제"·"3일 전"…).
      */
     public record FeedItemResponse(String handle, String kind, String regionCode, Rarity rarity, String themeId, Integer level,
-                                   String badgeId, int daysAgo, String when) {
+                                   String badgeId, int daysAgo, String when, String provinceCode, Integer months,
+                                   String weekStart) {
         static FeedItemResponse of(FeedItem item) {
             var detail = item.entry().detail();
             return new FeedItemResponse(item.handle(), item.entry().kind().name(), detail.regionCode(), detail.rarity(),
-                detail.themeId(), detail.level(), detail.badgeId(), item.age().daysAgo(), item.age().label());
+                detail.themeId(), detail.level(), detail.badgeId(), item.age().daysAgo(), item.age().label(), detail.provinceCode(),
+                detail.months(), detail.weekStart());
         }
     }
 

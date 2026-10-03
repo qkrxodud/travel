@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.kobi.territory.exploration.domain.territory.CheckInPreview.XpLine;
 import com.kobi.territory.exploration.domain.territory.CheckInPreview.XpSource;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -121,5 +122,36 @@ class CheckInPreviewTest {
         Territory territory = Territory.empty(MAP);
         preview(territory, JONGNO);
         assertThat(territory.visits()).isEmpty();
+    }
+
+    @Nested
+    @DisplayName("이번 주 미스터리 지역을 고르면")
+    class MysteryOfWeek {
+
+        @Test
+        @DisplayName("미스터리 보너스 50 줄이 더 붙는다")
+        void bonusLine() {
+            var preview = CheckInPreview.preview(Territory.empty(MAP), ME, GAPYEONG, Optional.of(GAPYEONG.code()), REWARDS);
+
+            assertThat(preview.lines()).contains(new XpLine(XpSource.MYSTERY_BONUS, 50));
+            assertThat(preview.totalXp()).isEqualTo(20 + 15 + 10 + 50);
+        }
+
+        @Test
+        @DisplayName("다른 지역을 고르면 보너스 줄이 없다")
+        void otherRegion() {
+            var preview = CheckInPreview.preview(Territory.empty(MAP), ME, JONGNO, Optional.of(GAPYEONG.code()), REWARDS);
+
+            assertThat(preview.lines()).extracting(XpLine::source).doesNotContain(XpSource.MYSTERY_BONUS);
+        }
+
+        @Test
+        @DisplayName("이미 칠한 곳이면 보너스 줄도 없다")
+        void alreadyPainted() {
+            var preview = CheckInPreview.preview(territory().paint(ME, GAPYEONG).build(), ME, GAPYEONG,
+                Optional.of(GAPYEONG.code()), REWARDS);
+
+            assertThat(preview.lines()).isEmpty();
+        }
     }
 }

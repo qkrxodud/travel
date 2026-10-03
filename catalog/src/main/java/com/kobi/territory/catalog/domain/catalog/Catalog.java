@@ -6,6 +6,7 @@ import com.kobi.territory.catalog.domain.definition.TitleDefinition;
 import com.kobi.territory.catalog.domain.item.GrantRule;
 import com.kobi.territory.catalog.domain.item.ItemDefinition;
 import com.kobi.territory.catalog.domain.item.ItemDefinitions;
+import com.kobi.territory.catalog.domain.mystery.MysteryRules;
 import com.kobi.territory.catalog.domain.region.Provinces;
 import com.kobi.territory.catalog.domain.region.Regions;
 import com.kobi.territory.catalog.domain.reward.RewardRules;
@@ -19,15 +20,22 @@ import java.util.Objects;
  * {@link #requireItemCoverage}로, 새 아이템의 참조는 {@link #requireReferences}로 검증한다).
  */
 public record Catalog(Regions regions, Provinces provinces, RewardRules rewardRules, String regionsGeoJson,
-                      ProgressionDefinitions progression) {
+                      ProgressionDefinitions progression, MysteryRules mystery) {
     public Catalog {
         Objects.requireNonNull(regions, "regions");
         Objects.requireNonNull(provinces, "provinces");
         Objects.requireNonNull(rewardRules, "rewardRules");
         Objects.requireNonNull(regionsGeoJson, "regionsGeoJson");
         Objects.requireNonNull(progression, "progression");
+        Objects.requireNonNull(mystery, "mystery");
         provinces.requireConsistentWith(regions);
         progression.requireConsistentWith(regions, provinces);
+    }
+
+    /** 미스터리 규칙 없이(8단계 이전 범위) 만든다. */
+    public Catalog(Regions regions, Provinces provinces, RewardRules rewardRules, String regionsGeoJson,
+                   ProgressionDefinitions progression) {
+        this(regions, provinces, rewardRules, regionsGeoJson, progression, MysteryRules.none());
     }
 
     /** 진행 정의 없이(1단계 범위) 만든다. */
@@ -56,6 +64,8 @@ public record Catalog(Regions regions, Provinces provinces, RewardRules rewardRu
             case GrantRule.PeriodCheckIn periodCheckIn -> true;
             case GrantRule.Manual manual -> true;
             case GrantRule.Invitation invitation -> true;
+            case GrantRule.ProvinceComplete provinceComplete -> provinces.find(provinceComplete.provinceCode()).isPresent();
+            case GrantRule.StreakMilestone streakMilestone -> progression.streak().defines(streakMilestone.months());
         };
         if (!known) throw CatalogError.UNKNOWN_ITEM_REFERENCE.exception("지급 규칙이 모르는 대상을 가리킵니다: " + rule.type() + " " + rule.ref());
     }

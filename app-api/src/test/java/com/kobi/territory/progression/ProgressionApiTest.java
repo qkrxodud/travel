@@ -3,6 +3,7 @@ package com.kobi.territory.progression;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -111,7 +112,7 @@ class ProgressionApiTest {
     class Beginner {
 
         @Test
-        @DisplayName("경험치 0·레벨 1·첫 칭호이고, 뱃지 12종과 칭호 35종 목록을 본다")
+        @DisplayName("경험치 0·레벨 1·첫 칭호이고, 뱃지 15종과 칭호 39종 목록을 본다")
         void startsAtLevelOne() throws Exception {
             mvc.perform(as(get("/progress"))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.xp").value(0))
@@ -122,9 +123,34 @@ class ProgressionApiTest {
                 .andExpect(jsonPath("$.title.id").value("lv1"))
                 .andExpect(jsonPath("$.streak.months").value(0))
                 .andExpect(jsonPath("$.badgeCount").value(0))
-                .andExpect(jsonPath("$.badges", hasSize(12)))
-                .andExpect(jsonPath("$.titles", hasSize(35)))
+                .andExpect(jsonPath("$.badges", hasSize(15)))
+                .andExpect(jsonPath("$.titles", hasSize(39)))
                 .andExpect(jsonPath("$.titles[0].earned").value(true));
+        }
+
+        @Test
+        @DisplayName("보호권은 없고 최대 두 개까지이며, 다음 마일스톤은 3개월이고 시·도 17곳 모두 아직 정복 전이다")
+        void startsWithoutGameRewards() throws Exception {
+            mvc.perform(as(get("/progress"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.streakFreeze.held").value(0))
+                .andExpect(jsonPath("$.streakFreeze.max").value(2))
+                .andExpect(jsonPath("$.streakFreeze.lastUsed").value(nullValue()))
+                .andExpect(jsonPath("$.streakFreeze.thisMonth.questsRewarded").value(0))
+                .andExpect(jsonPath("$.streakFreeze.thisMonth.questsRequired").value(4))
+                .andExpect(jsonPath("$.streakFreeze.thisMonth.reward").value(1))
+                .andExpect(jsonPath("$.streakFreeze.thisMonth.earned").value(false))
+                .andExpect(jsonPath("$.streakFreeze.thisMonth.granted").value(0))
+                .andExpect(jsonPath("$.streak.freezesNeeded").value(0))
+                .andExpect(jsonPath("$.nextMilestone.months").value(3))
+                .andExpect(jsonPath("$.nextMilestone.xp").value(50))
+                .andExpect(jsonPath("$.nextMilestone.titleId").value("streak-3"))
+                .andExpect(jsonPath("$.nextMilestone.remainingMonths").value(3))
+                .andExpect(jsonPath("$.milestones", hasSize(4)))
+                .andExpect(jsonPath("$.provinces", hasSize(17)))
+                .andExpect(jsonPath("$.provinces[0].code").value("KR-11"))
+                .andExpect(jsonPath("$.provinces[0].total").value(25))
+                .andExpect(jsonPath("$.provinces[0].conquered").value(false))
+                .andExpect(jsonPath("$.mysteryFoundCount").value(0));
         }
 
         @Test

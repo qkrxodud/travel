@@ -9,5 +9,6 @@ import java.util.List;
  */
 @FunctionalInterface
 public interface CheckInRewards {
-    List<CheckInPreview.XpLine> award(Rarity rarity, boolean firstInProvince, boolean firstClaim);
+    /** @param mysteryOfWeek 이번 주 미스터리 지역인지(8단계 — 주마다 한 번인지는 진행이 지킨다, 미리보기는 최대 보상) */
+    List<CheckInPreview.XpLine> award(Rarity rarity, boolean firstInProvince, boolean firstClaim, boolean mysteryOfWeek);
 }

@@ -23,6 +23,9 @@ export const SLOT_NAME: Readonly<Record<ClientSlot, string>> = { hand: '손', ba
 /** 세트 이름 찾기(도감 GET /collection 값) */
 export type SetNameLookup = (setId: string) => string | undefined;
 
+const CONQUEST_PREFIX = 'conquest:';
+const STREAK_PREFIX = 'streak:';
+
 /** 아이템이 어디서 왔는지(툴팁) */
 export function itemOrigin(itemId: string, catalog: Catalog | null, setName: SetNameLookup): string {
   if (itemId.startsWith('region:')) return catalog ? labelOfCode(catalog, itemId.slice('region:'.length)) : itemId;
@@ -30,7 +33,21 @@ export function itemOrigin(itemId: string, catalog: Catalog | null, setName: Set
     const setId = itemId.slice('set:'.length);
     return `${setName(setId) ?? setId} 세트 완성 보상`;
   }
+  if (itemId.startsWith(CONQUEST_PREFIX)) {
+    const provinceCode = itemId.slice(CONQUEST_PREFIX.length);
+    return `${catalog?.provinceByCode.get(provinceCode) ?? provinceCode} 정복 보상`;
+  }
+  if (itemId.startsWith(STREAK_PREFIX)) return `${itemId.slice(STREAK_PREFIX.length)}개월 연속 탐험 보상`;
   return '이벤트 보상';
+}
+
+export type AchievementKind = 'conquest' | 'streak';
+
+/** 업적 보상 아이템(시·도 정복 대표 장식 · 연속 탐험 마일스톤)인지 — 가방 타일 표시 */
+export function achievementOf(itemId: string): AchievementKind | null {
+  if (itemId.startsWith(CONQUEST_PREFIX)) return 'conquest';
+  if (itemId.startsWith(STREAK_PREFIX)) return 'streak';
+  return null;
 }
 
 type ServedItem = Pick<ItemResponse, 'itemId' | 'name' | 'emoji' | 'slot' | 'tier' | 'theme' | 'look'>;

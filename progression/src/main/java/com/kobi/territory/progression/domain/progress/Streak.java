@@ -1,10 +1,13 @@
 package com.kobi.territory.progression.domain.progress;
 
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
 /**
  * 탐험 스트릭 — 매달 새 지역 1곳 이상 체크인하면 연속이 이어진다. 처리 시각(visitedAt) 기준이라 소급이 없다.
+ * 8단계 보호권: 빈 달이 생긴 뒤 다시 칠할 때 빈 달 수만큼 보호권이 있으면 그만큼 써서 연속을 잇는다(빈 달은 개월 수에 더하지 않는다).
+ * 모자라면 끊기고 보호권은 쓰지 않는다.
  * 달을 넘나드는 연속 값이라 QuestBoard 가 아니라 ExplorerProgress 에 둔다.
  * 다음 상태를 계산하는 값 객체라 record 가 아니라 class(class vs record 기준).
  */
@@ -35,10 +38,36 @@ public final class Streak {
         return month.equals(lastMonth.plusMonths(1)) ? new Streak(months + 1, month) : new Streak(1, month);
     }
 
+    /**
+     * month 에 체크인했을 때의 스트릭과 쓸 보호권 수(8단계). 빈 달이 있으면 빈 달 수만큼 보호권(freezesHeld)이 있을 때만 이어 가고(+1),
+     * 모자라면 1부터 다시(보호권은 쓰지 않는다). 같은 달·과거 달은 그대로.
+     */
+    public StreakStep record(YearMonth month, int freezesHeld) {
+        if (lastMonth == null || !month.isAfter(lastMonth)) return new StreakStep(record(month), 0);
+        int gap = emptyMonthsBefore(month);
+        if (gap == 0) return new StreakStep(new Streak(months + 1, month), 0);
+        if (gap <= freezesHeld) return new StreakStep(new Streak(months + 1, month), gap);
+        return new StreakStep(new Streak(1, month), 0);
+    }
+
     /** current 달 기준 화면에 보일 연속 개월 수. 지난달까지 이어졌으면 유지(이번 달에 1곳이면 계속), 그보다 오래면 0. */
     public int asOf(YearMonth current) {
-        if (lastMonth == null) return 0;
-        return lastMonth.equals(current) || lastMonth.equals(current.minusMonths(1)) ? months : 0;
+        return asOf(current, 0);
+    }
+
+    /**
+     * 보호권 freezesHeld 개를 가진 채 current 달에 보이는 연속 개월 수(8단계). 이번 달에 칠하면 빈 달을 보호권으로 메워 이어 갈 수 있으면
+     * 유지, 아니면 0.
+     */
+    public int asOf(YearMonth current, int freezesHeld) {
+        if (lastMonth == null || lastMonth.isAfter(current)) return 0;
+        return emptyMonthsBefore(current) <= freezesHeld ? months : 0;
+    }
+
+    /** current 달에 칠하면 메워야 할 빈 달 수(= 쓰게 될 보호권 수, 8단계). 같은 달·바로 다음 달·기록 없음은 0. */
+    public int emptyMonthsBefore(YearMonth current) {
+        if (lastMonth == null || !current.isAfter(lastMonth)) return 0;
+        return (int) lastMonth.until(current, ChronoUnit.MONTHS) - 1;
     }
 
     /** 이번 달에 이미 체크인했는지. */

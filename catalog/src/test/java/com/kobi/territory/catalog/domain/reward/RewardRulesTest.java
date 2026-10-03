@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.kobi.territory.common.model.Rarity;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /** 체크인·테마 완성 보상 함수 — 탐험(미리보기)과 진행(실제 지급)이 같이 쓴다. 입력은 사실 값뿐(영토를 모른다). 회귀 출처: 2단계 D1. */
@@ -38,5 +39,32 @@ class RewardRulesTest {
     @DisplayName("테마 완성 보상은 100이다")
     void themeComplete() {
         assertThat(규칙.setComplete()).isEqualTo(new RewardLine(RewardSource.SET_COMPLETE, 100));
+    }
+
+    @Nested
+    @DisplayName("8단계 게임 보상")
+    class GameRewards {
+
+        private final RewardRules 규칙8 = new RewardRules(Map.of(Rarity.COMMON, 10, Rarity.RARE, 20, Rarity.LEGEND, 50),
+            15, 100, 10, 50, 300);
+
+        @Test
+        @DisplayName("이번 주 미스터리 지역이면 미스터리 보너스 줄이 붙는다")
+        void mysteryLine() {
+            assertThat(규칙8.checkIn(Rarity.RARE, false, false, true)).containsExactly(
+                new RewardLine(RewardSource.REGION_BASE, 20), new RewardLine(RewardSource.MYSTERY_BONUS, 50));
+        }
+
+        @Test
+        @DisplayName("미스터리 지역이 아니면 보너스 줄이 없다")
+        void noMysteryLine() {
+            assertThat(규칙8.checkIn(Rarity.RARE, false, false, false)).containsExactly(new RewardLine(RewardSource.REGION_BASE, 20));
+        }
+
+        @Test
+        @DisplayName("시·도 정복 보상은 300이다")
+        void conquest() {
+            assertThat(규칙8.provinceConquest()).isEqualTo(new RewardLine(RewardSource.PROVINCE_CONQUEST, 300));
+        }
     }
 }

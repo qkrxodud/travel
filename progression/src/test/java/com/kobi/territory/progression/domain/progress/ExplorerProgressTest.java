@@ -6,6 +6,7 @@ import static com.kobi.territory.progression.domain.Fixtures.나;
 import static com.kobi.territory.progression.domain.Fixtures.다른지도;
 import static com.kobi.territory.progression.domain.Fixtures.방문;
 import static com.kobi.territory.progression.domain.Fixtures.새_진행;
+import static com.kobi.territory.progression.domain.Fixtures.용산구;
 import static com.kobi.territory.progression.domain.Fixtures.울릉군;
 import static com.kobi.territory.progression.domain.Fixtures.종로구;
 import static com.kobi.territory.progression.domain.Fixtures.중구;
@@ -433,8 +434,9 @@ class ExplorerProgressTest {
         void provinceComplete() {
             ExplorerProgress progress = 새_진행();
             칠한다(progress, 방문(종로구));
+            칠한다(progress, 방문(중구).처리시각(초(1)));
 
-            ProgressChange change = 칠한다(progress, 방문(중구).처리시각(초(1)));
+            ProgressChange change = 칠한다(progress, 방문(용산구).처리시각(초(2)));
 
             assertThat(change.badgesEarned()).contains("seoul");
             assertThat(change.titlesEarned()).contains("own-KR-11");
@@ -445,7 +447,8 @@ class ExplorerProgressTest {
         void conquestRatio() {
             ExplorerProgress progress = 새_진행();
             칠한다(progress, 방문(종로구));
-            칠한다(progress, 방문(중구).처리시각(초(1))); // 3곳 중 2곳 = 67%
+            칠한다(progress, 방문(중구).처리시각(초(1)));
+            칠한다(progress, 방문(가평군).처리시각(초(2))); // 5곳 중 3곳 = 60%
 
             assertThat(progress.badges()).containsKeys("first", "half");
         }
@@ -474,9 +477,11 @@ class ExplorerProgressTest {
             ExplorerProgress progress = 새_진행();
             칠한다(progress, 방문(종로구));
             칠한다(progress, 방문(중구).처리시각(초(1)));
+            칠한다(progress, 방문(용산구).처리시각(초(2)));
 
-            취소한다(progress, 방문(중구).처리시각(초(2)));
-            취소한다(progress, 방문(종로구).처리시각(초(3)));
+            취소한다(progress, 방문(용산구).처리시각(초(3)));
+            취소한다(progress, 방문(중구).처리시각(초(4)));
+            취소한다(progress, 방문(종로구).처리시각(초(5)));
 
             assertThat(progress.badges()).containsKeys("first", "seoul", "half");
             assertThat(progress.titles()).containsKey("own-KR-11");
@@ -493,6 +498,7 @@ class ExplorerProgressTest {
             ExplorerProgress progress = 새_진행();
             칠한다(progress, 방문(종로구));
             칠한다(progress, 방문(중구).처리시각(초(1)));
+            칠한다(progress, 방문(용산구).처리시각(초(2)));
 
             progress.selectTitle("own-KR-11", 진행규칙, 기준시각);
 
@@ -505,11 +511,12 @@ class ExplorerProgressTest {
             ExplorerProgress progress = 새_진행();
             칠한다(progress, 방문(종로구));
             칠한다(progress, 방문(중구).처리시각(초(1)));
+            칠한다(progress, 방문(용산구).처리시각(초(2)));
             progress.selectTitle("own-KR-11", 진행규칙, 기준시각);
 
             progress.selectTitle(null, 진행규칙, 기준시각);
 
-            assertThat(progress.displayTitle(진행규칙)).isEqualTo("lv1");
+            assertThat(progress.displayTitle(진행규칙)).isEqualTo(progress.levelTitle(진행규칙)).startsWith("lv");
         }
 
         @Test

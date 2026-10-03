@@ -43,6 +43,8 @@ export interface Catalog {
   itemById: ReadonlyMap<string, ItemView>;
   xpByTier: Readonly<Record<Tier, number>>;
   provinceFirstBonus: number;
+  /** 시·도 정복 보너스 XP(서버 reward-rules) */
+  provinceConquestBonus: number;
 }
 
 export function buildCatalog(geo: RegionFeatureCollection, provinces: ProvinceView[], items: ItemView[], rules: RewardRulesView): Catalog {
@@ -67,6 +69,7 @@ export function buildCatalog(geo: RegionFeatureCollection, provinces: ProvinceVi
     itemById: new Map(items.map(item => [item.itemId, item])),
     xpByTier: { common: rules.xpByRarity.COMMON, rare: rules.xpByRarity.RARE, legend: rules.xpByRarity.LEGEND },
     provinceFirstBonus: rules.provinceFirstBonus,
+    provinceConquestBonus: rules.provinceConquestBonus,
   };
 }
 

@@ -15,7 +15,8 @@ public class SocialSubscriptions {
     public static final String FEED_SUBSCRIBER = "social.feed";
 
     /**
-     * 친구 소식: 체크인·취소·탈퇴 숨김·재가입 복구·테마 완성·레벨 업·뱃지·계정 병합({@link FeedProjector#EVENT_TYPES}).
+     * 친구 소식: 체크인·취소·탈퇴 숨김·재가입 복구·테마 완성·레벨 업·뱃지·계정 병합, 8단계 연속 탐험 마일스톤·시·도 정복·미스터리 발견
+     * ({@link FeedProjector#EVENT_TYPES}).
      */
     @Bean
     EventSubscriber feedSubscriber(FeedProjector projector) {

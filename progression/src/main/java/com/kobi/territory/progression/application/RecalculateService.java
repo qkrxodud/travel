@@ -53,12 +53,14 @@ public class RecalculateService {
     private final Clock clock;
     private final EventBacklog backlog;
     private final TransactionTemplate perExplorerTx;
+    private final ProgressService progressService;
 
-    public RecalculateService(TerritoryQuery territories, ExplorerProgressRepository progresses,
+    public RecalculateService(TerritoryQuery territories, ProgressService progressService, ExplorerProgressRepository progresses,
                               CollectionBookRepository collectionBooks, QuestBoardRepository boards,
                               ProgressionCatalog catalog, Clock clock, EventBacklog backlog,
                               PlatformTransactionManager transactionManager) {
         this.backlog = backlog;
+        this.progressService = progressService;
         this.territories = territories;
         this.progresses = progresses;
         this.collectionBooks = collectionBooks;
@@ -104,7 +106,7 @@ public class RecalculateService {
         if (onlyIfSettled && !settled(explorerId)) return Optional.empty();
         Map<String, List<ReplayVisit>> histories = new LinkedHashMap<>();
         territories.mapIdsOf(explorerId.value()).forEach(mapId -> histories.put(mapId,
-            territories.visitHistory(mapId).stream().map(RecalculateService::replayVisit).toList()));
+            territories.visitHistory(mapId).stream().map(this::replayVisit).toList()));
         Map<String, CollectionBook> existingBooks = new LinkedHashMap<>();
         histories.keySet().forEach(mapId -> existingBooks.put(mapId, collectionBooks.load(mapId)));
         List<QuestBoard> explorerBoards = boards.loadAll(explorerId);
@@ -175,8 +177,8 @@ public class RecalculateService {
 
     }
 
-    private static ReplayVisit replayVisit(RegionVisited event) {
+    private ReplayVisit replayVisit(RegionVisited event) {
         List<ExplorerId> members = event.memberIds() == null ? List.of() : event.memberIds().stream().map(ExplorerId::of).toList();
-        return new ReplayVisit(ExplorerId.of(event.explorerId()), ProgressService.visitOf(event), members);
+        return new ReplayVisit(ExplorerId.of(event.explorerId()), progressService.visitWithMystery(event), members);
     }
 }

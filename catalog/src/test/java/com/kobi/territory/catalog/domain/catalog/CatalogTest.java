@@ -1,5 +1,6 @@
 package com.kobi.territory.catalog.domain.catalog;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.kobi.territory.catalog.domain.definition.BadgeCondition;
@@ -7,6 +8,8 @@ import com.kobi.territory.catalog.domain.definition.BadgeDefinition;
 import com.kobi.territory.catalog.domain.definition.LevelRules;
 import com.kobi.territory.catalog.domain.definition.LevelTitle;
 import com.kobi.territory.catalog.domain.definition.ProgressionDefinitions;
+import com.kobi.territory.catalog.domain.definition.StreakMilestone;
+import com.kobi.territory.catalog.domain.definition.StreakRules;
 import com.kobi.territory.catalog.domain.definition.ThemeDefinition;
 import com.kobi.territory.catalog.domain.item.GrantRule;
 import com.kobi.territory.catalog.domain.item.ItemDefinition;
@@ -18,6 +21,7 @@ import com.kobi.territory.catalog.domain.region.Provinces;
 import com.kobi.territory.catalog.domain.region.Region;
 import com.kobi.territory.catalog.domain.region.Regions;
 import com.kobi.territory.catalog.domain.reward.RewardRules;
+import com.kobi.territory.common.error.TerritoryException;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
 import java.time.Instant;
@@ -72,5 +76,49 @@ class CatalogTest {
             new BadgeCondition(BadgeCondition.Type.PROVINCES_COMPLETE, 0, List.of("KR-99"), null, 0))), List.of());
 
         assertThatThrownBy(() -> new Catalog(종로구만, 서울만, 보상, "{}", badBadge)).hasMessageContaining("모르는 시·도");
+    }
+
+    @Test
+    @DisplayName("시·도 정복 보상이 모르는 시·도를 가리키면 받지 않는다")
+    void conquestUnknownProvince() {
+        Catalog catalog = new Catalog(종로구만, 서울만, 보상, "{}");
+        ItemDefinition 부산_기념비 = new ItemDefinition("event:busan-statue", "부산", "*", ItemSlot.PROP, Rarity.LEGEND, null, null,
+            new GrantRule.ProvinceComplete("KR-21"), ValidPeriod.ALWAYS, Instant.EPOCH);
+
+        assertThatThrownBy(() -> catalog.requireReferences(부산_기념비)).isInstanceOf(TerritoryException.class);
+    }
+
+    @Test
+    @DisplayName("마일스톤 보상이 정의되지 않은 개월 수를 가리키면 받지 않는다")
+    void milestoneUnknownMonths() {
+        ProgressionDefinitions 석달만 = new ProgressionDefinitions(레벨, List.of(), List.of(), List.of(),
+            new StreakRules(2, 1, List.of(new StreakMilestone(3, 50, 1, "꾸준한 탐험가"))));
+        Catalog catalog = new Catalog(종로구만, 서울만, 보상, "{}", 석달만);
+
+        catalog.requireReferences(마일스톤아이템(3));
+        assertThatThrownBy(() -> catalog.requireReferences(마일스톤아이템(5))).isInstanceOf(TerritoryException.class);
+    }
+
+    @Test
+    @DisplayName("연속 탐험 마일스톤마다 칭호가 생긴다")
+    void milestoneTitles() {
+        ProgressionDefinitions 석달만 = new ProgressionDefinitions(레벨, List.of(), List.of(), List.of(),
+            new StreakRules(2, 1, List.of(new StreakMilestone(3, 50, 1, "꾸준한 탐험가"))));
+
+        assertThat(new Catalog(종로구만, 서울만, 보상, "{}", 석달만).titles())
+            .extracting(title -> title.id() + ":" + title.name() + ":" + title.source())
+            .contains("streak-3:꾸준한 탐험가:STREAK");
+    }
+
+    @Test
+    @DisplayName("같은 개월 수의 마일스톤이 두 번 있으면 기동하지 않는다")
+    void duplicateMilestone() {
+        assertThatThrownBy(() -> new StreakRules(2, 1, List.of(new StreakMilestone(3, 50, 1, "a"), new StreakMilestone(3, 60, 1, "b"))))
+            .hasMessageContaining("중복");
+    }
+
+    private static ItemDefinition 마일스톤아이템(int months) {
+        return new ItemDefinition("event:streak-" + months, "i", "*", ItemSlot.HAT, Rarity.RARE, null, null,
+            new GrantRule.StreakMilestone(months), ValidPeriod.ALWAYS, Instant.EPOCH);
     }
 }

@@ -12,6 +12,19 @@ public interface RewardCalculator {
     /** 체크인 한 번의 보상 줄: 지역 기본 + (시·도 첫 발) + (선점). */
     List<RewardLineView> checkIn(Rarity rarity, boolean firstInProvince, boolean firstClaim);
 
+    /**
+     * 체크인 한 번의 보상 줄 + (이번 주 미스터리 지역 보너스, 8단계). 주마다 한 번인지는 진행이 장부로 지킨다 — 미리보기는 "최대 보상".
+     *
+     * @param mysteryOfWeek 체크인한 지역이 처리 시각이 속한 주의 미스터리 지역인지
+     */
+    List<RewardLineView> checkIn(Rarity rarity, boolean firstInProvince, boolean firstClaim, boolean mysteryOfWeek);
+
     /** 도감 세트 완성 보너스. */
     RewardLineView setComplete();
+
+    /** 이번 주 미스터리 지역 보너스(8단계). */
+    RewardLineView mysteryBonus();
+
+    /** 시·도 정복 보상(8단계 — 탐험가 단위로 한 시·도의 현행 지역을 모두 칠했을 때 한 번). */
+    RewardLineView provinceConquest();
 }

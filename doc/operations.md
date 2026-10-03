@@ -39,6 +39,7 @@
 | `DB_USERNAME` / `DB_PASSWORD` | 앱 계정(mysql 첫 기동 때 생성). 강한 랜덤 값 |
 | `MYSQL_ROOT_PASSWORD` | root(백업·복원 스크립트가 컨테이너 안에서 사용) |
 | `TERRITORY_ADMIN_TOKEN` | `/admin/**` 의 `X-Admin-Token`. 강한 랜덤 값 |
+| `TERRITORY_MYSTERY_SALT` | 이번 주 미스터리 지역 주차 시드에 섞는 서버 비밀값(8단계, 필수 — 없으면 기동 실패). 강한 랜덤 값. 바꾸면 아직 기록되지 않은 주부터 다른 지역이 되고, 이미 기록된 주(`mystery_week`)는 그대로 |
 | `TERRITORY_PUBLIC_BASE_URL` | 공개 기준 주소(og:image·og:url·OAuth redirect_uri). 로컬은 `http://localhost:18080` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 선택. 비우면 구글 로그인만 비활성(익명 탐험 정상) |
 

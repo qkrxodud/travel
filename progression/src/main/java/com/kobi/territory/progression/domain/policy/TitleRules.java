@@ -23,6 +23,12 @@ public final class TitleRules {
         return items.stream().filter(title -> !earned.contains(title.id()) && earnedNow.test(title)).toList();
     }
 
+    /** 이 개월 수 연속 탐험 마일스톤의 칭호(STREAK, 8단계). */
+    public Optional<TitleRule> forStreak(int months) {
+        return items.stream()
+            .filter(title -> title.source() == TitleRule.Source.STREAK && title.ref().equals(String.valueOf(months))).findFirst();
+    }
+
     /** level 이하에서 가장 높은 레벨 칭호. */
     public Optional<TitleRule> levelTitleFor(int level) {
         return items.stream()

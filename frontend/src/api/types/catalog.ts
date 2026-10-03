@@ -41,6 +41,10 @@ export interface RewardRulesView {
   provinceFirstBonus: number;
   setCompleteBonus: number;
   claimBonus: number;
+  /** 이번 주 미스터리 보너스(8단계) */
+  mysteryBonus: number;
+  /** 시·도 정복 보너스(8단계) */
+  provinceConquestBonus: number;
 }
 
 /** GET /catalog/regions.geojson 의 Feature.properties (서버 코드 KR-xxxxx) */

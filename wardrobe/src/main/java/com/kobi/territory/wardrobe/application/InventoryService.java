@@ -10,7 +10,10 @@ import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.event.VisitCancelled;
 import com.kobi.territory.exploration.api.query.ExplorerProfileQuery;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
+import com.kobi.territory.progression.api.event.ProvinceConquered;
 import com.kobi.territory.progression.api.event.SetCompleted;
+import com.kobi.territory.progression.api.event.StreakMilestoneReached;
+import com.kobi.territory.wardrobe.domain.item.ItemSpec;
 import com.kobi.territory.progression.api.query.CollectionBookQuery;
 import com.kobi.territory.wardrobe.api.event.ItemGranted;
 import com.kobi.territory.wardrobe.api.event.InviteRewardOwed;
@@ -122,6 +125,27 @@ public class InventoryService {
 
     private static List<ExplorerId> explorerIdsOrNull(List<String> explorerIds) {
         return explorerIds == null ? null : explorerIds.stream().map(ExplorerId::of).toList();
+    }
+
+    /** 시·도 정복(8단계) → 그 시·도 대표 장식(PROVINCE_COMPLETE). 회수 없음, 아이템 단위로 멱등. */
+    @Transactional
+    public void onProvinceConquered(ProvinceConquered event) {
+        grantAchievement(ExplorerId.of(event.explorerId()),
+            catalog.grantedByProvinceConquest(event.provinceCode(), event.conqueredAt()), event.conqueredAt());
+    }
+
+    /** 연속 탐험 마일스톤(8단계) → 한정 아이템(STREAK_MILESTONE). 회수 없음, 아이템 단위로 멱등. */
+    @Transactional
+    public void onStreakMilestoneReached(StreakMilestoneReached event) {
+        grantAchievement(ExplorerId.of(event.explorerId()),
+            catalog.grantedByStreakMilestone(event.months(), event.reachedAt()), event.reachedAt());
+    }
+
+    private void grantAchievement(ExplorerId explorerId, List<ItemSpec> rewards, Instant at) {
+        Inventory inventory = loadLocked(recipientOf(explorerId.value()));
+        InventoryChange change = inventory.grantRewards(rewards, at);
+        inventories.save(inventory);
+        publish(inventory, change);
     }
 
     /** 지도 생성 — 지도장의 인벤토리 루트 행을 보장한다(가입 때 개인 지도로 미리 생겨, 이후 이벤트 처리·재계산이 항상 있는 행을 잠근다 — S3-1 과 같은 이유). 멱등. */

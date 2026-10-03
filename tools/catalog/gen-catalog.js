@@ -53,6 +53,8 @@ const geojson = { type: 'FeatureCollection', features: api.FEATURES.map(f => ({
 const rewardRules = {
   xpByRarity: { COMMON: api.XP.common, RARE: api.XP.rare, LEGEND: api.XP.legend },
   provinceFirstBonus: api.BONUS.prov, setCompleteBonus: api.BONUS.set, claimBonus: 10,
+  // 8단계(게임 요소 1순위): 이번 주 미스터리 지역 보너스·시·도 정복 보상 — 프로토타입에 없는 값이라 여기서 정한다
+  mysteryBonus: 50, provinceConquestBonus: 300,
 };
 const sample = api.SAMPLE.map(([p, n, mo, day, memo]) => {
   const c = api.findCode(p, n); if (!c) throw new Error('sample missing ' + p + n);
@@ -90,6 +92,12 @@ const badges = api.BADGES.map(b => {
   return { id: b.id, ico: b.ico, name: b.name, desc: b.desc, condition: BADGE_RULES[b.id] };
 });
 if (badges.length !== Object.keys(BADGE_RULES).length) throw new Error('badge rule extra');
+// 8단계: 이번 주 미스터리 지역 누적 뱃지(프로토타입에 없는 뱃지 — 끝에 덧붙인다)
+badges.push(
+  { id: 'mystery1', ico: '?', name: '미스터리 탐험가', desc: '이번 주 미스터리 지역 1번 찾기', condition: { type: 'MYSTERY_FOUND', min: 1 } },
+  { id: 'mystery5', ico: '??', name: '미스터리 추적자', desc: '이번 주 미스터리 지역 5번 찾기', condition: { type: 'MYSTERY_FOUND', min: 5 } },
+  { id: 'mystery10', ico: '謎', name: '미스터리 마스터', desc: '이번 주 미스터리 지역 10번 찾기', condition: { type: 'MYSTERY_FOUND', min: 10 } },
+);
 const QUEST_RULES = {
   m3:    { metric: 'NEW_REGIONS' },
   mgun:  { metric: 'NON_COMMON_REGIONS' },

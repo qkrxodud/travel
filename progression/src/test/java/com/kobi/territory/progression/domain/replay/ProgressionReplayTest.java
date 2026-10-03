@@ -1,6 +1,10 @@
 package com.kobi.territory.progression.domain.replay;
 
 import static com.kobi.territory.progression.domain.Fixtures.가평군;
+import static com.kobi.territory.progression.domain.Fixtures.그달에_칠한다;
+import static com.kobi.territory.progression.domain.Fixtures.그달의방문;
+import static com.kobi.territory.progression.domain.Fixtures.용산구;
+import static com.kobi.territory.progression.domain.Fixtures.월간퀘스트를_모두_받는다;
 import static com.kobi.territory.progression.domain.Fixtures.기준시각;
 import static com.kobi.territory.progression.domain.Fixtures.나;
 import static com.kobi.territory.progression.domain.Fixtures.늦게온멤버;
@@ -25,6 +29,8 @@ import com.kobi.territory.progression.domain.collectionbook.CollectionBook;
 import com.kobi.territory.progression.domain.progress.ExplorerProgress;
 import com.kobi.territory.progression.domain.progress.ProgressVisit;
 import com.kobi.territory.progression.domain.progress.RefIds;
+import com.kobi.territory.progression.domain.progress.StreakFreezeEntry;
+import com.kobi.territory.progression.domain.policy.XpSource;
 import com.kobi.territory.progression.domain.progress.XpLedgerEntry;
 import com.kobi.territory.progression.domain.quest.QuestBoard;
 import com.kobi.territory.progression.domain.quest.QuestFact;
@@ -32,6 +38,7 @@ import com.kobi.territory.progression.domain.quest.QuestPeriod;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -266,5 +273,101 @@ class ProgressionReplayTest {
 
         assertThat(result.progress().ledger().has(RefIds.theme(나, "han"))).isTrue();
         assertThat(result.progress().xp()).isEqualTo(100); // 내 방문은 없다 — 테마 보너스만
+    }
+
+    @Nested
+    @DisplayName("보호권·마일스톤·미스터리·시·도 정복은 다시 세어도")
+    class GameRewards {
+
+        private ReplayVisit 그달내방문(int year, int month) {
+            return new ReplayVisit(나, 그달의방문(year, month));
+        }
+
+        /** 7월 월간 퀘스트 완주(보호권 하나) → 7·8월 칠하고 9월을 비운 뒤 10월에 칠함(보호권으로 이음 → 3개월 마일스톤 → 보호권 하나). */
+        private ExplorerProgress 누적() {
+            ExplorerProgress progress = 새_진행();
+            월간퀘스트를_모두_받는다(progress, 2026, 7);
+            그달에_칠한다(progress, 2026, 7);
+            그달에_칠한다(progress, 2026, 8);
+            그달에_칠한다(progress, 2026, 10);
+            return progress;
+        }
+
+        private final List<ReplayVisit> 이력 = List.of(그달내방문(2026, 7), 그달내방문(2026, 8), 그달내방문(2026, 10));
+
+        @Test
+        @DisplayName("소식을 하나씩 받은 것과 같은 보호권 장부가 나온다")
+        void sameFreezeLedger() {
+            ExplorerProgress events = 누적();
+
+            ExplorerProgress replayed = 재계산(events, 이력, null, List.of()).progress();
+
+            assertThat(replayed.freezes().held()).isEqualTo(events.freezes().held()).isEqualTo(1);
+            assertThat(replayed.freezes().chronological()).extracting(StreakFreezeEntry::refId)
+                .containsExactlyElementsOf(events.freezes().chronological().stream().map(StreakFreezeEntry::refId).toList());
+            assertThat(replayed.streak()).isEqualTo(events.streak());
+        }
+
+        @Test
+        @DisplayName("보호권으로 메운 달도 소식을 하나씩 받은 것과 같다")
+        void sameFrozenMonths() {
+            ExplorerProgress events = 누적();
+
+            ExplorerProgress replayed = 재계산(events, 이력, null, List.of()).progress();
+
+            YearMonth 시월 = YearMonth.of(2026, 10);
+            assertThat(replayed.frozenMonthsAsOf(시월)).isEqualTo(events.frozenMonthsAsOf(시월))
+                .containsExactly(YearMonth.of(2026, 9));
+        }
+
+        @Test
+        @DisplayName("몇 번을 다시 세도 같은 결과다")
+        void deterministic() {
+            ExplorerProgress first = 재계산(누적(), 이력, null, List.of()).progress();
+
+            ExplorerProgress second = 재계산(first, 이력, null, List.of()).progress();
+
+            assertThat(second.freezes().chronological()).isEqualTo(first.freezes().chronological());
+            assertThat(second.xp()).isEqualTo(first.xp());
+        }
+
+        @Test
+        @DisplayName("이미 받은 마일스톤·미스터리·정복 보상은 다시 주지도 지우지도 않는다")
+        void keptOnce() {
+            ExplorerProgress events = 누적();
+            칠한다(events, 방문(가평군).처리시각(초(10)).그주의미스터리("2026-09-28", 가평군));
+            List<ReplayVisit> history = new ArrayList<>(이력);
+            history.add(new ReplayVisit(나, 방문(가평군).처리시각(초(10)).그주의미스터리("2026-09-28", 가평군).사실()));
+
+            ExplorerProgress replayed = 재계산(events, history, null, List.of()).progress();
+
+            assertThat(replayed.ledger().entriesOf(XpSource.STREAK_MILESTONE)).hasSize(1);
+            assertThat(replayed.ledger().entriesOf(XpSource.MYSTERY_BONUS)).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("기록이 사라진 지역 때문에 지금 100%가 아니어도 받은 정복은 남는다")
+        void conquestKeptAfterCancel() {
+            ExplorerProgress events = 새_진행();
+            칠한다(events, 방문(종로구));
+            칠한다(events, 방문(중구).처리시각(초(1)));
+            칠한다(events, 방문(용산구).처리시각(초(2)));
+            취소한다(events, 방문(용산구).처리시각(초(3)));
+
+            ExplorerProgress replayed = 재계산(events, List.of(내방문(종로구, 기준시각), 내방문(중구, 초(1))), null, List.of())
+                .progress();
+
+            assertThat(replayed.provincesConquered()).containsOnlyKeys("KR-11");
+        }
+
+        @Test
+        @DisplayName("정복 기록이 빠졌어도 지금 다 칠해져 있으면 다시 셀 때 지급한다")
+        void conquestRecovered() {
+            List<ReplayVisit> history = List.of(내방문(종로구, 기준시각), 내방문(중구, 초(1)), 내방문(용산구, 초(2)));
+
+            ExplorerProgress replayed = 재계산(새_진행(), history, null, List.of()).progress();
+
+            assertThat(replayed.ledger().has(RefIds.conquest(나, "KR-11"))).isTrue();
+        }
     }
 }

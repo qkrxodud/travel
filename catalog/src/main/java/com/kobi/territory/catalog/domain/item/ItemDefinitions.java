@@ -46,7 +46,7 @@ public final class ItemDefinitions {
      */
     public void requireRegistrable(ItemDefinition item) {
         if (item.migrated()) {
-            throw CatalogError.INVALID_ITEM_DEFINITION.exception("region:·set:·invite: 으로 시작하는 id 는 이관 데이터 전용입니다: " + item.itemId());
+            throw CatalogError.INVALID_ITEM_DEFINITION.exception("region:·set:·invite:·conquest:·streak: 으로 시작하는 id 는 이관 데이터 전용입니다: " + item.itemId());
         }
         if (byId.containsKey(item.itemId())) throw CatalogError.ITEM_ALREADY_EXISTS.exception(item.itemId());
     }
@@ -64,6 +64,16 @@ public final class ItemDefinitions {
     /** 완성 시각 completedAt(날짜 day)의 테마(세트) 완성으로 받는 아이템(세트 배경 + 정의 생성 뒤 완성분의 운영 추가 보상). */
     public List<ItemDefinition> grantedByThemeCompletion(String themeId, LocalDate day, Instant completedAt) {
         return stream().filter(item -> item.grantedByThemeCompletion(themeId, day, completedAt)).toList();
+    }
+
+    /** 정복 시각 conqueredAt(날짜 day)의 시·도 정복으로 받는 아이템(8단계). */
+    public List<ItemDefinition> grantedByProvinceConquest(String provinceCode, LocalDate day, Instant conqueredAt) {
+        return stream().filter(item -> item.grantedByProvinceConquest(provinceCode, day, conqueredAt)).toList();
+    }
+
+    /** 도달 시각 reachedAt(날짜 day)의 연속 탐험 마일스톤으로 받는 아이템(8단계). */
+    public List<ItemDefinition> grantedByStreakMilestone(int months, LocalDate day, Instant reachedAt) {
+        return stream().filter(item -> item.grantedByStreakMilestone(months, day, reachedAt)).toList();
     }
 
     /** 이 날짜의 초대 합류에서 그 쪽(HOST·GUEST)이 받는 아이템. */

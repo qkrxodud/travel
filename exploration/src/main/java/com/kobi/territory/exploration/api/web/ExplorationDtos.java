@@ -67,7 +67,7 @@ public final class ExplorationDtos {
      */
     public record XpResponse(List<XpLineResponse> lines, int total, String basis, String note) {
         static final String BASIS = "MAP_MAX";
-        static final String NOTE = "이 지도 기준 최대 보상이에요. 이미 받은 기본 XP·시·도 보너스·선점 보너스는 다시 지급되지 않아 실제 지급은 적을 수 있어요.";
+        static final String NOTE = "이 지도 기준 최대 보상이에요. 이미 받은 기본 XP·시·도 보너스·선점 보너스·이번 주 미스터리 보너스는 다시 지급되지 않아 실제 지급은 적을 수 있어요.";
 
         XpResponse(List<XpLineResponse> lines, int total) {
             this(lines, total, BASIS, NOTE);
@@ -93,6 +93,7 @@ public final class ExplorationDtos {
                 case REGION_BASE -> RARITY_LABEL.get(region.rarity()) + " 지역 기본";
                 case PROVINCE_FIRST -> region.provinceName() + " 첫 발 도장";
                 case FIRST_CLAIM -> "선점 보너스";
+                case MYSTERY_BONUS -> "이번 주 미스터리 보너스";
             };
         }
     }

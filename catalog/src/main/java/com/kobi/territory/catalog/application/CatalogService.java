@@ -13,6 +13,7 @@ import com.kobi.territory.catalog.domain.catalog.CatalogRepository;
 import com.kobi.territory.catalog.domain.item.ItemDefinition;
 import com.kobi.territory.catalog.domain.region.Province;
 import com.kobi.territory.catalog.domain.definition.ProgressionDefinitions;
+import com.kobi.territory.catalog.domain.definition.StreakRules;
 import com.kobi.territory.catalog.domain.region.Region;
 import com.kobi.territory.catalog.domain.reward.RewardRules;
 import com.kobi.territory.catalog.domain.reward.RewardLine;
@@ -40,6 +41,7 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
     private final List<QuestView> quests;
     private final List<TitleView> titles;
     private final List<LevelTitleView> levelTitles;
+    private final StreakRulesView streakRules;
 
     public CatalogService(CatalogRepository repository, ItemDefinitionCache itemDefinitions) {
         this.catalog = repository.load();
@@ -48,7 +50,7 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
         this.provinces = catalog.provinces().inDisplayOrder().stream().map(CatalogService::toView).toList();
         RewardRules rules = catalog.rewardRules();
         this.rewardRules = new RewardRulesView(rules.xpByRarity(), rules.provinceFirstBonus(), rules.setCompleteBonus(),
-            rules.claimBonus());
+            rules.claimBonus(), rules.mysteryBonus(), rules.provinceConquestBonus());
         ProgressionDefinitions definitions = catalog.progression();
         this.levelTitles = definitions.levels().titles().stream().map(levelTitle -> new LevelTitleView(levelTitle.level(), levelTitle.name())).toList();
         this.sets = definitions.themes().stream().map(theme -> new SetView(theme.id(), theme.name(), theme.desc(), theme.title(),
@@ -59,6 +61,11 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
                 badge.condition().groups(), badge.condition().ratio()))).toList();
         this.quests = definitions.quests().stream().map(quest -> new QuestView(quest.id(), quest.scope().name(), quest.ico(), quest.name(), quest.desc(),
             quest.metric().name(), quest.param(), quest.target(), quest.xp(), quest.title())).toList();
+        StreakRules streak = definitions.streak();
+        this.streakRules = new StreakRulesView(streak.freezeMaxHeld(), streak.monthlyQuestsFreezes(), streak.milestones().stream()
+            .map(milestone -> new MilestoneView(milestone.months(), milestone.xp(), milestone.freezes(), milestone.titleId(),
+                milestone.title()))
+            .toList());
         this.titles = catalog.titles().stream()
             .map(title -> new TitleView(title.id(), title.name(), title.how(), title.source().name(), title.ref())).toList();
     }
@@ -71,8 +78,24 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
     }
 
     @Override
+    public List<RewardLineView> checkIn(Rarity rarity, boolean firstInProvince, boolean firstClaim, boolean mysteryOfWeek) {
+        return catalog.rewardRules().checkIn(rarity, firstInProvince, firstClaim, mysteryOfWeek).stream()
+            .map(CatalogService::toView).toList();
+    }
+
+    @Override
     public RewardLineView setComplete() {
         return toView(catalog.rewardRules().setComplete());
+    }
+
+    @Override
+    public RewardLineView mysteryBonus() {
+        return toView(catalog.rewardRules().mystery());
+    }
+
+    @Override
+    public RewardLineView provinceConquest() {
+        return toView(catalog.rewardRules().provinceConquest());
     }
 
     // ---- ProgressionRules ----
@@ -105,6 +128,11 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
     @Override
     public List<TitleView> titles() {
         return titles;
+    }
+
+    @Override
+    public StreakRulesView streakRules() {
+        return streakRules;
     }
 
     private static RewardLineView toView(RewardLine line) {

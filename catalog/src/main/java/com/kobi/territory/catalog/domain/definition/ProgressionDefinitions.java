@@ -13,16 +13,23 @@ import java.util.Set;
  * 생성 시 id 유일성을, {@link #requireConsistentWith}로 지역·시·도 참조 정합성을 검증한다(어긋나면 기동 실패).
  */
 public record ProgressionDefinitions(LevelRules levels, List<ThemeDefinition> themes, List<BadgeDefinition> badges,
-                                     List<QuestDefinition> quests) {
+                                     List<QuestDefinition> quests, StreakRules streak) {
 
     public ProgressionDefinitions {
         Objects.requireNonNull(levels, "levels");
+        Objects.requireNonNull(streak, "streak");
         themes = List.copyOf(themes);
         badges = List.copyOf(badges);
         quests = List.copyOf(quests);
         unique("테마(세트)", themes.stream().map(ThemeDefinition::id).toList());
         unique("뱃지", badges.stream().map(BadgeDefinition::id).toList());
         unique("퀘스트", quests.stream().map(QuestDefinition::id).toList());
+    }
+
+    /** 연속 탐험 규칙(보호권·마일스톤) 없이 — 8단계 이전 정의. */
+    public ProgressionDefinitions(LevelRules levels, List<ThemeDefinition> themes, List<BadgeDefinition> badges,
+                                  List<QuestDefinition> quests) {
+        this(levels, themes, badges, quests, StreakRules.none());
     }
 
     /** 1단계 테스트 등 진행 정의가 필요 없는 곳에서 쓰는 빈 정의. */
@@ -38,7 +45,7 @@ public record ProgressionDefinitions(LevelRules levels, List<ThemeDefinition> th
         badges.forEach(badge -> badge.condition().referencedProvinces().forEach(provinces::require));
     }
 
-    /** 칭호 전체(표시 순서: 레벨 → 세트 → 상시 도전 → 시·도 주인). 프로토타입 titles() 와 같은 순서·id. */
+    /** 칭호 전체(표시 순서: 레벨 → 세트 → 상시 도전 → 연속 탐험 마일스톤(8단계) → 시·도 주인). 프로토타입 titles() 와 같은 순서·id. */
     public List<TitleDefinition> titles(Provinces provinces) {
         List<TitleDefinition> out = new ArrayList<>();
         levels.titles().forEach(levelTitle -> out.add(new TitleDefinition("lv" + levelTitle.level(), levelTitle.name(), "Lv." + levelTitle.level(),
@@ -47,6 +54,8 @@ public record ProgressionDefinitions(LevelRules levels, List<ThemeDefinition> th
             TitleDefinition.Source.SET, theme.id())));
         quests.stream().filter(quest -> quest.title() != null).forEach(quest -> out.add(new TitleDefinition("long-" + quest.id(), quest.title(),
             quest.name(), TitleDefinition.Source.QUEST, quest.id())));
+        streak.milestones().forEach(milestone -> out.add(new TitleDefinition(milestone.titleId(), milestone.title(),
+            milestone.months() + "개월 연속 탐험", TitleDefinition.Source.STREAK, String.valueOf(milestone.months()))));
         provinces.inDisplayOrder().forEach(province -> out.add(new TitleDefinition("own-" + province.code(), province.name() + "의 주인",
             province.name() + " 100%", TitleDefinition.Source.PROVINCE, province.code())));
         return List.copyOf(out);

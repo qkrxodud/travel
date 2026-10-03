@@ -1,15 +1,21 @@
 package com.kobi.territory.progression.domain.progress;
 
 import com.kobi.territory.progression.domain.policy.XpSource;
+import com.kobi.territory.progression.domain.quest.QuestPeriod;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * 일급 컬렉션: XP 장부. XP = 장부 합계(감소는 음수 항목으로만). refId 가 멱등 키라 같은 지급은 두 번 쌓이지 않는다.
@@ -91,6 +97,43 @@ public final class XpLedger {
         return generation > 0 && !has(RefIds.regionRevoke(explorer, region, generation)) ? generation : 0;
     }
 
+    /** 이 출처의 지급 줄(양수, 쌓인 순). */
+    public List<XpLedgerEntry> entriesOf(XpSource source) {
+        return entries.stream().filter(entry -> entry.source() == source && entry.amount() > 0).toList();
+    }
+
+    public Optional<XpLedgerEntry> find(String refId) {
+        return entries.stream().filter(entry -> entry.refId().equals(refId)).findFirst();
+    }
+
+    /** 그 달 보드의 퀘스트(questIds) 중 보상을 받은 수(8단계 — 이번 달 보호권 진행). */
+    int questsRewarded(ExplorerId explorer, QuestPeriod period, Set<String> questIds) {
+        return (int) questIds.stream().filter(questId -> has(RefIds.quest(explorer, period, questId))).count();
+    }
+
+    /** 그 달 보드의 퀘스트(questIds — 월간 퀘스트 전부)를 모두 보상 받았는지(8단계 보호권). 퀘스트가 없으면 아니다. */
+    boolean allQuestsRewarded(ExplorerId explorer, QuestPeriod period, Set<String> questIds) {
+        return !questIds.isEmpty() && questIds.stream().allMatch(questId -> has(RefIds.quest(explorer, period, questId)));
+    }
+
+    /** 월간 퀘스트(questIds)를 모두 보상 받은 달 → 마지막 보상 시각(8단계 — 재계산이 보호권 받을 일을 다시 만들 때). */
+    Map<QuestPeriod, Instant> monthlyQuestsCompleted(Set<String> questIds) {
+        Map<QuestPeriod, Map<String, Instant>> byPeriod = new TreeMap<>(Comparator.comparing(QuestPeriod::value));
+        entriesOf(XpSource.QUEST).forEach(entry -> {
+            QuestPeriod period = RefIds.questPeriodOf(entry.refId());
+            if (!period.always()) {
+                byPeriod.computeIfAbsent(period, key -> new LinkedHashMap<>()).put(RefIds.subjectOf(entry.refId()), entry.at());
+            }
+        });
+        Map<QuestPeriod, Instant> completed = new LinkedHashMap<>();
+        byPeriod.forEach((period, rewarded) -> {
+            if (!questIds.isEmpty() && rewarded.keySet().containsAll(questIds)) {
+                completed.put(period, questIds.stream().map(rewarded::get).max(Comparator.naturalOrder()).orElseThrow());
+            }
+        });
+        return completed;
+    }
+
     public int count(XpSource source) {
         return (int) entries.stream().filter(entry -> entry.source() == source && entry.amount() > 0).count();
     }
@@ -105,7 +148,7 @@ public final class XpLedger {
      */
     public List<XpLedgerEntry> chronological() {
         return entries.stream()
-            .sorted(java.util.Comparator.comparing(XpLedgerEntry::at).thenComparing(XpLedgerEntry::source))
+            .sorted(Comparator.comparing(XpLedgerEntry::at).thenComparing(XpLedgerEntry::source))
             .toList();
     }
 

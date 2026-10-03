@@ -21,7 +21,9 @@ export type MapCommand =
   | { kind: 'zoom'; codes: string[]; pad?: number }
   | { kind: 'reset' }
   | { kind: 'to-character' }
-  | { kind: 'ping'; code: string };
+  | { kind: 'ping'; code: string }
+  /** 막 정복한 시·도 테두리를 잠깐 반짝인다(시·도 이름) */
+  | { kind: 'flash-provinces'; provinces: string[] };
 
 const MAP_KEY = 'territory-map-id';
 /** 프로토타입 화면 저장 키(가방 필터만 남는다) */
@@ -77,6 +79,8 @@ export interface UiState {
   /** 영토 비교 대상 handle */
   compareHandle: string | null;
   mapCommand: (MapCommand & { id: number }) | null;
+  /** 이번 주 미스터리 지역 이름을 보여 줄지(❓ 마커·카드를 누르면 지도에서 보여 준다) */
+  mysteryRevealed: boolean;
 
   setTab: (tab: Tab) => void;
   setMode: (mode: MapMode) => void;
@@ -95,6 +99,8 @@ export interface UiState {
   closeCard: () => void;
   compareWith: (handle: string | null) => void;
   sendMapCommand: (command: MapCommand) => void;
+  /** 미스터리 지역을 지도에서 보여 준다(이름 공개 + 그 지역으로 확대·강조) */
+  revealMystery: (code: string) => void;
 }
 
 let commandSequence = 0;
@@ -112,6 +118,7 @@ export const useUiStore = create<UiState>()(set => ({
   cardUrl: null,
   compareHandle: null,
   mapCommand: null,
+  mysteryRevealed: false,
 
   setTab: tab => {
     try {
@@ -152,5 +159,9 @@ export const useUiStore = create<UiState>()(set => ({
   sendMapCommand: command => {
     commandSequence += 1;
     set({ mapCommand: { ...command, id: commandSequence } });
+  },
+  revealMystery: code => {
+    commandSequence += 1;
+    set({ mysteryRevealed: true, highlight: code, selected: code, mapCommand: { kind: 'zoom', codes: [code], pad: 0.25, id: commandSequence } });
   },
 }));

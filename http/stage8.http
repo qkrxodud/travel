@@ -1,0 +1,154 @@
+### 8단계(게임 요소 1순위) 왕복 확인 — 이번 주 미스터리 지역·시·도 정복·연속 탐험 마일스톤·보호권
+### 서버: ./gradlew :app-api:bootRun --args='--server.port=18081'   (8080·18080 은 쓰지 않는다)
+### 진행 값(XP·보호권·정복)은 outbox 릴레이(비동기, local 300ms)로 반영 — 체크인 뒤 1초쯤 뒤에 조회한다.
+### 달 넘김은 local 전용 서버 시계(POST /dev/clock — 앞으로만, DELETE /dev/reset·/dev/clock 이 되돌린다)로 옮긴다.
+@host = http://localhost:18081
+
+### 0. [local] 전체 초기화(밀어 둔 서버 시계도 되돌린다) → 204
+DELETE {{host}}/dev/reset
+
+### 1. 탐험가 발급 → 201 {explorerId, accessToken, personalMapId}
+POST {{host}}/explorers
+
+> {% client.global.set("token", response.body.accessToken); %}
+
+### 2. 이번 주 미스터리 지역 → 200 {weekStart(월요일), startsAt, endsAt, remainingSeconds, region{code,name,provinceCode,provinceName,rarity RARE|LEGEND}, bonusXp:50, received:false, receivedAt:null, foundCount:0, revealed:false}
+GET {{host}}/mystery/this-week
+X-Explorer-Token: {{token}}
+
+> {% client.global.set("mystery", response.body.region.code); %}
+
+### 3. 체크인 미리보기 — 미스터리 지역이면 보너스 줄 → 200 xp.lines[] 에 {source:MYSTERY_BONUS, label:"이번 주 미스터리 보너스", amount:50}
+GET {{host}}/visits/preview?region={{mystery}}
+X-Explorer-Token: {{token}}
+
+### 4. 미스터리 지역 체크인 → 201 (xp.lines 에 MYSTERY_BONUS 줄 포함 — 최대 보상)
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "{{mystery}}", "visitDate": "2026-10-04"}
+
+### 5. (1초 뒤) 이번 주 보너스 받음 → 200 {received:true, receivedAt, foundCount:1, revealed:true(이름 바로 공개)}
+GET {{host}}/mystery/this-week
+X-Explorer-Token: {{token}}
+
+### 6. 세종(지역이 한 곳뿐인 시·도) 체크인 → 201
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-29010", "visitDate": "2026-10-04"}
+
+### 7. (1초 뒤) 진행 → 200 provinces[KR-29]{visited:1,total:1,percent:100,complete:true,conquered:true,conqueredAt},
+###    recentXp 에 PROVINCE_CONQUEST +300·MYSTERY_BONUS +50, badges[mystery1].earned:true, mysteryFoundCount:1,
+###    streakFreeze{held:0,max:2,lastUsed:null,thisMonth{questsRewarded:0,questsRequired:4,reward:1,earned:false,granted:0}}, nextMilestone{months:3,xp:50,titleId:streak-3,remainingMonths:2}
+GET {{host}}/progress
+X-Explorer-Token: {{token}}
+
+### 8. 가방 → 200 items 에 conquest:KR-29(세종 정복 호수 정원 나무, PROP·LEGEND, source EVENT)
+GET {{host}}/inventory
+X-Explorer-Token: {{token}}
+
+### 9. [local] 서버 시계를 한 달 민다 → 200 {now, offsetSeconds, zone:"Asia/Seoul"}
+POST {{host}}/dev/clock
+Content-Type: application/json
+
+{"days": 31}
+
+### 10. 다음 달 체크인(종로) → 201  (visitDate 는 서버 시계 기준 미래가 아니면 된다)
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-11010", "visitDate": "2026-10-04"}
+
+### 11. [local] 한 달 더 → 200
+POST {{host}}/dev/clock
+Content-Type: application/json
+
+{"days": 31}
+
+### 12. 그다음 달 체크인(중구) → 201 — 석 달 연속: 마일스톤 3개월(+50 XP·칭호 streak-3·보호권 1·한정 아이템 streak:3)
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-11020", "visitDate": "2026-10-04"}
+
+### 13. (1초 뒤) 진행 → 200 streak{months:3}, streakFreeze{held:1}, milestones[0]{months:3,reached:true}, nextMilestone{months:6},
+###     titles[streak-3].earned:true
+GET {{host}}/progress
+X-Explorer-Token: {{token}}
+
+### 14. [local] 두 달을 민다(한 달이 빈다) → 200
+POST {{host}}/dev/clock
+Content-Type: application/json
+
+{"days": 62}
+
+### 15. 빈 달 뒤의 진행 → 200 streak{months:3, freezesNeeded:1, frozenMonths:[]} (보호권 하나로 메울 수 있어 아직 이어진 것으로 보인다 — 아직 쓰지 않아 메운 달은 없다)
+GET {{host}}/progress
+X-Explorer-Token: {{token}}
+
+### 16. 체크인(용산) → 201 — 보호권 1개로 스트릭을 지킨다
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-11030", "visitDate": "2026-10-04"}
+
+### 17. (1초 뒤) 진행 → 200 streak{months:4, freezesNeeded:0, frozenMonths:["<빈 달 yyyy-MM>"]}, streakFreeze{held:0, lastUsed{month, count:1, at}}
+###     frozenMonths = 지금 연속 구간 안에서 보호권으로 메운 달 전부(오래된 순). lastUsed.month 의 바로 앞 달과 같다
+GET {{host}}/progress
+X-Explorer-Token: {{token}}
+
+### 18. 가방 → 200 items 에 streak:3(3개월 발자국 키링)
+GET {{host}}/inventory
+X-Explorer-Token: {{token}}
+
+### 19. [local] 다시 세도 같다 → 200 {recalculated:1, deferred:[] ...} 뒤 진행이 17과 같다(streak.frozenMonths 포함)
+POST {{host}}/dev/recalculate
+X-Explorer-Token: {{token}}
+
+### 20. [local] 서버 시계 되돌리기 → 200 {offsetSeconds:0}
+DELETE {{host}}/dev/clock
+
+### ---- 8단계 보완: [local] 미스터리 지역 고정(E2E 가 칠하는 희귀 지역과 겹치지 않게) ----
+
+### 21. [local] 지금 미스터리 지역과 고정 여부 → 200 {weekStart, regionCode, pinned:false}
+GET {{host}}/dev/mystery
+
+### 22. [local] 기장군(KR-21310, 희귀)으로 고정 → 200 {weekStart, regionCode:"KR-21310", pinned:true}
+PUT {{host}}/dev/mystery
+Content-Type: application/json
+
+{"regionCode": "KR-21310"}
+
+### 23. 이번 주 미스터리 → 200 region.code:"KR-21310" (미리보기·체크인 보너스도 이 지역 기준)
+GET {{host}}/mystery/this-week
+X-Explorer-Token: {{token}}
+
+### 24. [local] 시계를 한 주 밀어도 → 200, 이어서 GET /dev/mystery 는 여전히 {regionCode:"KR-21310", pinned:true}
+POST {{host}}/dev/clock
+Content-Type: application/json
+
+{"days": 7}
+
+###
+GET {{host}}/dev/mystery
+
+### 25. [local] 희귀·전설이 아니거나 없는 지역 → 400 {message}
+PUT {{host}}/dev/mystery
+Content-Type: application/json
+
+{"regionCode": "KR-11010"}
+
+### 26. [local] 고정 해제 → 200 {regionCode:<원래 주차 선택>, pinned:false}  (DELETE /dev/reset 도 고정을 푼다)
+PUT {{host}}/dev/mystery
+Content-Type: application/json
+
+{"regionCode": null}
+
+### 27. [local] 서버 시계 되돌리기 → 200 {offsetSeconds:0}
+DELETE {{host}}/dev/clock

@@ -136,5 +136,35 @@
    "type": "CONQUEST_RATIO",
    "ratio": 0.5
   }
+ },
+ {
+  "id": "mystery1",
+  "ico": "?",
+  "name": "미스터리 탐험가",
+  "desc": "이번 주 미스터리 지역 1번 찾기",
+  "condition": {
+   "type": "MYSTERY_FOUND",
+   "min": 1
+  }
+ },
+ {
+  "id": "mystery5",
+  "ico": "??",
+  "name": "미스터리 추적자",
+  "desc": "이번 주 미스터리 지역 5번 찾기",
+  "condition": {
+   "type": "MYSTERY_FOUND",
+   "min": 5
+  }
+ },
+ {
+  "id": "mystery10",
+  "ico": "謎",
+  "name": "미스터리 마스터",
+  "desc": "이번 주 미스터리 지역 10번 찾기",
+  "condition": {
+   "type": "MYSTERY_FOUND",
+   "min": 10
+  }
  }
 ]

@@ -70,12 +70,13 @@ public final class Fixtures {
     public static final RegionSnapshot ULLEUNG = region("KR-37430", Rarity.LEGEND, "KR-37");
 
     /** 보상 대역(카탈로그 보상 규칙과 같은 값: 기본 10/20/50, 시·도 첫 발 15, 선점 10). 실제 규칙은 catalog 테스트가 검증한다. */
-    public static final CheckInRewards REWARDS = (rarity, firstInProvince, firstClaim) -> {
+    public static final CheckInRewards REWARDS = (rarity, firstInProvince, firstClaim, mysteryOfWeek) -> {
         List<CheckInPreview.XpLine> lines = new ArrayList<>();
         lines.add(new CheckInPreview.XpLine(CheckInPreview.XpSource.REGION_BASE,
             Map.of(Rarity.COMMON, 10, Rarity.RARE, 20, Rarity.LEGEND, 50).get(rarity)));
         if (firstInProvince) lines.add(new CheckInPreview.XpLine(CheckInPreview.XpSource.PROVINCE_FIRST, 15));
         if (firstClaim) lines.add(new CheckInPreview.XpLine(CheckInPreview.XpSource.FIRST_CLAIM, 10));
+        if (mysteryOfWeek) lines.add(new CheckInPreview.XpLine(CheckInPreview.XpSource.MYSTERY_BONUS, 50));
         return lines;
     };
 

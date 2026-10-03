@@ -11,6 +11,9 @@ import com.kobi.territory.catalog.domain.definition.LevelRules;
 import com.kobi.territory.catalog.domain.definition.LevelTitle;
 import com.kobi.territory.catalog.domain.definition.ProgressionDefinitions;
 import com.kobi.territory.catalog.domain.definition.QuestDefinition;
+import com.kobi.territory.catalog.domain.definition.StreakMilestone;
+import com.kobi.territory.catalog.domain.definition.StreakRules;
+import com.kobi.territory.catalog.domain.mystery.MysteryRules;
 import com.kobi.territory.catalog.domain.catalog.CatalogRepository;
 import com.kobi.territory.catalog.domain.region.Province;
 import com.kobi.territory.catalog.domain.region.Provinces;
@@ -27,6 +30,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -56,11 +60,18 @@ public class JsonCatalogRepository implements CatalogRepository {
         rj.xpByRarity.forEach((rarityName, amount) -> xp.put(Rarity.valueOf(rarityName), amount));
         // 정합성 검증은 도메인(Catalog·일급 컬렉션)이 생성 시 한다
         this.catalog = new Catalog(Regions.of(regions), Provinces.of(provinces),
-            new RewardRules(xp, rj.provinceFirstBonus, rj.setCompleteBonus, rj.claimBonus), readString("regions.geojson"),
-            progression(om));
+            new RewardRules(xp, rj.provinceFirstBonus, rj.setCompleteBonus, rj.claimBonus, rj.mysteryBonus,
+                rj.provinceConquestBonus), readString("regions.geojson"),
+            progression(om), mystery(om));
     }
 
-    /** 2단계 진행 정의: levels.json, sets.json, badges.json, quests.json */
+    /** 8단계 이번 주 미스터리 지역 규칙: mystery.json */
+    private static MysteryRules mystery(ObjectMapper om) {
+        MysteryJson mj = read(om, "mystery.json", new TypeReference<MysteryJson>() {});
+        return new MysteryRules(mj.rarities.stream().map(Rarity::valueOf).collect(Collectors.toSet()), mj.bottomFraction);
+    }
+
+    /** 2단계 진행 정의: levels.json, sets.json, badges.json, quests.json (+ 8단계 streak-rules.json) */
     private static ProgressionDefinitions progression(ObjectMapper om) {
         LevelsJson lj = read(om, "levels.json", new TypeReference<LevelsJson>() {});
         List<ThemeDefinition> themes = read(om, "sets.json", new TypeReference<List<ThemeJson>>() {}).stream()
@@ -80,7 +91,14 @@ public class JsonCatalogRepository implements CatalogRepository {
             .toList();
         return new ProgressionDefinitions(
             new LevelRules(lj.divisor, lj.titles.stream().map(titleJson -> new LevelTitle(titleJson.level, titleJson.name)).toList()),
-            themes, badges, quests);
+            themes, badges, quests, streak(om));
+    }
+
+    private static StreakRules streak(ObjectMapper om) {
+        StreakRulesJson sj = read(om, "streak-rules.json", new TypeReference<StreakRulesJson>() {});
+        return new StreakRules(sj.freeze.maxHeld, sj.freeze.monthlyQuestsReward, sj.milestones.stream()
+            .map(milestoneJson -> new StreakMilestone(milestoneJson.months, milestoneJson.xp, milestoneJson.freezes, milestoneJson.title))
+            .toList());
     }
 
     @Override
@@ -130,5 +148,14 @@ public class JsonCatalogRepository implements CatalogRepository {
     record QuestJson(String id, String scope, String ico, String name, String desc, String metric, int param, int target,
                      int xp, String title) {}
 
-    record RewardJson(Map<String, Integer> xpByRarity, int provinceFirstBonus, int setCompleteBonus, int claimBonus) {}
+    record RewardJson(Map<String, Integer> xpByRarity, int provinceFirstBonus, int setCompleteBonus, int claimBonus,
+                      int mysteryBonus, int provinceConquestBonus) {}
+
+    record FreezeJson(int maxHeld, int monthlyQuestsReward) {}
+
+    record MilestoneJson(int months, int xp, int freezes, String title) {}
+
+    record StreakRulesJson(FreezeJson freeze, List<MilestoneJson> milestones) {}
+
+    record MysteryJson(List<String> rarities, double bottomFraction) {}
 }

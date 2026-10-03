@@ -1,11 +1,14 @@
 import type { MouseEvent } from 'react';
 import type { SceneRequest } from '../../../api/types/wardrobe';
-import { SLOT_NAME, SLOT_TO_SERVER, type DisplayItem } from '../../../shared/lib/item/displayItem';
+import { achievementOf, SLOT_NAME, SLOT_TO_SERVER, type DisplayItem } from '../../../shared/lib/item/displayItem';
 import { ItemImage } from '../../../shared/ui/ItemImage';
 import { toast, toastError } from '../../../store/toastStore';
 import { useUiStore } from '../../../store/uiStore';
 import { BAG_FILTERS, filterAndSort, isSetReward } from '../model/bag';
 import { useFavorite } from '../queries';
+
+/** 업적 보상 표시(시·도 정복 👑 · 연속 탐험 🔥) */
+const ACHIEVEMENT_MARK = { conquest: '👑', streak: '🔥' } as const;
 
 const MAX_PROPS = 3;
 
@@ -56,22 +59,27 @@ export function InventoryPanel({ items, sceneProps, onEdit }: InventoryPanelProp
       <div id="bag-inv">
         {list.length ? (
           <div className="inv">
-            {list.map(item => (
-              <button
-                key={item.code}
-                className={`item ${item.tier} ${item.equipped ? 'on' : ''} ${isSetReward(item) ? 'set' : ''}`}
-                data-equip={item.code}
-                title={`${item.name} · ${item.from}`}
-                onClick={() => toggle(item)}
-              >
-                <ItemImage item={item} />
-                <span className="sb">{SLOT_NAME[item.slot]}</span>
-                <span className="n">{item.name}</span>
-                <span className={`fav ${item.favorite ? 'on' : ''}`} data-fav={item.code} role="button" aria-pressed={item.favorite} title="즐겨찾기" aria-label="즐겨찾기" onClick={event => star(event, item)}>
-                  {item.favorite ? '★' : '☆'}
-                </span>
-              </button>
-            ))}
+            {list.map(item => {
+              const achievement = achievementOf(item.code);
+              return (
+                <button
+                  key={item.code}
+                  className={`item ${item.tier} ${item.equipped ? 'on' : ''} ${isSetReward(item) ? 'set' : ''}`}
+                  data-equip={item.code}
+                  title={`${item.name} · ${item.from}`}
+                  data-origin={item.from}
+                  onClick={() => toggle(item)}
+                >
+                  <ItemImage item={item} />
+                  {achievement ? <span className={`ach ${achievement}`} title={item.from}>{ACHIEVEMENT_MARK[achievement]}</span> : null}
+                  <span className="sb">{SLOT_NAME[item.slot]}</span>
+                  <span className="n">{item.name}</span>
+                  <span className={`fav ${item.favorite ? 'on' : ''}`} data-fav={item.code} role="button" aria-pressed={item.favorite} title="즐겨찾기" aria-label="즐겨찾기" onClick={event => star(event, item)}>
+                    {item.favorite ? '★' : '☆'}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         ) : <p className="empty">아직 이 종류의 장비가 없어요. 지도를 더 칠해보세요.</p>}
       </div>

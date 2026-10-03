@@ -8,9 +8,18 @@ import { test as base, expect, APIRequestContext, Page } from '@playwright/test'
  */
 export const EXPLORER_HEADER = 'X-Explorer-Token';
 
+/** 어떤 스펙도 칠하지 않는 희귀 지역(부산 기장군) — 테스트마다 이번 주 미스터리 지역으로 고정해 XP 기대값을 주차와 무관하게 지킨다 */
+export const QUIET_MYSTERY = 'KR-21310';
+const SHIFT_DAYS = Number(process.env.E2E_SHIFT_DAYS ?? 0);
+
 export type DevApi = {
-  /** 전체 데이터 초기화 (DELETE /dev/reset) */
+  /** 전체 데이터 초기화 (DELETE /dev/reset — 서버 시계·미스터리 고정도 되돌린다) */
   reset: () => Promise<void>;
+  /**
+   * 이번 주부터 미스터리 지역을 고정(PUT /dev/mystery, 8단계). 주마다 바뀌는 미스터리 지역이 스펙이 칠하는 희귀 지역과 겹쳐
+   * +50 이 붙지 않게, 모든 테스트는 시작 때 스펙이 칠하지 않는 지역(기장군)으로 고정해 둔다. null 이면 원래 주차 선택으로.
+   */
+  pinMystery: (regionCode: string | null) => Promise<void>;
   /** 탐험가에 프로토타입 SAMPLE 45곳 시드 (POST /dev/seed) */
   seed: (token: string) => Promise<number>;
   /** 탐험가 가입 시각을 hours 만큼 과거로(온보딩 72h 예외 종료 시뮬레이션) */
@@ -51,6 +60,7 @@ export const test = base.extend<{ dev: DevApi }>({
     async ({ request }, use) => {
       const dev: DevApi = {
         reset: async () => expectOk(await request.delete('/dev/reset'), 'DELETE /dev/reset'),
+        pinMystery: async (regionCode) => expectOk(await request.put('/dev/mystery', { data: { regionCode } }), `PUT /dev/mystery ${regionCode}`),
         seed: async (explorerId) => {
           const res = await request.post('/dev/seed', { headers: { [EXPLORER_HEADER]: explorerId } });
           await expectOk(res, 'POST /dev/seed');
@@ -95,6 +105,9 @@ export const test = base.extend<{ dev: DevApi }>({
         },
       };
       await dev.reset();
+      // E2E_SHIFT_DAYS=n: 서버 시계를 n일 앞으로 민 채로 돌린다(주차·달에 기대값이 묶이지 않았는지 확인용)
+      if (SHIFT_DAYS) await expectOk(await request.post('/dev/clock', { data: { days: SHIFT_DAYS } }), `POST /dev/clock +${SHIFT_DAYS}d`);
+      await dev.pinMystery(QUIET_MYSTERY);
       await use(dev);
     },
     { auto: true },

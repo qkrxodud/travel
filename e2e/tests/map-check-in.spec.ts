@@ -126,12 +126,14 @@ test.describe('지도에 영토 칠하기', () => {
     });
   });
 
-  test('오늘 이후 날짜로는 칠할 수 없다고 알려 주고 칠하지 않는다', async ({ page }) => {
+  test('오늘 이후 날짜로는 칠할 수 없다고 알려 주고 칠하지 않는다', async ({ page, request }) => {
     await open(page);
     await clickRegion(page, JONGNO);
     await expect(page.locator('#checkin')).toBeVisible();
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 2);
+    // "오늘"은 서버 시계 기준(서울) — 서버 시계를 앞으로 민 채로 돌려도 미래 날짜가 되게 서버 날짜에서 이틀 뒤를 고른다
+    const serverToday = ((await (await request.get('/dev/clock')).json()).now as string).slice(0, 10);
+    const [year, month, day] = serverToday.split('-').map(Number);
+    const tomorrow = new Date(year, month - 1, day + 2);
     await page.fill('#ci-date', localISO(tomorrow));
     await page.click('#ci-save');
     await expect(toast(page, '날짜를 확인해 주세요')).toBeVisible();
@@ -188,8 +190,9 @@ test.describe('지도에 영토 칠하기', () => {
       await expect(page.locator('#note-txt')).toContainText('예시 데이터');
       await expect(page.locator('#log li').first()).toContainText('뚝섬 한강'); // 일지는 최근 40건, 방문일 최근 순
       await page.locator('#tabs [data-tab="bag"]').click();
-      // 가방은 서버 값 — 예시 지역 아이템 45 + 예시가 완성하는 세트의 배경 1(늦게 반영)
-      await expect(page.locator('#n-bag')).toHaveText('46', { timeout: 10_000 });
+      // 가방은 서버 값 — 예시 지역 아이템 45 + 예시가 완성하는 세트의 배경 1 + (8단계) 연속 탐험 마일스톤 3·6·12개월 3
+      // + 예시가 다 칠한 세종·제주 정복 장식 2(모두 늦게 반영)
+      await expect(page.locator('#n-bag')).toHaveText('51', { timeout: 10_000 });
       await page.locator('#tabs [data-tab="map"]').click();
     });
 

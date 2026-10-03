@@ -6,5 +6,7 @@
  },
  "provinceFirstBonus": 15,
  "setCompleteBonus": 100,
- "claimBonus": 10
+ "claimBonus": 10,
+ "mysteryBonus": 50,
+ "provinceConquestBonus": 300
 }

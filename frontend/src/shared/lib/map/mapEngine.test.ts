@@ -1,6 +1,6 @@
 /**
  * 지도 엔진 — 지도 그림은 엔진이 소유하고 화면은 바뀐 값만 넘긴다. 캐릭터 이동은 목적지가 바뀔 때만 시작한다.
- * 이야기 순서: 캐릭터 이동 → 지도 칠하기 → 지도 만지기.
+ * 이야기 순서: 캐릭터 이동 → 지도 칠하기 → 시·도 정복 테두리 → 이번 주 미스터리 마커 → 지도 만지기.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { CATALOG } from '../../../test/fixtures';
@@ -18,10 +18,11 @@ function mount() {
   card.append(svg, tip);
   document.body.append(card);
   const clicks: string[] = [];
-  const engine = new MapEngine(svg, tip, card, CATALOG.features, { onRegionClick: code => clicks.push(code), describe: code => code });
+  const mysteryClicks: string[] = [];
+  const engine = new MapEngine(svg, tip, card, CATALOG.features, { onRegionClick: code => clicks.push(code), onMysteryClick: code => mysteryClicks.push(code), describe: code => code });
   const charpos = () => svg.querySelector('g.charpos') as TransitionNode;
   const transitions = () => Object.keys(charpos().__transition ?? {});
-  return { engine, svg, tip, charpos, transitions, clicks };
+  return { engine, svg, tip, charpos, transitions, clicks, mysteryClicks };
 }
 
 const paint = (mine: string[], selected: string | null = null): RegionPaint =>
@@ -151,6 +152,79 @@ describe('지도 칠하기', () => {
     expect(jongno.classList.contains('claimed')).toBe(true);
     expect(jongno.style.fill).toBe('rgb(232, 116, 59)');
     expect(jongno.getAttribute('data-claim')).toBe('friend');
+  });
+});
+
+describe('시·도 정복 테두리', () => {
+  const outlineOf = (svg: SVGSVGElement, province: string) => svg.querySelector(`g.conquest[data-province="${province}"]`) as SVGGElement | null;
+
+  it('정복한 시·도는 그 시·도 지역들로 테두리를 두르고, 안쪽 경계선은 가리개로 가린다', () => {
+    const { engine, svg } = mount();
+    engine.setConqueredProvinces(new Set(['서울']));
+    const outline = outlineOf(svg, '서울');
+    expect(outline?.querySelectorAll('path')).toHaveLength(2);
+    const maskId = /url\(#(.+)\)/.exec(outline?.getAttribute('mask') ?? '')?.[1];
+    expect(svg.querySelector(`mask[id="${maskId}"]`)?.querySelectorAll('path')).toHaveLength(2);
+    expect(outlineOf(svg, '경기')).toBeNull();
+  });
+
+  it('정복한 시·도가 늘면 그 시·도만 더하고, 같은 목록이면 다시 그리지 않는다', () => {
+    const { engine, svg } = mount();
+    engine.setConqueredProvinces(new Set(['서울']));
+    const seoul = outlineOf(svg, '서울');
+    engine.setConqueredProvinces(new Set(['서울']));
+    engine.setConqueredProvinces(new Set(['서울', '경북']));
+    expect(outlineOf(svg, '서울')).toBe(seoul);
+    expect(outlineOf(svg, '경북')).not.toBeNull();
+    expect(svg.querySelectorAll('mask')).toHaveLength(2);
+  });
+
+  it('막 정복한 시·도는 잠깐 반짝이고, 반짝이는 동안 다시 불려도 처음부터 다시 걸지 않는다', () => {
+    const { engine, svg } = mount();
+    engine.setConqueredProvinces(new Set(['서울']));
+    engine.flashProvinces(['서울', '경기']);
+    const seoul = outlineOf(svg, '서울') as SVGGElement;
+    expect(seoul.classList.contains('flash')).toBe(true);
+    seoul.classList.add('restarted-marker');
+    engine.flashProvinces(['서울']);
+    expect(seoul.classList.contains('restarted-marker')).toBe(true);
+    seoul.dispatchEvent(new Event('animationend'));
+    expect(seoul.classList.contains('flash')).toBe(false);
+  });
+});
+
+describe('이번 주 미스터리 마커', () => {
+  const markOf = (svg: SVGSVGElement) => svg.querySelector('g.mystery-mark') as SVGGElement | null;
+
+  it('미스터리 지역 한가운데 물음표 마커를 세우고, 누르면 그 지역을 알린다', () => {
+    const { engine, svg, clicks, mysteryClicks } = mount();
+    engine.setMystery({ code: '31370', received: false });
+    const mark = markOf(svg) as SVGGElement;
+    expect(mark.getAttribute('data-mystery')).toBe('31370');
+    expect(mark.getAttribute('transform')).toMatch(/^translate\(/);
+    expect(mark.textContent).toBe('❓');
+    mark.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(mysteryClicks).toEqual(['31370']);
+    expect(clicks).toEqual([]);
+  });
+
+  it('이번 주 보너스를 받으면 체크 표시로 바뀌고, 같은 값이면 다시 그리지 않는다', () => {
+    const { engine, svg } = mount();
+    engine.setMystery({ code: '31370', received: false });
+    const mark = markOf(svg);
+    engine.setMystery({ code: '31370', received: true });
+    expect(markOf(svg)).toBe(mark);
+    expect(mark?.classList.contains('received')).toBe(true);
+    expect(mark?.textContent).toBe('✓');
+  });
+
+  it('미스터리 지역이 없거나 지도에 없는 지역이면 마커를 세우지 않는다', () => {
+    const { engine, svg } = mount();
+    engine.setMystery({ code: '99999', received: false });
+    expect(markOf(svg)).toBeNull();
+    engine.setMystery({ code: '31370', received: false });
+    engine.setMystery(null);
+    expect(markOf(svg)).toBeNull();
   });
 });
 

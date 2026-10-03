@@ -1,12 +1,15 @@
 /**
  * 지도 탭 — 내 영토를 보고, 지역을 눌러 칠하고(체크인), 고치고, 지운다. 정복률·시·도별 값은 서버 값이고 화면은 고르기·정렬·문구만 한다.
- * 이야기 순서: 내 영토 보기 → 지역 누르기 → 체크인 모달 → 체크인한 뒤 → 기록 수정·취소 → 예시 채우기·전부 지우기 → 공유 지도 이의.
+ * 이야기 순서: 내 영토 보기 → 이번 주 미스터리 지역 → 지역 누르기 → 체크인 모달 → 체크인한 뒤 → 기록 수정·취소 → 예시 채우기·전부 지우기 → 공유 지도 이의.
  */
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { explorationApi } from '../../api/exploration';
 import type { MapDetailResponse } from '../../api/types/exploration';
-import type { SetResponse } from '../../api/types/progression';
+import type { MysteryWeekResponse, SetResponse } from '../../api/types/progression';
+import { mysteryKeys } from '../../shared/queries/mystery';
+import { MysteryCard } from './components/MysteryCard';
+import { mysteryCard, remainingText } from './model/mystery';
 import { myVisits, type MyVisit } from '../../shared/lib/territory/visits';
 import { recapKeys } from '../../shared/queries/recap';
 import { mapKeys } from '../../shared/queries/territory';
@@ -54,6 +57,8 @@ const CHECK_IN = { code: '11010', visitDate: '2026-10-03', memo: '', photoUrl: '
 const visitsOf = (...codes: string[]): Map<string, MyVisit> => new Map(codes.map(code => [code, { code, date: '', memo: '', at: 0 }]));
 
 afterEach(() => {
+  cleanup();
+  useUiStore.setState({ mysteryRevealed: false });
   vi.clearAllMocks();
   useSyncStore.setState({ settleUntil: 0, territoryUntil: 0, announce: false });
   useUiStore.setState({ sampleMode: false, mode: 'paint', selected: null, checkinCode: null });
@@ -84,6 +89,18 @@ describe('내 영토 보기', () => {
 
     it('서버 값이 오기 전에는 카탈로그 시·도 순서로 모두 0곳을 보여 준다', () => {
       expect(provinceRows(null, CATALOG).map(row => `${row.name}${row.visited}/${row.total}`)).toEqual(['서울0/2', '경기0/1', '경북0/1']);
+    });
+
+    it('정복한 시·도에는 왕관을 씌우고, 지금 지도에서 덜 칠했어도 정복 기록이 있으면 왕관은 남는다', () => {
+      const rows = provinceRows(territory({ provinces: [
+        { code: 'KR-11', name: '서울', visited: 1, total: 2, percent: 50, conquered: false },
+        { code: 'KR-31', name: '경기', visited: 1, total: 1, percent: 100, conquered: true },
+      ] }), CATALOG, new Set(['KR-11']));
+      expect(rows.map(row => `${row.name}${row.crowned ? '👑' : ''}`)).toEqual(['경기', '서울👑']);
+    });
+
+    it('서버 값이 오기 전에도 정복 기록이 있는 시·도에는 왕관을 씌운다', () => {
+      expect(provinceRows(null, CATALOG, new Set(['KR-37'])).filter(row => row.crowned).map(row => row.name)).toEqual(['경북']);
     });
   });
 
@@ -130,6 +147,59 @@ describe('내 영토 보기', () => {
     it('이미 떠난 멤버의 선점은 색 없이 둔다', () => {
       const shared = territory({ mapKind: 'SHARED', claims: [{ regionCode: 'KR-11010', explorerId: 'gone' }] });
       expect(claimMaps(shared, detail([member('me', true, '#2fc3ad')])).claimer.size).toBe(0);
+    });
+  });
+});
+
+describe('이번 주 미스터리 지역', () => {
+  const week = (overrides: Partial<MysteryWeekResponse> = {}): MysteryWeekResponse => ({
+    weekStart: '2026-09-28', startsAt: '2026-09-27T15:00:00Z', endsAt: '2026-10-04T15:00:00Z', remainingSeconds: 2 * 86400 + 3 * 3600 + 120,
+    region: { code: 'KR-31370', name: '가평군', provinceCode: 'KR-31', provinceName: '경기', rarity: 'RARE' },
+    bonusXp: 50, received: false, receivedAt: null, foundCount: 0, revealed: false, ...overrides,
+  });
+
+  describe('남은 기간', () => {
+    it('하루 넘게 남으면 며칠 몇 시간 남았는지 보여 준다', () => {
+      expect(remainingText(2 * 86400 + 3 * 3600 + 59)).toBe('2일 3시간 남음');
+    });
+
+    it('하루가 안 남으면 몇 시간 몇 분, 한 시간이 안 남으면 몇 분 남았는지 보여 준다', () => {
+      expect(remainingText(5 * 3600 + 7 * 60)).toBe('5시간 7분 남음');
+      expect(remainingText(42 * 60 + 10)).toBe('42분 남음');
+    });
+
+    it('1분도 안 남으면 곧 다음 주 지역으로 바뀐다고 알려 준다', () => {
+      expect(remainingText(30)).toBe('곧 다음 주 지역으로 바뀌어요');
+      expect(remainingText(-5)).toBe('곧 다음 주 지역으로 바뀌어요');
+    });
+  });
+
+  describe('미스터리 카드', () => {
+    it('누르기 전에는 지역 이름 대신 희귀도만 알려 주고, 남은 기간과 보너스 XP 를 보여 준다', () => {
+      expect(mysteryCard(week(), false)).toMatchObject({ title: '어딘가의 희귀 지역', remaining: '2일 3시간 남음', bonus: '+50 XP', received: false });
+      expect(mysteryCard(week({ region: { ...week().region, rarity: 'LEGEND' } }), false).title).toBe('어딘가의 전설 지역');
+    });
+
+    it('카드나 마커를 눌러 지도에서 찾으면 시·도와 지역 이름을 보여 준다', () => {
+      expect(mysteryCard(week(), true).title).toBe('경기 가평군');
+    });
+
+    it('이번 주 보너스를 받아 서버가 공개해도 된다고 하면 누르지 않아도 지역 이름을 보여 준다', () => {
+      expect(mysteryCard(week({ received: true, revealed: true }), false)).toMatchObject({ title: '경기 가평군', revealed: true });
+    });
+
+    it('이번 주 보너스를 받았으면 받았다고 표시하고 지금까지 찾은 주 수를 알려 준다', () => {
+      expect(mysteryCard(week({ received: true, revealed: true, foundCount: 3 }), true)).toMatchObject({ received: true, hint: '이번 주 보너스를 받았어요 · 지금까지 3주 찾음' });
+    });
+
+    it('카드를 누르면 지역 이름을 공개하고 지도에서 그 지역으로 확대해 강조한다', () => {
+      const { wrapper } = serverState([[mysteryKeys.thisWeek(), week()]]);
+      render(<MysteryCard />, { wrapper });
+      expect(screen.getByText('어딘가의 희귀 지역')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button'));
+      expect(screen.getByText('경기 가평군')).toBeTruthy();
+      expect(useUiStore.getState()).toMatchObject({ mysteryRevealed: true, highlight: '31370', selected: '31370' });
+      expect(useUiStore.getState().mapCommand).toMatchObject({ kind: 'zoom', codes: ['31370'] });
     });
   });
 });

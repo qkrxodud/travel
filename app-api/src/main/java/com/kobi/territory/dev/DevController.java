@@ -2,36 +2,33 @@ package com.kobi.territory.dev;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kobi.territory.common.error.ErrorKind;
-import com.kobi.territory.common.error.TerritoryException;
-import com.kobi.territory.common.model.ExplorerId;
-import com.kobi.territory.common.model.RegionCode;
-import com.kobi.territory.common.identity.CurrentExplorer;
-import com.kobi.territory.exploration.application.ExplorationDevService;
-import com.kobi.territory.exploration.application.ExplorationDevService.SampleVisit;
-import com.kobi.territory.exploration.application.MapAccess;
-import com.kobi.territory.exploration.domain.explorer.Explorer;
-import com.kobi.territory.outbox.OutboxRedelivery;
-import com.kobi.territory.readmodel.FeedRebuildJob;
-import com.kobi.territory.readmodel.FeedRebuildStatus;
-import com.kobi.territory.social.application.RankBatchJob;
-import com.kobi.territory.social.domain.stats.RankSnapshot;
-import com.kobi.territory.outbox.OutboxRelay;
 import com.kobi.territory.api.security.ExplorerAuthentication;
 import com.kobi.territory.api.security.GoogleLoginConfig;
 import com.kobi.territory.api.security.LoginResponse;
 import com.kobi.territory.api.security.SessionLogin;
+import com.kobi.territory.catalog.api.query.MysteryWeekView;
+import com.kobi.territory.catalog.application.ItemDefinitionCache;
+import com.kobi.territory.common.error.ErrorKind;
+import com.kobi.territory.common.error.TerritoryException;
+import com.kobi.territory.common.identity.CurrentExplorer;
+import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.common.model.RegionCode;
+import com.kobi.territory.config.AdjustableClock;
+import com.kobi.territory.exploration.application.ExplorationDevService.SampleVisit;
+import com.kobi.territory.exploration.application.ExplorationDevService;
+import com.kobi.territory.exploration.application.MapAccess;
 import com.kobi.territory.exploration.domain.explorer.AccountIdentity;
+import com.kobi.territory.exploration.domain.explorer.Explorer;
+import com.kobi.territory.outbox.OutboxRedelivery;
+import com.kobi.territory.outbox.OutboxRelay;
+import com.kobi.territory.progression.application.RecalculateService;
+import com.kobi.territory.readmodel.FeedRebuildJob;
+import com.kobi.territory.readmodel.FeedRebuildStatus;
+import com.kobi.territory.social.application.RankBatchJob;
+import com.kobi.territory.social.domain.stats.RankSnapshot;
+import com.kobi.territory.wardrobe.application.InventoryRecalculateService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
-import com.kobi.territory.progression.application.RecalculateService;
-import com.kobi.territory.catalog.application.ItemDefinitionCache;
-import com.kobi.territory.wardrobe.application.InventoryRecalculateService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -40,21 +37,30 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -73,6 +79,8 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>{@code POST /dev/login} {email, sub?} — 구글 로그인 대신 같은 계정 연결·병합 경로로 세션을 만든다(4단계, E2E). 200 LoginResponse</li>
  *   <li>{@code POST /dev/rebuild/feed} — 친구 소식 재구성(운영 /admin/rebuild/feed 와 같은 작업을 끝날 때까지 기다림, 5단계). 200 상태
  *       {state, generation, replayed, skipped, …}</li>
+ *   <li>{@code GET·PUT /dev/mystery} {regionCode|null} — 미스터리 지역 고정·해제(8단계 보완, {@link PinnableMysteryRegionQuery}). 200
+ *       {weekStart, regionCode, pinned} / 400 {message}</li>
  *   <li>{@code POST /dev/batch/rank} — 일 1회 집계 배치(상위 %·지역별 방문자 비율·시·도 평균) 수동 실행(5단계). 200 {population, ranked, regions, provinces, overflowed}</li>
  * </ul>
  * 시드는 샘플을 방문일 순으로 체크인하고 처리 시각을 샘플 날짜로 둔다(D6) — 스트릭·월간 퀘스트가 프로토타입과 비슷하게 나온다.
@@ -91,9 +99,10 @@ public class DevController {
         "inventory", "scene", "xp_ledger", "badge_earned",
         "title_earned", "explorer_region_mark", "explorer_region", "set_progress", "quest_progress", "explorer_progress", "visit_generation", "visit", "territory",
         "map_member", "expedition_map", "recalculation_request", "handle_reservation", "account", "share_card", "privacy_settings",
-        "invite_reward", "explorer");
+        "invite_reward", "streak_freeze", "explorer");
 
     private final JdbcTemplate jdbc;
+    private final ExplorerDataReset dataReset;
     private final ExplorationDevService exploration;
     private final MapAccess mapAccess;
     private final RecalculateService recalculate;
@@ -108,13 +117,16 @@ public class DevController {
     private final SessionLogin sessionLogin;
     private final FeedRebuildJob feedRebuild;
     private final RankBatchJob rankBatch;
+    private final PinnableMysteryRegionQuery mysteries;
 
     public DevController(JdbcTemplate jdbc, ExplorationDevService exploration, MapAccess mapAccess,
                          RecalculateService recalculate, OutboxRedelivery redelivery, ObjectMapper objectMapper,
                          Clock clock, InventoryRecalculateService inventoryRecalculate,
                          ItemDefinitionCache itemDefinitions, ObjectProvider<OutboxRelay> relay,
                          PlatformTransactionManager transactionManager, ExplorerAuthentication authentication,
-                         SessionLogin sessionLogin, FeedRebuildJob feedRebuild, RankBatchJob rankBatch) {
+                         SessionLogin sessionLogin, FeedRebuildJob feedRebuild, RankBatchJob rankBatch,
+                         PinnableMysteryRegionQuery mysteries) {
+        this.mysteries = mysteries;
         this.feedRebuild = feedRebuild;
         this.rankBatch = rankBatch;
         this.relay = relay;
@@ -125,6 +137,7 @@ public class DevController {
         this.itemDefinitions = itemDefinitions;
         this.redelivery = redelivery;
         this.jdbc = jdbc;
+        this.dataReset = new ExplorerDataReset(jdbc);
         this.exploration = exploration;
         this.mapAccess = mapAccess;
         this.recalculate = recalculate;
@@ -143,13 +156,18 @@ public class DevController {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
                 TABLES.forEach(table -> jdbc.update("DELETE FROM " + table));
                 // 운영 추가 아이템(event: 등)만 지운다 — 이관 데이터(region:·set:, 250+9 + V4_1 invite: 2)는 유지(QA P3-16)
+                // 8단계 V6 이관 데이터(conquest: 시·도 정복 17·streak: 마일스톤 4)도 유지
                 jdbc.update("DELETE FROM item_definition WHERE item_id NOT LIKE 'region:%' AND item_id NOT LIKE 'set:%'"
-                    + " AND item_id NOT LIKE 'invite:%'");
+                    + " AND item_id NOT LIKE 'invite:%' AND item_id NOT LIKE 'conquest:%' AND item_id NOT LIKE 'streak:%'");
             });
         } finally {
             relay.ifAvailable(OutboxRelay::resume);
         }
         itemDefinitions.invalidate();
+        // 8단계: 밀어 둔 서버 시계도 시스템 시계로(다음 이야기가 과거·미래에 남지 않게)
+        if (clock instanceof AdjustableClock adjustable) adjustable.reset();
+        // 8단계 보완: 고정해 둔 미스터리 지역도 풀어 원래 주차 선택으로
+        mysteries.unpin();
         return ResponseEntity.noContent().build();
     }
 
@@ -173,31 +191,10 @@ public class DevController {
         return Map.of("cleared", cleared);
     }
 
-    /** 이 탐험가의 진행 데이터 삭제(dev 전용). 이후 도착하는 VisitCancelled 는 빈 진행에 no-op 이다. */
+    /** 이 탐험가의 진행·가방 데이터를 시작 상태로(dev 전용, 멱등 — {@link ExplorerDataReset}). 이후 도착하는 VisitCancelled 는 빈 진행에 no-op 이다. */
     private void resetProgression(ExplorerId explorerId) {
-        String id = mapAccess.requireExplorer(explorerId).id().value();
-        PROGRESSION_TABLES.forEach(table -> jdbc.update("DELETE FROM " + table + " WHERE explorer_id = ?", id));
-        // 진행 루트 행은 지우지 않고 시작 상태로 되돌린다 — 루트 선생성(S3-1) 전제 유지(QA Q-R2-2). version 을 올려 동시 갱신을 드러낸다.
-        jdbc.update("UPDATE explorer_progress SET xp = 0, level = 1, title_id = NULL, streak_months = 0, streak_last_month = NULL, "
-            + "version = version + 1 WHERE explorer_id = ?", id);
-        // 시작 상태의 레벨 1 칭호(ExplorerProgress.start 와 같게)
-        jdbc.update("INSERT INTO title_earned (explorer_id, title_id, earned_at) SELECT explorer_id, 'lv1', updated_at "
-            + "FROM explorer_progress WHERE explorer_id = ?", id);
-        // 개인 지도 도감만 — 공유 지도 도감은 다른 멤버 것이기도 하다(QA P3-13)
-        jdbc.update("DELETE FROM set_progress WHERE map_id IN (SELECT id FROM expedition_map WHERE owner_id = ? AND kind = 'PERSONAL')", id);
-        WARDROBE_CHILD_TABLES.forEach(table -> jdbc.update("DELETE FROM " + table + " WHERE explorer_id = ?", id));
-        jdbc.update("UPDATE scene SET slot_hat = NULL, slot_hand = NULL, slot_badge = NULL, slot_bag = NULL, slot_pet = NULL, "
-            + "slot_bg = NULL, props = '', version = version + 1 WHERE explorer_id = ?", id);
+        dataReset.reset(mapAccess.requireExplorer(explorerId).id().value());
     }
-
-    /**
-     * 꾸미기(3단계) — 시드·전부 지우기 때 가방·장면도 비운다(세트 배경처럼 회수 없는 보상이 남지 않게). 루트 행(inventory·scene)은
-     * 지우지 않고 자식 행·착용 칸만 비운다 — 이후 이벤트 처리·재계산이 항상 있는 루트 행을 잠근다는 전제(S3-1)를 지킨다(Q-R2-2).
-     */
-    private static final List<String> WARDROBE_CHILD_TABLES = List.of("owned_item_basis", "owned_item", "inventory_visit");
-
-    private static final List<String> PROGRESSION_TABLES = List.of("xp_ledger", "badge_earned", "title_earned",
-        "explorer_region_mark", "explorer_region", "quest_progress");
 
     @PostMapping("/outbox/redeliver")
     public Map<String, Integer> redeliver(@RequestParam(value = "eventId", required = false) Long eventId,
@@ -256,6 +253,85 @@ public class DevController {
         return Map.of("population", snapshot.population(), "ranked", snapshot.percentiles().size(),
             "regions", snapshot.regionStats().size(), "provinces", snapshot.provinceStats().size(),
             "overflowed", snapshot.overflows().size());
+    }
+
+    /**
+     * 서버 시계 보기(8단계) — 지금 시각·간격·시간대. 주차(월요일 00:00)·월 넘김 E2E 용.
+     */
+    @GetMapping("/clock")
+    public ResponseEntity<Map<String, Object>> clockNow() {
+        if (!(clock instanceof AdjustableClock adjustable)) return notAdjustable();
+        return ResponseEntity.ok(clockState(adjustable));
+    }
+
+    /**
+     * 서버 시계를 앞으로 민다(8단계, local 전용). 본문 {@code {"days": n, "hours": n, "minutes": n}} 만큼, 또는 {@code {"to": "ISO 시각"}}
+     * 까지(지금보다 뒤여야 한다). 뒤로는 못 민다 — 되돌리기는 DELETE /dev/clock(초기화와 함께).
+     */
+    @PostMapping("/clock")
+    public ResponseEntity<Map<String, Object>> advanceClock(@RequestBody ClockShift shift) {
+        if (!(clock instanceof AdjustableClock adjustable)) return notAdjustable();
+        Duration amount = shift.to() != null ? Duration.between(adjustable.instant(), OffsetDateTime.parse(shift.to()).toInstant())
+            : Duration.ofDays(shift.days()).plusHours(shift.hours()).plusMinutes(shift.minutes());
+        try {
+            adjustable.advance(amount);
+        } catch (IllegalArgumentException backwards) {
+            return ResponseEntity.badRequest().body(Map.of("message", backwards.getMessage(), "now", adjustable.instant().toString()));
+        }
+        return ResponseEntity.ok(clockState(adjustable));
+    }
+
+    /** 서버 시계를 시스템 시계로 되돌린다(8단계). 쌓인 데이터보다 과거가 되므로 DELETE /dev/reset 과 함께 쓴다(reset 도 시계를 되돌린다). */
+    @DeleteMapping("/clock")
+    public ResponseEntity<Map<String, Object>> resetClock() {
+        if (!(clock instanceof AdjustableClock adjustable)) return notAdjustable();
+        adjustable.reset();
+        return ResponseEntity.ok(clockState(adjustable));
+    }
+
+    /** 지금 미스터리 지역과 고정 여부(8단계 보완). */
+    @GetMapping("/mystery")
+    public Map<String, Object> mysteryState() {
+        return mysteryStateBody();
+    }
+
+    /**
+     * 미스터리 지역 고정(8단계 보완, E2E 용). 본문 {@code {"regionCode": "KR-xxxxx"}} 이면 이번 주부터(시계를 넘긴 다음 주들도) 해제 전까지
+     * 그 지역, {@code {"regionCode": null}} 이면 원래 주차 선택으로. 현행 희귀·전설 지역만 — 아니면 400 {message}. 초기화(DELETE /dev/reset)도 푼다.
+     */
+    @PutMapping("/mystery")
+    public ResponseEntity<Map<String, Object>> pinMystery(@RequestBody(required = false) MysteryPinRequest body) {
+        String regionCode = body == null ? null : body.regionCode();
+        if (regionCode == null || regionCode.isBlank()) {
+            mysteries.unpin();
+            return ResponseEntity.ok(mysteryStateBody());
+        }
+        try {
+            mysteries.pin(regionCode);
+        } catch (IllegalArgumentException invalid) {
+            return ResponseEntity.badRequest().body(Map.of("message", invalid.getMessage()));
+        }
+        return ResponseEntity.ok(mysteryStateBody());
+    }
+
+    public record MysteryPinRequest(String regionCode) {}
+
+    private Map<String, Object> mysteryStateBody() {
+        MysteryWeekView week = mysteries.thisWeek();
+        return Map.of("weekStart", week.weekId(), "regionCode", week.regionCode(),
+            "pinned", mysteries.pinnedRegion().isPresent());
+    }
+
+    /** @param to ISO-8601 오프셋 포함 시각(예: 2026-10-12T00:00:00+09:00) — 있으면 days·hours·minutes 는 무시 */
+    public record ClockShift(int days, int hours, int minutes, String to) {}
+
+    private Map<String, Object> clockState(AdjustableClock adjustable) {
+        return Map.of("now", adjustable.instant().atZone(adjustable.getZone()).toOffsetDateTime().toString(),
+            "offsetSeconds", adjustable.offset().getSeconds(), "zone", adjustable.getZone().getId());
+    }
+
+    private static ResponseEntity<Map<String, Object>> notAdjustable() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", "이 서버의 시계는 밀 수 없어요(테스트 시계)."));
     }
 
     @PostMapping("/explorers/age")

@@ -1,8 +1,11 @@
 package com.kobi.territory.progression.application;
 
 import com.kobi.territory.catalog.api.query.ProgressionRules;
+import com.kobi.territory.catalog.api.query.MysteryRegionQuery;
+import com.kobi.territory.catalog.api.query.MysteryWeekView;
 import com.kobi.territory.catalog.api.query.ProgressionRules.BadgeConditionView;
-import com.kobi.territory.catalog.api.query.ProvinceView;
+import com.kobi.territory.catalog.api.query.ProgressionRules.QuestView;
+import com.kobi.territory.catalog.api.query.ProgressionRules.StreakRulesView;
 import com.kobi.territory.catalog.api.query.RegionCatalog;
 import com.kobi.territory.catalog.api.query.RewardCalculator;
 import com.kobi.territory.common.model.Rarity;
@@ -12,6 +15,10 @@ import com.kobi.territory.progression.domain.policy.BadgeRule;
 import com.kobi.territory.progression.domain.policy.Badges;
 import com.kobi.territory.progression.domain.policy.LevelCurve;
 import com.kobi.territory.progression.domain.policy.ProgressionPolicy;
+import com.kobi.territory.progression.domain.policy.ProvinceRoster;
+import com.kobi.territory.progression.domain.policy.StreakMilestone;
+import com.kobi.territory.progression.domain.policy.StreakRules;
+import com.kobi.territory.progression.domain.progress.MysteryFact;
 import com.kobi.territory.progression.domain.quest.QuestRule;
 import com.kobi.territory.progression.domain.quest.QuestRules;
 import com.kobi.territory.progression.domain.collectionbook.Theme;
@@ -22,6 +29,9 @@ import com.kobi.territory.progression.domain.policy.XpAward;
 import com.kobi.territory.progression.domain.policy.XpRewards;
 import com.kobi.territory.progression.domain.policy.XpSource;
 import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Optional;
 import java.time.YearMonth;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,22 +46,34 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProgressionCatalog implements XpRewards {
 
+    /** 카탈로그 퀘스트 범위 값 중 월간(공개 계약 값). */
+    private static final String MONTHLY = "MONTHLY";
+
     private final RewardCalculator rewards;
+    private final MysteryRegionQuery mysteries;
     private final Clock clock;
     private final ProgressionPolicy policy;
     private final Themes themes;
     private final QuestRules questRules;
 
-    public ProgressionCatalog(ProgressionRules rules, RewardCalculator rewards, RegionCatalog regions, Clock clock) {
+    public ProgressionCatalog(ProgressionRules rules, RewardCalculator rewards, RegionCatalog regions,
+                              MysteryRegionQuery mysteries, Clock clock) {
         this.rewards = rewards;
+        this.mysteries = mysteries;
         this.clock = clock;
-        Map<String, Integer> provinceTotals = regions.provinces().stream()
-            .collect(Collectors.toMap(ProvinceView::code, ProvinceView::regionCount, (first, second) -> first, LinkedHashMap::new));
+        Map<String, List<RegionCode>> currentRegions = new LinkedHashMap<>();
+        regions.provinces().forEach(province -> currentRegions.put(province.code(), new ArrayList<>()));
+        regions.activeRegions().forEach(region -> currentRegions.computeIfAbsent(region.provinceCode(), key -> new ArrayList<>())
+            .add(RegionCode.of(region.code())));
+        StreakRulesView streak = rules.streakRules();
         this.policy = new ProgressionPolicy(LevelCurve.withDivisor(rules.levelDivisor()), this,
             new Badges(rules.badges().stream().map(badge -> new Badge(badge.id(), badgeRule(badge.condition()))).toList()),
             new TitleRules(rules.titles().stream()
                 .map(title -> new TitleRule(title.id(), TitleRule.Source.valueOf(title.source()), title.ref())).toList()),
-            provinceTotals, regions.activeRegions().size(), clock.getZone());
+            ProvinceRoster.of(currentRegions), regions.activeRegions().size(), clock.getZone(),
+            new StreakRules(streak.freezeMaxHeld(), streak.monthlyQuestsFreezes(), streak.milestones().stream()
+                .map(milestone -> new StreakMilestone(milestone.months(), milestone.xp(), milestone.freezes())).toList()),
+            rules.quests().stream().filter(quest -> MONTHLY.equals(quest.scope())).map(QuestView::id).collect(Collectors.toSet()));
         this.themes = new Themes(rules.sets().stream()
             .map(setView -> new Theme(setView.id(),
                 setView.regionCodes().stream().map(RegionCode::of).collect(Collectors.toSet())))
@@ -73,6 +95,7 @@ public class ProgressionCatalog implements XpRewards {
             case "SETS_COMPLETED" -> new BadgeRule.ThemesCompleted(condition.min());
             case "STREAK_MONTHS" -> new BadgeRule.StreakMonths(condition.min());
             case "CONQUEST_RATIO" -> new BadgeRule.ConquestRatio(condition.ratio());
+            case "MYSTERY_FOUND" -> new BadgeRule.MysteryFound(condition.min());
             default -> throw new IllegalStateException("모르는 뱃지 조건: " + condition.type());
         };
     }
@@ -84,8 +107,36 @@ public class ProgressionCatalog implements XpRewards {
     }
 
     @Override
+    public List<XpAward> checkIn(Rarity rarity, boolean firstInProvince, boolean firstClaim, boolean mysteryOfWeek) {
+        return rewards.checkIn(rarity, firstInProvince, firstClaim, mysteryOfWeek).stream()
+            .map(line -> new XpAward(XpSource.valueOf(line.source()), line.amount())).toList();
+    }
+
+    @Override
     public int themeComplete() {
         return rewards.setComplete().amount();
+    }
+
+    @Override
+    public int provinceConquest() {
+        return rewards.provinceConquest().amount();
+    }
+
+    /** 이번 주 미스터리 지역 보너스 XP. */
+    public int mysteryBonus() {
+        return rewards.mysteryBonus().amount();
+    }
+
+    /**
+     * 처리 시각 at 이 속한 주의 미스터리 지역(8단계). 그 주 기록이 없으면(지난 주 — 소급 없음) 비어 있다. 지금 주면 카탈로그가 골라 기록한다.
+     */
+    public Optional<MysteryFact> mysteryOf(Instant at) {
+        return mysteries.weekOf(at).map(week -> new MysteryFact(week.weekId(), RegionCode.of(week.regionCode())));
+    }
+
+    /** 이번 주 미스터리 지역(없으면 카탈로그가 골라 기록) — GET /mystery/this-week. */
+    public MysteryWeekView mysteryThisWeek() {
+        return mysteries.thisWeek();
     }
 
     public ProgressionPolicy policy() {

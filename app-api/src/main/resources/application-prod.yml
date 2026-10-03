@@ -23,3 +23,7 @@ territory:
   admin:
     # 운영 관리자 토큰 — 환경변수 필수(없으면 기동 실패).
     token: ${TERRITORY_ADMIN_TOKEN}
+  mystery:
+    # 이번 주 미스터리 지역 주차 시드의 서버 비밀값 — 환경변수 필수(없으면 기동 실패). 바꾸면 아직 기록되지 않은 주부터 다른 지역이 된다
+    # (이미 기록된 주는 mystery_week 그대로).
+    salt: ${TERRITORY_MYSTERY_SALT}

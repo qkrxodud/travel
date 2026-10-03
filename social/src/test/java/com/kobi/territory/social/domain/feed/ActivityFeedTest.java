@@ -52,4 +52,14 @@ class ActivityFeedTest {
     void mergedNewsKeepsOrigin() {
         assertThat(MERGED_LEVEL.refId()).contains(ANON.value()).isEqualTo(FeedEntry.levelUp(ANON, 2, T0).refId());
     }
+
+    @Test
+    @DisplayName("미스터리 소식은 같은 지역이어도 주가 다르면 따로 보이고 그 지역 체크인 소식과도 겹치지 않는다")
+    void mysteryPerWeek() {
+        FeedEntry visit = FeedEntry.visit(KIM, PERSONAL_MAP, "KR-37430", Rarity.LEGEND, 1, T0);
+        ActivityFeed feed = ActivityFeed.of(List.of(visit, FeedEntry.mysteryFound(KIM, "KR-37430", "2026-09-28", T0),
+            FeedEntry.mysteryFound(KIM, "KR-37430", "2026-10-05", T0.plusSeconds(700_000))));
+
+        assertThat(feed.size()).isEqualTo(3);
+    }
 }

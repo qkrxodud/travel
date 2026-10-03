@@ -17,6 +17,9 @@ spring:
       path: /h2-console
 
 territory:
+  mystery:
+    # 이번 주 미스터리 지역 주차 시드의 서버 비밀값(8단계) — 로컬 전용 고정값. 운영은 TERRITORY_MYSTERY_SALT(application-prod.yml).
+    salt: local-mystery-salt
   dev:
     # /dev/**(reset·seed·login 등) 켜기 — 이 파일에만 둔다. local 프로파일 + 이 값이 모두 있어야 빈이 생긴다(QA P3-11).
     enabled: true

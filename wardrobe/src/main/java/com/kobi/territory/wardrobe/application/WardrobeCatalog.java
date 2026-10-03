@@ -2,12 +2,14 @@ package com.kobi.territory.wardrobe.application;
 
 import com.kobi.territory.catalog.api.query.ItemCatalog;
 import com.kobi.territory.catalog.api.query.ItemView;
+import com.kobi.territory.progression.api.query.AchievementsView;
 import com.kobi.territory.progression.api.query.CompletedSetView;
 import com.kobi.territory.wardrobe.domain.item.GrantKind;
 import com.kobi.territory.wardrobe.domain.item.ItemSlot;
 import com.kobi.territory.wardrobe.domain.item.ItemSpec;
 import com.kobi.territory.wardrobe.domain.item.ItemSpecs;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -46,6 +48,26 @@ public class WardrobeCatalog {
     /** 초대 합류 보상 — side = HOST(초대한 쪽) | GUEST(초대받은 쪽), 기간은 합류 시각으로 판정(4단계). */
     public List<ItemSpec> grantedByInvitation(String side, Instant joinedAt) {
         return items.grantedByInvitation(side, joinedAt).stream().map(WardrobeCatalog::specOf).toList();
+    }
+
+    /** 시·도 정복 보상(8단계) — 기간은 정복 시각으로 판정. */
+    public List<ItemSpec> grantedByProvinceConquest(String provinceCode, Instant conqueredAt) {
+        return items.grantedByProvinceConquest(provinceCode, conqueredAt).stream().map(WardrobeCatalog::specOf).toList();
+    }
+
+    /** 연속 탐험 마일스톤 보상(8단계) — 기간은 도달 시각으로 판정. */
+    public List<ItemSpec> grantedByStreakMilestone(int months, Instant reachedAt) {
+        return items.grantedByStreakMilestone(months, reachedAt).stream().map(WardrobeCatalog::specOf).toList();
+    }
+
+    /** 진행 기록에 남은 업적(시·도 정복·마일스톤)의 보상 전부(재계산 복구) — 각자 받은 시각으로 판정. */
+    public List<ItemSpec> grantedByAchievements(AchievementsView achievements) {
+        List<ItemSpec> rewards = new ArrayList<>();
+        achievements.conquests().forEach(conquest ->
+            rewards.addAll(grantedByProvinceConquest(conquest.provinceCode(), conquest.conqueredAt())));
+        achievements.milestones().forEach(milestone ->
+            rewards.addAll(grantedByStreakMilestone(milestone.months(), milestone.reachedAt())));
+        return List.copyOf(rewards);
     }
 
     public ItemSpecs specsOf(Collection<String> itemIds) {

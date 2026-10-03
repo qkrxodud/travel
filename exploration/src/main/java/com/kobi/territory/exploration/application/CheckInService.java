@@ -86,7 +86,8 @@ public class CheckInService {
         MapMembership mm = mapAccess.resolve(explorerId, MapSelector.of(mapId));
         RegionSnapshot region = regions.require(code);
         Territory territory = territories.load(mm.map().id());
-        return outcome(mm.map().id(), CheckInPreview.preview(territory, explorerId, region, regions));
+        return outcome(mm.map().id(), CheckInPreview.preview(territory, explorerId, region,
+            regions.mysteryRegionAt(clock.instant()), regions));
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -105,10 +106,11 @@ public class CheckInService {
         RegionSnapshot region = regions.require(cmd.regionCode());
         Territory territory = territories.load(mapId);
 
-        CheckInPreview.Result preview = CheckInPreview.preview(territory, cmd.explorerId(), region, regions);
+        Instant now = Optional.ofNullable(visitedAtOverride).orElseGet(clock::instant);
+        CheckInPreview.Result preview = CheckInPreview.preview(territory, cmd.explorerId(), region, regions.mysteryRegionAt(now),
+            regions);
         CheckInPolicy policy = Optional.ofNullable(policyOverride)
             .orElseGet(() -> mm.map().checkInPolicy(settings.onboardingGrace()));
-        Instant now = Optional.ofNullable(visitedAtOverride).orElseGet(clock::instant);
         CheckInResult result = territory.checkIn(cmd.explorerId(), region, VisitDate.of(cmd.visitDate()),
             Memo.of(cmd.memo()), PhotoRef.ofNullable(cmd.photoUrl()), context(policy, mm, now));
         territories.save(territory);

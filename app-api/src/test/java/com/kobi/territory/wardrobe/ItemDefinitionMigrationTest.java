@@ -10,6 +10,7 @@ import com.kobi.territory.catalog.api.query.RegionView;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
 import com.kobi.territory.support.IntegrationTest;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -51,7 +52,7 @@ class ItemDefinitionMigrationTest {
     @DisplayName("테마마다 완성 보상으로 전설 배경이 있다")
     void backgroundPerTheme() {
         for (ProgressionRules.SetView set : progression.sets()) {
-            List<ItemView> rewards = items.grantedByThemeCompletion(set.id(), java.time.Instant.parse("2026-10-03T03:00:00Z"));
+            List<ItemView> rewards = items.grantedByThemeCompletion(set.id(), Instant.parse("2026-10-03T03:00:00Z"));
             assertThat(rewards).extracting(ItemView::itemId).contains("set:" + set.id());
             ItemView background = items.item("set:" + set.id()).orElseThrow();
             assertThat(background.slot()).isEqualTo("BG");
@@ -70,5 +71,26 @@ class ItemDefinitionMigrationTest {
         }
         assertThat(regions.regionItem(RegionCode.of("KR-25040")).orElseThrow().name()).startsWith("대전 튀김소보로");
         assertThat(names).anyMatch(name -> name.startsWith("군산 단팥빵"));
+    }
+
+    @Test
+    @DisplayName("시·도마다 정복하면 받는 전설 장식이 하나씩 있다")
+    void conquestDecorationPerProvince() {
+        for (var province : regions.provinces()) {
+            List<ItemView> rewards = items.grantedByProvinceConquest(province.code(), Instant.parse("2026-10-05T03:00:00Z"));
+            assertThat(rewards).extracting(ItemView::itemId).containsExactly("conquest:" + province.code());
+            assertThat(rewards.get(0).slot()).isEqualTo("PROP");
+            assertThat(rewards.get(0).tier()).isEqualTo(Rarity.LEGEND);
+            assertThat(rewards.get(0).name()).startsWith(province.name());
+        }
+    }
+
+    @Test
+    @DisplayName("연속 탐험 마일스톤마다 한정 아이템이 하나씩 있다")
+    void itemPerStreakMilestone() {
+        for (var milestone : progression.streakRules().milestones()) {
+            assertThat(items.grantedByStreakMilestone(milestone.months(), Instant.parse("2026-10-05T03:00:00Z")))
+                .extracting(ItemView::itemId).containsExactly("streak:" + milestone.months());
+        }
     }
 }

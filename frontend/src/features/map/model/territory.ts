@@ -15,17 +15,29 @@ export function latestVisitCode(visits: ReadonlyMap<string, MyVisit>): string | 
 }
 
 export interface ProvinceRow {
+  /** 시·도 코드(KR-11) */
+  code: string;
   name: string;
   visited: number;
   total: number;
   ratio: number;
+  /** 👑 — 탐험가 단위 정복 기록(GET /progress.provinces, 취소해도 남는다) */
+  crowned: boolean;
 }
 
-/** 시·도별 정복률 줄(서버 값) — 정복률 높은 순, 같으면 방문 수 많은 순 */
-export function provinceRows(territory: TerritoryResponse | null, catalog: Catalog): ProvinceRow[] {
+const NO_CROWNS: ReadonlySet<string> = new Set();
+
+/**
+ * 시·도별 정복률 줄(서버 값) — 정복률 높은 순, 같으면 방문 수 많은 순. 막대는 지금 보는 지도 기준(GET /territory),
+ * 왕관은 탐험가 단위 정복 기록(crowns = 정복한 시·도 코드)이다.
+ */
+export function provinceRows(territory: TerritoryResponse | null, catalog: Catalog, crowns: ReadonlySet<string> = NO_CROWNS): ProvinceRow[] {
   const rows: ProvinceRow[] = territory
-    ? territory.provinces.map(province => ({ name: province.name, visited: province.visited, total: province.total, ratio: province.visited / province.total }))
-    : catalog.provinces.map(name => ({ name, visited: 0, total: catalog.provinceTotal.get(name) ?? 0, ratio: 0 }));
+    ? territory.provinces.map(province => ({
+      code: province.code, name: province.name, visited: province.visited, total: province.total,
+      ratio: province.visited / province.total, crowned: crowns.has(province.code),
+    }))
+    : [...catalog.provinceByCode].map(([code, name]) => ({ code, name, visited: 0, total: catalog.provinceTotal.get(name) ?? 0, ratio: 0, crowned: crowns.has(code) }));
   return rows.sort((left, right) => right.ratio - left.ratio || right.visited - left.visited);
 }
 

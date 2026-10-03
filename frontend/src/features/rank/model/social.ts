@@ -34,7 +34,23 @@ export function feedParts(item: FeedItemResponse, catalog: Catalog | null, setNa
   }
   if (item.kind === 'THEME_COMPLETED') return { strong: setName(item.themeId ?? '') ?? item.themeId ?? '', text: ' 테마를 완성했어요' };
   if (item.kind === 'LEVEL_UP') return { strong: `Lv.${item.level}`, text: ' 달성' };
+  if (item.kind === 'STREAK_MILESTONE') return { strong: `${item.months}개월 연속 탐험`, text: '을 달성했어요' };
+  if (item.kind === 'PROVINCE_CONQUERED') {
+    const province = (item.provinceCode && catalog?.provinceByCode.get(item.provinceCode)) || item.provinceCode || '';
+    return { strong: province, text: `${objectParticle(province)} 정복했어요` };
+  }
+  if (item.kind === 'MYSTERY_FOUND') {
+    const region = item.regionCode && catalog ? catalog.byCode.get(toClientCode(item.regionCode))?.properties.name ?? item.regionCode : item.regionCode ?? '';
+    return { prefix: '이번 주 미스터리 지역 ', strong: region, text: `${objectParticle(region)} 찾았어요` };
+  }
   return { strong: null, prefix: `뱃지 「${badgeName(item.badgeId ?? '') ?? item.badgeId ?? ''}」를 얻었어요`, text: '' };
+}
+
+/** 목적격 조사(을/를) — 마지막 글자에 받침이 있으면 "을" */
+export function objectParticle(word: string): string {
+  const last = word.charCodeAt(word.length - 1);
+  const hangul = last >= 0xac00 && last <= 0xd7a3;
+  return hangul && (last - 0xac00) % 28 !== 0 ? '을' : '를';
 }
 
 export type CompareClass = 'vs-mine' | 'vs-both' | 'vs-theirs';

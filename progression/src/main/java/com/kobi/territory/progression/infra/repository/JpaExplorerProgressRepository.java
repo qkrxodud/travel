@@ -4,6 +4,7 @@ import com.kobi.territory.progression.infra.entity.BadgeEarnedJpaEntity;
 import com.kobi.territory.progression.infra.entity.ExplorerProgressJpaEntity;
 import com.kobi.territory.progression.infra.entity.ExplorerRegionJpaEntity;
 import com.kobi.territory.progression.infra.entity.ExplorerRegionMarkJpaEntity;
+import com.kobi.territory.progression.infra.entity.StreakFreezeJpaEntity;
 import com.kobi.territory.progression.infra.entity.TitleEarnedJpaEntity;
 import com.kobi.territory.progression.infra.entity.XpLedgerJpaEntity;
 import com.kobi.territory.common.model.ExplorerId;
@@ -17,7 +18,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
 /**
- * ExplorerProgress 저장소 어댑터 — explorer_progress(루트)·xp_ledger·explorer_region·badge_earned·title_earned.
+ * ExplorerProgress 저장소 어댑터 — explorer_progress(루트)·xp_ledger·explorer_region·badge_earned·title_earned·streak_freeze(8단계).
  * "어떻게 저장할지"만 한다(무엇을 할지는 호출자가 save/replace 로 고른다). 행 ↔ 도메인 변환은 각 엔티티가 한다.
  * <ul>
  *   <li>{@link #save}: 새로 쌓인 장부·뱃지·칭호 추가, 바뀐 지역만 쓰기(재조회 없음 — 짧은 트랜잭션).</li>
@@ -34,12 +35,14 @@ class JpaExplorerProgressRepository implements ExplorerProgressRepository {
     private final TitleEarnedJpaRepository titleRows;
     private final ExplorerRegionJpaRepository regionRows;
     private final ExplorerRegionMarkJpaRepository markRows;
+    private final StreakFreezeJpaRepository freezeRows;
     private final EntityManager entityManager;
 
     JpaExplorerProgressRepository(ExplorerProgressJpaRepository progressRows, XpLedgerJpaRepository ledgerRows,
                                   BadgeEarnedJpaRepository badgeRows, TitleEarnedJpaRepository titleRows,
                                   ExplorerRegionJpaRepository regionRows, ExplorerRegionMarkJpaRepository markRows,
-                                  EntityManager entityManager) {
+                                  StreakFreezeJpaRepository freezeRows, EntityManager entityManager) {
+        this.freezeRows = freezeRows;
         this.markRows = markRows;
         this.progressRows = progressRows;
         this.ledgerRows = ledgerRows;
@@ -62,7 +65,8 @@ class JpaExplorerProgressRepository implements ExplorerProgressRepository {
     private ExplorerProgress withChildren(ExplorerProgressJpaEntity root) {
         String id = root.explorerId();
         return root.toDomain(ledgerRows.findByExplorerIdOrderByIdAsc(id), regionRows.findByExplorerId(id),
-            markRows.findByExplorerId(id), badgeRows.findByExplorerId(id), titleRows.findByExplorerId(id));
+            markRows.findByExplorerId(id), badgeRows.findByExplorerId(id), titleRows.findByExplorerId(id),
+            freezeRows.findByExplorerIdOrderByIdAsc(id));
     }
 
     @Override
@@ -76,6 +80,7 @@ class JpaExplorerProgressRepository implements ExplorerProgressRepository {
         saveRoot(progress);
         ExplorerId explorer = progress.explorerId();
         progress.ledger().unsaved().forEach(entry -> ledgerRows.save(XpLedgerJpaEntity.from(explorer, entry)));
+        progress.freezes().unsaved().forEach(entry -> freezeRows.save(StreakFreezeJpaEntity.from(explorer, entry)));
         progress.unsavedBadges().forEach(badge ->
             badgeRows.save(BadgeEarnedJpaEntity.from(explorer, badge, progress.badges().get(badge))));
         progress.unsavedTitles().forEach(title ->
@@ -97,8 +102,10 @@ class JpaExplorerProgressRepository implements ExplorerProgressRepository {
         markRows.deleteAll(markRows.findByExplorerId(id));
         badgeRows.deleteAll(badgeRows.findByExplorerId(id));
         titleRows.deleteAll(titleRows.findByExplorerId(id));
+        freezeRows.deleteAll(freezeRows.findByExplorerIdOrderByIdAsc(id));
         entityManager.flush();
         progress.ledger().chronological().forEach(entry -> ledgerRows.save(XpLedgerJpaEntity.from(explorer, entry)));
+        progress.freezes().chronological().forEach(entry -> freezeRows.save(StreakFreezeJpaEntity.from(explorer, entry)));
         progress.regions().all().forEach(region -> {
             regionRows.save(ExplorerRegionJpaEntity.from(explorer, region));
             markRows.saveAll(ExplorerRegionMarkJpaEntity.from(explorer, region));

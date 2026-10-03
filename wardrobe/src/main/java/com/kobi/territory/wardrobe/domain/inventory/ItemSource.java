@@ -10,7 +10,7 @@ public enum ItemSource {
         return switch (grantKind) {
             case REGION_VISIT -> REGION;
             case THEME_COMPLETE -> SET_REWARD;
-            case PERIOD_CHECK_IN, PROVINCE_CHECK_IN, MANUAL, INVITATION -> EVENT;
+            case PERIOD_CHECK_IN, PROVINCE_CHECK_IN, MANUAL, INVITATION, PROVINCE_COMPLETE, STREAK_MILESTONE -> EVENT;
         };
     }
 }

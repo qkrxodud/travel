@@ -49,6 +49,11 @@ public sealed interface BadgeRule {
         public boolean satisfiedBy(BadgeFacts facts) { return facts.streakMonths() >= min; }
     }
 
+    /** 이번 주 미스터리 보너스를 받은 주가 min 번 이상(8단계 "미스터리 탐험가"). */
+    record MysteryFound(int min) implements BadgeRule {
+        public boolean satisfiedBy(BadgeFacts facts) { return facts.mysteryFound() >= min; }
+    }
+
     record ConquestRatio(double ratio) implements BadgeRule {
         public boolean satisfiedBy(BadgeFacts facts) {
             return facts.totalRegions() > 0 && facts.regions() >= ratio * facts.totalRegions();

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import type { XpSource } from '../../../api/types/exploration';
 import { localIsoDate, setChips } from '../model/territory';
 import { pixelRenderer } from '../../../shared/lib/pixel';
 import { catalogItem, itemOrigin, SLOT_NAME } from '../../../shared/lib/item/displayItem';
@@ -11,6 +12,9 @@ import { useCollection } from '../../../shared/queries/collection';
 import { useCheckIn, usePreview } from '../queries';
 import { useMyTerritory } from '../../../shared/queries/territory';
 import { useMapActions } from '../queries';
+
+/** 예상 보상 줄 모양 — 기본 XP 는 보통 줄, 보너스는 강조, 이번 주 미스터리 보너스는 미스터리 색 */
+const gainClass = (source: XpSource): string => (source === 'REGION_BASE' ? '' : source === 'MYSTERY_BONUS' ? 'bonus mystery' : 'bonus');
 
 /**
  * 체크인 모달(#checkin): 지역을 누르면 미리보기(GET /visits/preview — 예상 XP·받을 아이템)가 온 뒤에 열린다.
@@ -88,7 +92,7 @@ export function CheckinModal() {
         </div>
         <div className="gains" id="ci-gains">
           {xp.lines.map(line => (
-            <div key={line.source} className={line.source === 'REGION_BASE' ? '' : 'bonus'}><span>{line.label}</span><b>+{line.amount}</b></div>
+            <div key={line.source} data-source={line.source} className={gainClass(line.source)}><span>{line.source === 'MYSTERY_BONUS' ? `❓ ${line.label}` : line.label}</span><b>+{line.amount}</b></div>
           ))}
           <div className="total"><span>예상 획득 XP</span><b id="ci-xp-total">+{xp.total}</b></div>
         </div>

@@ -29,11 +29,24 @@ export interface RegionPaint {
 
 export interface MapHandlers {
   onRegionClick: (code: string) => void;
+  /** 이번 주 미스터리 ❓ 마커를 눌렀을 때 */
+  onMysteryClick?: (code: string) => void;
   /** 툴팁 문구 */
   describe: (code: string) => string;
 }
 
 type FeatureCollection = { type: 'FeatureCollection'; features: RegionFeature[] };
+
+/** 이번 주 미스터리 지역 마커 상태 */
+export interface MysteryMark {
+  code: string;
+  /** 이번 주 보너스를 받았으면 ✓ */
+  received: boolean;
+}
+
+/** 정복 테두리 마스크 id 를 엔진마다 다르게(한 문서에 지도가 여럿일 때) */
+let engineSequence = 0;
+const OUTLINE_EXTENT = 4 * Math.max(MAP_WIDTH, MAP_HEIGHT);
 
 /** 같은 투영(지도 탭·영토 비교 지도·카드)에서 쓰는 경로 생성기 */
 export function createMapPath(features: RegionFeature[]): GeoPath<unknown, GeoPermissibleObjects> {
@@ -50,6 +63,10 @@ export class MapEngine {
   private readonly path: GeoPath<unknown, GeoPermissibleObjects>;
   private readonly regions: Selection<SVGPathElement, RegionFeature, SVGGElement, unknown>;
   private readonly pingLayer: Selection<SVGGElement, unknown, null, undefined>;
+  private readonly defs: Selection<SVGDefsElement, unknown, null, undefined>;
+  private readonly outlineLayer: Selection<SVGGElement, unknown, null, undefined>;
+  private readonly mysteryLayer: Selection<SVGGElement, unknown, null, undefined>;
+  private readonly maskPrefix: string;
   private readonly charPos: Selection<SVGGElement, unknown, null, undefined>;
   private readonly charScale: Selection<SVGGElement, unknown, null, undefined>;
   private readonly zoomBehavior: ZoomBehavior<SVGSVGElement, unknown>;
@@ -57,6 +74,9 @@ export class MapEngine {
 
   private zoomK = 1;
   private paint: RegionPaint | null = null;
+  /** 정복 테두리를 그린 시·도(이름) */
+  private conquered: ReadonlySet<string> = new Set();
+  private mystery: MysteryMark | null = null;
   /** 캐릭터가 서 있는 곳 / 가고 있는 곳 */
   private charAt: string | null = null;
   private charTarget: string | null = null;
@@ -82,13 +102,19 @@ export class MapEngine {
       .on('click', (_event: MouseEvent, feature) => this.handlers.onRegionClick(feature.properties.code))
       .on('mousemove', (event: MouseEvent, feature) => this.showTip(event, feature.properties.code))
       .on('mouseleave', () => this.hideTip());
+    engineSequence += 1;
+    this.maskPrefix = `conquest-mask-${engineSequence}-`;
+    this.defs = this.svg.insert('defs', ':first-child') as unknown as Selection<SVGDefsElement, unknown, null, undefined>;
+    this.outlineLayer = layer.append('g').attr('class', 'conquest-outlines').style('pointer-events', 'none') as unknown as Selection<SVGGElement, unknown, null, undefined>;
     this.pingLayer = layer.append('g') as unknown as Selection<SVGGElement, unknown, null, undefined>;
+    this.mysteryLayer = layer.append('g').attr('class', 'mystery-layer') as unknown as Selection<SVGGElement, unknown, null, undefined>;
     this.charPos = layer.append('g').attr('class', 'charpos').style('pointer-events', 'none') as unknown as Selection<SVGGElement, unknown, null, undefined>;
     this.charScale = this.charPos.append('g');
     this.zoomBehavior = d3zoom<SVGSVGElement, unknown>().scaleExtent([1, MAX_ZOOM]).on('zoom', (event: D3ZoomEvent<SVGSVGElement, unknown>) => {
       layer.attr('transform', event.transform.toString());
       this.zoomK = event.transform.k;
       this.charScale.attr('transform', `scale(${1.1 / Math.sqrt(this.zoomK)})`);
+      this.mysteryLayer.selectAll('g.mystery-mark > g').attr('transform', `scale(${1 / Math.sqrt(this.zoomK)})`);
     });
     this.svg.call(this.zoomBehavior).on('dblclick.zoom', null);
   }
@@ -111,6 +137,77 @@ export class MapEngine {
       .classed('claimed', feature => paint.claimColor.has(feature.properties.code))
       .style('fill', feature => paint.claimColor.get(feature.properties.code) ?? null)
       .attr('data-claim', feature => paint.claimer.get(feature.properties.code) ?? null);
+  }
+
+  /**
+   * 정복한 시·도 테두리 강조. 시·도마다 그 지역들의 굵은 테두리를 그리고, 시·도 안쪽을 가리는 마스크로 바깥 테두리만 남긴다
+   * (안쪽 경계선은 양쪽이 모두 시·도 안이라 가려진다). 같은 시·도 목록이면 DOM 을 건드리지 않는다.
+   */
+  setConqueredProvinces(provinces: ReadonlySet<string>): void {
+    if (sameSet(this.conquered, provinces)) return;
+    this.conquered = new Set(provinces);
+    const names = [...provinces].sort();
+    const featuresOf = (province: string) => [...this.byCode.values()].filter(feature => feature.properties.prov === province);
+    const maskId = (province: string) => this.maskPrefix + names.indexOf(province);
+    this.defs.selectAll<SVGMaskElement, string>('mask').data(names, name => name).join(enter => {
+      const mask = enter.append('mask').attr('maskUnits', 'userSpaceOnUse').attr('maskContentUnits', 'userSpaceOnUse')
+        .attr('x', -OUTLINE_EXTENT).attr('y', -OUTLINE_EXTENT).attr('width', 2 * OUTLINE_EXTENT).attr('height', 2 * OUTLINE_EXTENT);
+      mask.append('rect').attr('x', -OUTLINE_EXTENT).attr('y', -OUTLINE_EXTENT).attr('width', 2 * OUTLINE_EXTENT).attr('height', 2 * OUTLINE_EXTENT).attr('fill', '#fff');
+      mask.each((province, i, nodes) => {
+        select(nodes[i]).selectAll('path').data(featuresOf(province)).join('path')
+          .attr('d', feature => this.path(feature as unknown as GeoPermissibleObjects)).attr('fill', '#000');
+      });
+      return mask;
+    }).attr('id', maskId);
+    this.outlineLayer.selectAll<SVGGElement, string>('g.conquest').data(names, name => name).join(enter => {
+      const group = enter.append('g').attr('class', 'conquest').attr('data-province', province => province);
+      group.each((province, i, nodes) => {
+        select(nodes[i]).selectAll('path').data(featuresOf(province)).join('path')
+          .attr('d', feature => this.path(feature as unknown as GeoPermissibleObjects));
+      });
+      return group;
+    }).attr('mask', province => `url(#${maskId(province)})`);
+  }
+
+  /**
+   * 막 정복한 시·도 테두리를 잠깐 반짝인다(한 번짜리 명령 — CSS 애니메이션이 끝나면 표시를 지운다).
+   * 반짝이는 동안 화면이 다시 그려져도 다시 걸지 않는다(같은 시·도가 이미 반짝이는 중이면 그대로 둔다).
+   */
+  flashProvinces(provinces: readonly string[]): void {
+    for (const province of provinces) {
+      const group = this.outlineLayer.selectAll<SVGGElement, string>('g.conquest').filter(name => name === province);
+      if (group.empty() || group.classed('flash')) continue;
+      group.classed('flash', true).on('animationend', function endFlash(this: SVGGElement) {
+        select(this).classed('flash', false).on('animationend', null);
+      });
+    }
+  }
+
+  /** 이번 주 미스터리 지역 ❓ 마커(받았으면 ✓). 같은 값이면 DOM 을 건드리지 않는다. */
+  setMystery(mark: MysteryMark | null): void {
+    const before = this.mystery;
+    if (before === mark || (before && mark && before.code === mark.code && before.received === mark.received)) return;
+    this.mystery = mark;
+    const marks = mark && this.byCode.has(mark.code) ? [mark] : [];
+    this.mysteryLayer.selectAll<SVGGElement, MysteryMark>('g.mystery-mark').data(marks).join(enter => {
+      const group = enter.append('g').attr('class', 'mystery-mark').attr('role', 'button').attr('aria-label', '이번 주 미스터리 지역');
+      const inner = group.append('g');
+      inner.append('circle').attr('r', 9);
+      inner.append('text').attr('text-anchor', 'middle').attr('dy', '0.35em');
+      group.on('click', (event: MouseEvent, clicked) => {
+        event.stopPropagation();
+        this.handlers.onMysteryClick?.(clicked.code);
+      });
+      return group;
+    })
+      .attr('data-mystery', current => current.code)
+      .classed('received', current => current.received)
+      .attr('transform', current => {
+        const [atX, atY] = this.centroid(current.code);
+        return `translate(${atX},${atY})`;
+      })
+      .call(group => group.select('g').attr('transform', `scale(${1 / Math.sqrt(this.zoomK)})`))
+      .call(group => group.select('text').text(current => (current.received ? '✓' : '❓')));
   }
 
   /**
