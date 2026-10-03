@@ -1,6 +1,6 @@
 ---
 name: architecture-qa
-description: 나의 영토(territory) 멀티모듈의 아키텍처 규칙·모듈 경계·이벤트 경계면 정합성·빌드를 검증하는 QA 에이전트. 각 모듈 완성 직후 점진적으로(incremental) 실행된다. 검증 스크립트와 gradle 빌드를 직접 실행한다.
+description: 나의 영토(territory) 멀티모듈 백엔드와 React 프론트엔드의 아키텍처 규칙·모듈 경계·이벤트 경계면·API↔화면 타입 정합성·빌드를 검증하는 QA 에이전트. 각 모듈 완성 직후 점진적으로(incremental) 실행된다. 검증 스크립트와 gradle 빌드를 직접 실행한다.
 model: opus
 ---
 
@@ -15,7 +15,7 @@ model: opus
 1. 작업 시작 시 `.claude/skills/verify-architecture/SKILL.md`를 읽고 체크리스트를 따른다.
 2. 실행 가능한 검증부터: `./gradlew build`(ArchUnit 포함) → 경계면 교차 비교 → 불변식·테이블 스키마 대조 순서.
 3. 전체 완성 후 1회가 아니라 각 모듈 완성 직후 호출된다(incremental QA). 해당 모듈과 그 모듈이 맞닿는 경계면만 검증 범위로 한다 — 이미 통과한 모듈 전체를 다시 훑지 않는다.
-4. 발견한 결함은 심각도(빌드 깨짐 / 규칙 위반 / 권고)·위치(file:line)·근거를 붙여 보고한다. 직접 수정하지 않는다 — 수정은 context-builder의 몫이다. 이유: 검증자와 수정자가 같으면 결함이 기록 없이 사라진다.
+4. 발견한 결함은 심각도(빌드 깨짐 / 규칙 위반 / 권고)·위치(file:line)·근거를 붙여 보고한다. 직접 수정하지 않는다 — 수정은 context-builder(백엔드)·frontend-builder(프론트)의 몫이다. 이유: 검증자와 수정자가 같으면 결함이 기록 없이 사라진다.
 
 ## 입력/출력 프로토콜
 

@@ -1,6 +1,6 @@
 ---
 name: verify-architecture
-description: 나의 영토(territory) 멀티모듈의 빌드·아키텍처 규칙·이벤트 경계면 정합성을 검증한다. "검증해줘", "QA", "빌드 확인", "아키텍처 테스트", "경계 점검", "제대로 됐는지 확인" 요청이나 architecture-qa 에이전트가 모듈 완성 직후 검증할 때 반드시 이 스킬을 사용할 것.
+description: 나의 영토(territory) 멀티모듈 백엔드와 React 프론트엔드(frontend/)의 빌드·아키텍처 규칙·이벤트 경계면·API↔화면 타입 정합성을 검증한다. "검증해줘", "QA", "빌드 확인", "아키텍처 테스트", "경계 점검", "제대로 됐는지 확인", "프론트 검증" 요청이나 architecture-qa 에이전트가 모듈·화면 완성 직후 검증할 때 반드시 이 스킬을 사용할 것.
 ---
 
 # Verify Architecture — 검증 절차
@@ -51,6 +51,22 @@ curl localhost:8080/actuator/health
 - 모든 이벤트 핸들러가 멱등한가 — refId/유니크 키 없이 insert하는 핸들러는 결함.
 - 트랜잭션 경계: 커맨드가 애그리거트 두 개를 한 트랜잭션에서 수정하면 결함(outbox 적재는 예외).
 - 하드코딩된 게임 규칙 값(5, 72, 7, 10) — TerritoryProperties 주입이어야 한다.
+
+## 프론트엔드(frontend/) 검증
+
+프론트 작업이 포함되면 같은 세 층을 프론트에도 적용한다. 기준은 `.claude/skills/implement-frontend/SKILL.md`.
+
+- **실행**: `cd frontend && npm ci && npm run check`(tsc·eslint·vitest), `./gradlew clean build`가 프론트 빌드를 포함해 jar의 `static/`에 산출물이 들어가는지(`unzip -l app-api/build/libs/territory.jar | grep static/`), 서버 없는 상태 `E2E_PORT=18080 npx playwright test` 전체 2회 연속, Docker 이미지 빌드.
+- **경계면 교차 비교(API ↔ 화면)**: 백엔드 DTO(`*/api/web/*Response`·record)와 `frontend/src/api/types/`를 **동시에 열어** 필드명·nullable·enum 값·에러 코드를 비교한다. 실제 응답을 curl로 받아 TS 타입과 대조하면 확실하다. 불일치는 P1(런타임 깨짐) 또는 P2.
+- **규칙 대조**(위반 등급):
+  - `fetch(`가 `src/api/` 밖에 있으면 P2. 서버 응답을 zustand·useState에 복사해 들고 있으면 P2.
+  - 서버 계산 값(XP·레벨·정복률·랭킹·보상)을 클라이언트에서 재계산하면 P2.
+  - mutation 후 반영을 `setTimeout` 체인으로 처리하면 P3(쿼리 무효화·refetchInterval 사용).
+  - D3 엔진이 소유한 SVG를 React가 렌더하거나, 재렌더마다 애니메이션이 다시 시작되면 P2(체크인 후 캐릭터 이동 프레임 샘플링으로 역행 0회 확인).
+  - `any`·`@ts-ignore` P3, 한 글자 식별자(인덱스 i/j 제외)·내장 타입명 컴포넌트 P3, 기능 폴더 간 `components/` import P3.
+  - `dangerouslySetInnerHTML`에 사용자 입력(handle·메모·지도 이름)이 섞일 수 있으면 P1(XSS).
+  - 이전 작업: E2E 선택자(`data-*`, id) 변경, 화면 문구·디자인 차이(프로토타입 index.html과 나란히 띄워 스크린샷 비교)는 P2.
+  - 빌드 산출물(`dist/`, 복사된 `static/` 결과물)이 git에 커밋되면 P3.
 
 ## 결함 보고 형식
 

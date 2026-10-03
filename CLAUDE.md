@@ -48,7 +48,7 @@ docker compose -p territory-e2e -f compose.yaml -f compose.e2e.yaml down -v
 
 ## 하네스: 나의 영토(territory) 백엔드 구현
 
-**목표:** `doc/`의 설계 문서 2종(셋업 가이드 · 도메인 분석)에 따라 멀티모듈 DDD 백엔드를 단계별(뼈대 → 카탈로그+탐험 → 진행 → 꾸미기 → 공유 → 소셜)로 구현한다.
+**목표:** `doc/`의 설계 문서 2종(셋업 가이드 · 도메인 분석)에 따라 멀티모듈 DDD 백엔드를 단계별(뼈대 → 카탈로그+탐험 → 진행 → 꾸미기 → 공유 → 소셜)로 구현하고, 웹 프론트(frontend/, React)를 함께 유지한다.
 
 **트리거:** territory/나의 영토 구현·수정·검증·단계 진행 작업 요청 시 `territory-orchestrator` 스킬을 사용하라. 단순 질문은 직접 응답 가능.
 
@@ -64,4 +64,6 @@ docker compose -p territory-e2e -f compose.yaml -f compose.e2e.yaml down -v
 | 2026-10-03 | 리포지토리 어댑터 규칙 추가(애그리거트 단위 저장 유지, 어댑터는 저장 기술만 — 의도 분기·Clock·diff 금지, 재계산은 replace), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정(A안: JpaExplorerProgressRepository 리뷰) |
 | 2026-10-03 | class vs record 기준 추가(애그리거트·엔티티·일급 컬렉션·행동 있는 VO=class / 단순 VO·결과·정책·커맨드·이벤트·DTO·정의=record, 컬렉션 필드 copyOf), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정(도메인 record 리뷰) |
 | 2026-10-03 | domain 하위 패키지 구성 규칙 추가(애그리거트별 폴더, 리포지토리 포트 동거, 종류별 분류 금지), QA 3층 점검 항목 추가 | implement-context, verify-architecture | 사용자 요청(domain 한눈에 보이게) |
-| 2026-10-03 | infra 하위 패키지 규칙 추가(infra/entity, infra/repository 2개로 종류별 분리 — 애그리거트 구분은 domain이 담당), QA 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정 || 2026-10-03 | 의존성 주입 규칙 명시(생성자 주입만), QA 점검 항목 추가 | implement-context, verify-architecture | 3단계 QA r3 P3-R3-5(DevController 필드 주입) |
+| 2026-10-03 | infra 하위 패키지 규칙 추가(infra/entity, infra/repository 2개로 종류별 분리 — 애그리거트 구분은 domain이 담당), QA 점검 항목 추가 | implement-context, verify-architecture | 사용자 결정 |
+| 2026-10-03 | 의존성 주입 규칙 명시(생성자 주입만), QA 점검 항목 추가 | implement-context, verify-architecture | 3단계 QA r3 P3-R3-5(DevController 필드 주입) |
+| 2026-10-03 | 프론트엔드 확장: 에이전트 frontend-builder, 스킬 implement-frontend(Vite+React+TS, API 계층 단일화, TanStack Query/zustand, D3 엔진 통합, 빌드 산출물 app-api static 통합), verify-architecture에 "프론트엔드 검증" 절(API↔TS 타입 교차 비교), 오케스트레이터에 프론트 작업 흐름 | agents/frontend-builder, skills/implement-frontend, verify-architecture, architecture-qa, territory-orchestrator | 사용자 결정(프론트 React 이전 + 프론트 규칙) |

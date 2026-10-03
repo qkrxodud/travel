@@ -1,6 +1,6 @@
 ---
 name: territory-orchestrator
-description: 나의 영토(territory) 백엔드 구현 작업 전체를 조율하는 오케스트레이터. 멀티모듈 뼈대 생성, 단계별 구현(카탈로그·탐험·진행·꾸미기·공유·소셜), 체크인/XP/도감/인벤토리/공유지도 등 도메인 기능 개발 요청 시 반드시 이 스킬을 사용할 것. "다음 단계 진행해줘", "1단계 해줘", "다시 실행", "재실행", "수정해줘", "보완해줘", "업데이트", "이전 결과 기반으로 개선", "{모듈}만 다시" 같은 후속 요청도 모두 이 스킬로 처리한다. 하네스 자체의 수정은 harness 스킬, 단순 질문은 직접 응답.
+description: 나의 영토(territory) 백엔드·웹 프론트엔드 구현 작업 전체를 조율하는 오케스트레이터. 멀티모듈 뼈대 생성, 단계별 구현(카탈로그·탐험·진행·꾸미기·공유·소셜), 체크인/XP/도감/인벤토리/공유지도 등 도메인 기능 개발, React 프론트 이전·화면 기능 추가(백엔드+화면이 함께 바뀌는 기능 포함) 요청 시 반드시 이 스킬을 사용할 것. "다음 단계 진행해줘", "1단계 해줘", "다시 실행", "재실행", "수정해줘", "보완해줘", "업데이트", "이전 결과 기반으로 개선", "{모듈}만 다시" 같은 후속 요청도 모두 이 스킬로 처리한다. 하네스 자체의 수정은 harness 스킬, 단순 질문은 직접 응답.
 ---
 
 # Territory Orchestrator — 구현 워크플로우 조율
@@ -36,6 +36,19 @@ description: 나의 영토(territory) 백엔드 구현 작업 전체를 조율�
 4. **수렴 기준**: QA P1·P2 결함 0 + `./gradlew clean build` 통과 + 해당 단계 API curl 왕복 확인.
 5. **종합**: `_workspace/{단계}_summary.md`에 산출물·검증 결과·미해결 사항을 기록하고 팀을 정리한 뒤 사용자에게 보고한다.
 
+## 프론트엔드 작업 (frontend/)
+
+프론트 구현 규칙은 `implement-frontend` 스킬, 담당은 `frontend-builder` 에이전트다(`model: "opus"`).
+
+| 작업 유형 | 실행 모드 | 구성 |
+|----------|----------|------|
+| 화면만 바뀜(이전·UI 버그·화면 기능) | 서브 에이전트 | frontend-builder 1명 → architecture-qa 1명(verify-architecture "프론트엔드 검증" 절) |
+| 백엔드+화면이 함께 바뀌는 기능 | 에이전트 팀(가능하면) / 서브 병렬 | context-builder(API 먼저) + frontend-builder(화면) + architecture-qa. API 계약은 `_workspace/{NN}_contracts.md`에 context-builder가 먼저 쓰고 frontend-builder가 그것에 맞춘다. 같은 디렉터리에서 동시에 gradle·playwright를 돌리면 결과 파일이 깨지므로 포트·빌드 시점을 나눈다(중간 검증은 scratchpad 복사본) |
+
+- 프론트 단계 번호는 백엔드 단계 다음 번호를 쓴다(예: React 이전 = `06`). 보고 파일 `_workspace/{NN}_frontend_report.md`, QA `_workspace/{NN}_qa_frontend.md`.
+- 완료 기준: `npm run check` + `./gradlew clean build`(프론트 빌드 포함) + E2E 전체 2회 연속 + (이전 작업이면) 프로토타입과 화면 동등성 확인.
+- 사용자 확인용 서버는 커밋 시점 worktree(`../travel-stageN`)에서 18090으로 띄운다. 운영 compose(`docker compose`, 18080)는 사용자가 띄워 둔 것일 수 있으니 재빌드·재시작 전에 사용자에게 알린다.
+
 ## 데이터 전달 프로토콜
 
 - **태스크 기반**(조율): TaskCreate/TaskUpdate로 작업 상태·의존 관계 공유.
@@ -53,6 +66,10 @@ description: 나의 영토(territory) 백엔드 구현 작업 전체를 조율�
 단계 완료 시 보고에 포함한다: 생성 모듈·API 목록, 검증 결과(빌드·curl·QA), 다음 단계 안내(domain-model.md §6 기준). 보고 후 "결과나 워크플로우에서 개선할 점이 있는지" 한 번 묻는다(강요하지 않는다). 반복되는 피드백은 harness 스킬로 하네스 자체를 수정한다.
 
 ## 테스트 시나리오
+
+**정상 흐름 — "프론트 React로 옮겨줘"**: Phase 0에서 `frontend/` 부재 확인 → 프론트 작업(이전) 판별 → frontend-builder가 implement-frontend 스킬로 구현·E2E 20건 통과 → architecture-qa 프론트 검증(API↔TS 타입 교차 비교, 규칙 grep, 화면 동등성) → 결함 수정 왕복 → 커밋 → 18090 확인 서버.
+
+**에러 흐름 — 프론트가 서버 응답에 없는 값을 필요로 함**: frontend-builder가 클라이언트에서 재계산하지 않고 리더에게 보고 → 리더가 context-builder에게 API 확장 지시 → 계약 파일 갱신 → frontend-builder 재개.
 
 **정상 흐름 — "1단계 진행해줘"**: Phase 0에서 뼈대 존재 확인 → 없으면 0단계부터 제안 → 있으면 TaskCreate(카탈로그, 탐험, 통합) → 팀 구성 → catalog·exploration 병렬 구현 → 각 모듈 완성 직후 QA → 결함 수정 왕복 → V1 마이그레이션 + API curl 왕복(POST /visits → GET /territory → DELETE) 확인 → summary 기록 → 보고.
 
