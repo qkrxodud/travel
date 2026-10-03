@@ -55,6 +55,7 @@ public record Catalog(Regions regions, Provinces provinces, RewardRules rewardRu
                 .anyMatch(theme -> theme.id().equals(themeComplete.themeId()));
             case GrantRule.PeriodCheckIn periodCheckIn -> true;
             case GrantRule.Manual manual -> true;
+            case GrantRule.Invitation invitation -> true;
         };
         if (!known) throw CatalogError.UNKNOWN_ITEM_REFERENCE.exception("지급 규칙이 모르는 대상을 가리킵니다: " + rule.type() + " " + rule.ref());
     }

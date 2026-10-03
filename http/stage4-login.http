@@ -1,0 +1,120 @@
+### 4단계 파트 A(계정·로그인·병합) 왕복 확인 — IntelliJ HTTP Client / VS Code REST Client(쿠키를 유지하는 클라이언트 기준으로 순서대로 통과)
+### 서버: ./gradlew :app-api:bootRun   (8080이 점유돼 있으면 --args='--server.port=18080' 으로 띄우고 아래 @host 를 바꾼다)
+### 구글 클라이언트 ID 없이: 로그인은 local 전용 POST /dev/login(실제 OIDC 성공과 같은 계정 연결·병합 경로)으로.
+### 인증 공존: 로그인 세션(JSESSIONID — 클라이언트가 자동 보관)이 X-Explorer-Token 보다 먼저다. 그래서 토큰으로만 해야 하는 단계(익명 A·C 의
+###   발급·체크인)를 로그인보다 앞에 둔다. 로그인 뒤 "토큰 무효" 확인은 세션과 무관한 /dev/login 의 토큰 해석으로 한다.
+### CSRF: 세션이 있는 변경 요청은 토큰 헤더 유무와 관계없이 쿠키 XSRF-TOKEN 값을 헤더 X-XSRF-TOKEN 으로 보낸다. /dev/** 는 제외.
+### 병합의 방문 이동·재계산은 비동기(local: 릴레이 300ms, 재계산 예약 300ms) — 1~2초 뒤에 조회한다.
+@host = http://localhost:8080
+
+### 0. [local] 전체 초기화 → 204
+DELETE {{host}}/dev/reset
+
+### 1. 구글 로그인 상태 → 200 {googleLoginEnabled:false, loginUrl:null, loggedIn:false} (GOOGLE_CLIENT_ID/SECRET 없음) + Set-Cookie XSRF-TOKEN
+GET {{host}}/auth/session
+
+> {% const xsrf = (response.headers.valuesOf("Set-Cookie") || []).find(v => v.startsWith("XSRF-TOKEN=")); if (xsrf) client.global.set("xsrf", xsrf.split(";")[0].substring("XSRF-TOKEN=".length)); %}
+
+### 2. 구글 인가 시작 경로는 등록이 없어 404
+GET {{host}}/oauth2/authorization/google
+
+### 3. 첫 기기 익명 A 발급 → 201
+POST {{host}}/explorers
+
+> {% client.global.set("aId", response.body.explorerId); client.global.set("aToken", response.body.accessToken); %}
+
+### 4. A 체크인: 종로 → 201
+POST {{host}}/visits
+X-Explorer-Token: {{aToken}}
+Content-Type: application/json
+
+{"regionCode": "KR-11010", "visitDate": "2026-10-01"}
+
+### 5. 두 번째 기기 익명 C 발급 → 201
+POST {{host}}/explorers
+
+> {% client.global.set("cId", response.body.explorerId); client.global.set("cToken", response.body.accessToken); %}
+
+### 6. C 체크인: 종로를 더 이른 날짜로 → 201
+POST {{host}}/visits
+X-Explorer-Token: {{cToken}}
+Content-Type: application/json
+
+{"regionCode": "KR-11010", "visitDate": "2025-05-05", "memo": "두 번째 기기"}
+
+### 7. C 체크인: 부산 중구(새 지역) → 201
+POST {{host}}/visits
+X-Explorer-Token: {{cToken}}
+Content-Type: application/json
+
+{"regionCode": "KR-26010", "visitDate": "2026-10-01"}
+
+### 8. 로그인(첫 연결) — A 를 계정에 연결 → 200 {outcome:"LINKED", explorerId=aId, handle:"explorer-xxxx"(이메일과 무관한 랜덤), merge:null}
+###    + Set-Cookie JSESSIONID(이후 요청은 세션으로). /dev/** 는 CSRF 제외(local 전용)
+POST {{host}}/dev/login
+X-Explorer-Token: {{aToken}}
+Content-Type: application/json
+
+{"email": "Kim.Traveler+e2e@example.com"}
+
+> {% client.global.set("accountId", response.body.explorerId); %}
+
+### 9. 세션으로 영토(토큰 헤더 없이) → 200 visits[KR-11010@2026-10-01]
+GET {{host}}/territory
+
+### 10. 연결 뒤 A 의 익명 토큰은 무효 → 401 EXPLORER_TOKEN_INVALID (/dev/login 이 토큰을 먼저 해석 — 세션과 무관)
+POST {{host}}/dev/login
+X-Explorer-Token: {{aToken}}
+Content-Type: application/json
+
+{"email": "Kim.Traveler+e2e@example.com"}
+
+### 11. 세션 상태 → loggedIn:true, handle, mergeNotice{outcome:"LINKED"}(한 번만)
+GET {{host}}/auth/session
+
+> {% const xsrf = (response.headers.valuesOf("Set-Cookie") || []).find(v => v.startsWith("XSRF-TOKEN=")); if (xsrf) client.global.set("xsrf", xsrf.split(";")[0].substring("XSRF-TOKEN=".length)); %}
+
+### 12. 세션 변경 요청에 CSRF 헤더가 없으면 → 403 CSRF_INVALID (토큰 헤더를 실어도 세션이 있으면 똑같이 403 — 우회 불가)
+PUT {{host}}/me/handle
+X-Explorer-Token: {{cToken}}
+Content-Type: application/json
+
+{"handle": "kim"}
+
+### 13. CSRF 헤더를 실으면 handle 변경 → 200 {handle:"kim"} (옛 랜덤 handle 은 30일 예약 — 다른 사람이 못 가져감)
+PUT {{host}}/me/handle
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"handle": "kim"}
+
+### 14. 같은 계정으로 C 로그인 → 기존 계정으로 병합(세션 id 는 새로) → 200 {outcome:"MERGED", explorerId=accountId,
+###     merge:{fromExplorerId=cId, movedRegions:2, newRegions:1}}
+POST {{host}}/dev/login
+X-Explorer-Token: {{cToken}}
+Content-Type: application/json
+
+{"email": "Kim.Traveler+e2e@example.com"}
+
+### 15. (1~2초 뒤) 합쳐진 영토 → visits: KR-11010@2025-05-05(메모 "두 번째 기기"), KR-26010
+GET {{host}}/territory
+
+### 16. 진행 — 재계산 예약으로 부산 중구 기본 XP·시·도 첫 발·선점이 더해짐(35 → 70)
+GET {{host}}/progress
+
+### 17. 병합된 C 토큰 → 401 EXPLORER_TOKEN_INVALID
+POST {{host}}/dev/login
+X-Explorer-Token: {{cToken}}
+Content-Type: application/json
+
+{"email": "Kim.Traveler+e2e@example.com"}
+
+### 18. 재계산을 다시 돌려도 같다 → 200 {recalculated:1, deferred:[]}
+POST {{host}}/dev/recalculate
+
+### 19. 로그아웃(CSRF 필요) → 204
+POST {{host}}/logout
+X-XSRF-TOKEN: {{xsrf}}
+
+### 20. 로그아웃 뒤 → loggedIn:false
+GET {{host}}/auth/session

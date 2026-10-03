@@ -67,9 +67,9 @@ class WardrobeIntegrationTest {
         checkIns.cancel(ExplorerId.of(explorerId), mapId, RegionCode.of(code));
     }
 
-    /** 지역·세트 아이템(같은 DB 를 쓰는 다른 테스트가 만든 이슈 아이템 event:* 은 빼고 본다). */
+    /** 지역·세트 아이템(같은 DB 를 쓰는 다른 테스트가 만든 이슈 아이템 event:* 과 4단계 초대 보상 invite:* 은 빼고 본다). */
     private List<String> owned(String explorerId) {
-        return jdbc.queryForList("SELECT item_id FROM owned_item WHERE explorer_id = ? AND item_id NOT LIKE 'event:%' "
+        return jdbc.queryForList("SELECT item_id FROM owned_item WHERE explorer_id = ? AND item_id NOT LIKE 'event:%' AND item_id NOT LIKE 'invite:%' "
             + "ORDER BY item_id", String.class, explorerId);
     }
 

@@ -1,0 +1,173 @@
+### 4단계 파트 B(공유 — 자랑 카드·공개 프로필·공개 범위·프로필 링크 합류·초대 보상) 왕복 확인 — IntelliJ HTTP Client / VS Code REST Client
+### 서버: ./gradlew :app-api:bootRun   (8080이 점유돼 있으면 --args='--server.port=18081' 으로 띄우고 아래 @host 를 바꾼다)
+### 로그인은 local 전용 POST /dev/login(파트 A, 세션 쿠키 JSESSIONID — 클라이언트가 자동 보관). 세션 변경 요청은 X-XSRF-TOKEN 필요.
+### 카드 원천 무효화·초대 보상은 outbox 릴레이로 비동기(local 300ms) — 1초쯤 뒤에 조회한다.
+### 공개 경로 /u/** 는 인증 없이 열린다. 공개 범위가 PUBLIC 이 아니면 404(존재 숨김, FRIENDS 는 5단계 전까지 PRIVATE 처럼).
+### 공개 범위 기본값은 PRIVATE(사용자 결정 Q1) — 7-1 에서 "공개하기"(PUT /me/privacy PUBLIC).
+### 쿠키를 유지하는 클라이언트(IntelliJ HTTP Client)에서도 그대로 돈다: 로그인 뒤의 다른 익명 탐험가 요청(15~17·19)은
+### `Cookie: JSESSIONID=none` 으로 세션을 떼고 보낸다(세션이 토큰보다 먼저라서 — 안 떼면 계정 탐험가로 처리된다).
+@host = http://localhost:8080
+
+### 0. [local] 전체 초기화 → 204
+DELETE {{host}}/dev/reset
+
+### 1. CSRF 쿠키 받기 → 200 + Set-Cookie XSRF-TOKEN
+GET {{host}}/auth/session
+
+> {% const xsrf = (response.headers.valuesOf("Set-Cookie") || []).find(v => v.startsWith("XSRF-TOKEN=")); if (xsrf) client.global.set("xsrf", xsrf.split(";")[0].substring("XSRF-TOKEN=".length)); %}
+
+### 2. 익명 탐험가 발급 → 201
+POST {{host}}/explorers
+
+> {% client.global.set("hostToken", response.body.accessToken); %}
+
+### 3. 체크인 + 메모(비공개여야 한다) → 201
+POST {{host}}/visits
+X-Explorer-Token: {{hostToken}}
+Content-Type: application/json
+
+{"regionCode": "KR-11010", "visitDate": "2026-09-17", "memo": "아무도 보면 안 되는 메모"}
+
+### 4. 로그인(익명 탐험가를 계정에 연결) → 200 {explorerId, handle, outcome: LINKED}
+POST {{host}}/dev/login
+X-Explorer-Token: {{hostToken}}
+Content-Type: application/json
+
+{"email": "kim.share@example.com"}
+
+> {% client.global.set("handle", response.body.handle); %}
+
+### 5. 내 카드 메타 → 200 {handle, profileUrl:/u/{handle}, visibility:PUBLIC, cards:[TERRITORY,RECENT,RECAP]{previewUrl, publicUrl, rendered, stale}}
+GET {{host}}/me/cards
+
+### 6. 내 영토 카드 미리보기(첫 요청에 렌더) → 200 image/png 1200×630
+GET {{host}}/me/cards/territory.png
+
+### 7. 공개 범위 → 200 {visibility:PRIVATE, publiclyVisible:false} (기본 비공개) — 이때 /u/{handle} 은 404
+GET {{host}}/me/privacy
+
+###
+GET {{host}}/u/{{handle}}
+
+### 7-1. 공개하기 → 200 {visibility:PUBLIC, publiclyVisible:true}
+PUT {{host}}/me/privacy
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"visibility": "PUBLIC"}
+
+### 8. [로그아웃 상태로 열어도 됨] 공개 프로필 HTML → 200 text/html: og:title·og:description·og:image(절대 주소 = territory.public-base-url + /u/{handle}/card/territory.png — Host 헤더 무시),
+###    최근 영토는 "2026년 9월"(월 단위) — 메모·사진·"2026-09-17" 없음
+GET {{host}}/u/{{handle}}
+
+### 9. OG 이미지 → 200 image/png (Cache-Control: max-age=60, public)
+GET {{host}}/u/{{handle}}/card/territory.png
+
+### 10. 최근 여행·연간 리캡 카드 → 200 image/png
+GET {{host}}/u/{{handle}}/card/recent.png
+
+###
+GET {{host}}/u/{{handle}}/card/recap.png
+
+### 11. 모르는 카드 → 404 HTML
+GET {{host}}/u/{{handle}}/card/selfie.png
+
+### 12. 공유 지도 만들기(세션) → 201 {mapId, inviteCode, settings.visibility:PRIVATE}
+POST {{host}}/maps
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"name": "부산 원정대"}
+
+> {% client.global.set("mapId", response.body.mapId); %}
+
+### 13. 프로필에 지도 열기(지도장 설정 visibility=PUBLIC) → 200
+PUT {{host}}/maps/{{mapId}}/settings
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"photoRequired": false, "dailyCheckInCap": 5, "visibility": "PUBLIC"}
+
+### 14. 공개 프로필에 "이 지도에 합류" 버튼(data-join=mapId, 초대코드 없음) → 200
+GET {{host}}/u/{{handle}}
+
+### 15. 두 번째 탐험가(익명) 발급 → 201 (세션을 떼고)
+POST {{host}}/explorers
+Cookie: JSESSIONID=none
+
+> {% client.global.set("guestToken", response.body.accessToken); %}
+
+### 16. 프로필 링크로 합류 → 200 {mapId, members 2명}
+POST {{host}}/maps/join-via-profile/{{handle}}
+Cookie: JSESSIONID=none
+X-Explorer-Token: {{guestToken}}
+Content-Type: application/json
+
+{"mapId": "{{mapId}}"}
+
+### 17. 초대받은 쪽 가방 → invite:guest-ticket(동행 티켓 키링, EVENT) 포함
+GET {{host}}/inventory
+Cookie: JSESSIONID=none
+X-Explorer-Token: {{guestToken}}
+
+### 18. 초대한 쪽(세션) 가방 → invite:host-flag(길잡이 깃발, EVENT) 포함
+GET {{host}}/inventory
+
+### 19. 닫힌 지도·모르는 handle 로 합류 → 404 PROFILE_MAP_NOT_FOUND(어느 쪽인지 숨김)
+POST {{host}}/maps/join-via-profile/nobody
+Cookie: JSESSIONID=none
+X-Explorer-Token: {{guestToken}}
+Content-Type: application/json
+
+{"mapId": "{{mapId}}"}
+
+### 20. 공개 범위 PRIVATE → 200 {publiclyVisible:false}
+PUT {{host}}/me/privacy
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"visibility": "PRIVATE"}
+
+### 21. 공개 프로필·카드 → 404(존재 숨김)
+GET {{host}}/u/{{handle}}
+
+###
+GET {{host}}/u/{{handle}}/card/territory.png
+
+### 21-1. 프로필이 비공개면 지도가 PUBLIC 이어도 프로필 합류 404(초대 보상 없음)
+POST {{host}}/explorers
+Cookie: JSESSIONID=none
+
+> {% client.global.set("lateToken", response.body.accessToken); %}
+
+###
+POST {{host}}/maps/join-via-profile/{{handle}}
+Cookie: JSESSIONID=none
+X-Explorer-Token: {{lateToken}}
+Content-Type: application/json
+
+{"mapId": "{{mapId}}"}
+
+### 22. FRIENDS(5단계 전까지 PRIVATE 처럼) → 200 {visibility:FRIENDS, publiclyVisible:false} → 공개 프로필 404
+PUT {{host}}/me/privacy
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"visibility": "FRIENDS"}
+
+###
+GET {{host}}/u/{{handle}}
+
+### 23. 잘못된 공개 범위 → 400 INVALID_VISIBILITY
+PUT {{host}}/me/privacy
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"visibility": "everyone"}
+
+### 24. 다시 PUBLIC → 200
+PUT {{host}}/me/privacy
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"visibility": "PUBLIC"}

@@ -127,6 +127,8 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.danger{color:var(--danger)}
 .btn.sm{padding:4px 10px;font-size:12px}
+/* 비활성 버튼(예: 구글 키가 없을 때 로그인) — 활성과 한눈에 구분되게 회색·점선 테두리·금지 커서(QA P3-8) */
+.btn:disabled,.btn.primary:disabled{background:var(--bg);border:1px dashed var(--line);color:var(--muted);cursor:not-allowed;opacity:.75;filter:grayscale(1)}
 .empty{color:var(--muted);font-size:13px;margin:0}
 .sub{color:var(--muted);font-size:12px}
 .setchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
@@ -199,6 +201,25 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
 .feed time{color:var(--muted);display:block;font-size:11px}
 
 /* 프로필 */
+/* 4단계 계정(로그인·handle·병합 안내) */
+.acct .who{font-size:13px;margin:0 0 8px}
+.acct .who b{font-family:var(--display);font-size:16px}
+.acct .note{font-size:12px;color:var(--muted);margin:6px 0 0}
+.acct .merged{font-size:12px;background:var(--gold-soft);border:1px solid var(--gold);border-radius:6px;padding:6px 9px;margin:8px 0 0}
+.acct .handle-row{display:flex;gap:6px;margin-top:8px}
+.acct .handle-row input{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px}
+/* 4단계 공유(자랑 카드·공개 범위·프로필 합류 지도) */
+.share-thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.share-thumbs figure{margin:0;min-width:0}
+.share-thumbs img{width:100%;aspect-ratio:1200/630;border-radius:6px;background:#10211f;cursor:zoom-in;display:block}
+.share-thumbs figcaption{font-size:11px;color:var(--muted);text-align:center;margin-top:2px}
+.share-privacy{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;font-size:12px}
+.share-privacy select{border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px;background:var(--panel)}
+.share-privacy .note{flex-basis:100%;font-size:11px;color:var(--muted);margin:0}
+.share-vs{display:flex;gap:6px;margin-top:8px}
+.share-vs input{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px}
+.share-maps{margin-top:10px;font-size:12px}
+.share-maps label{display:flex;gap:6px;align-items:center;margin-top:4px}
 .titles{display:flex;flex-wrap:wrap;gap:6px}
 .titles button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font-size:12px}
 .titles button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
@@ -476,15 +497,38 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
   <!-- 프로필 -->
   <section id="tab-profile" hidden class="grid2">
     <div class="side">
-      <div class="card">
-        <h2>자랑하기 <span>카드는 공개 프로필 링크 미리보기로도 쓰임</span></h2>
-        <div class="cards">
+      <div class="card acct" id="account-card">
+        <h2>계정 <span id="acct-sub">로그인하면 기기를 바꿔도 영토가 이어져요</span></h2>
+        <div id="acct-body"></div>
+      </div>
+      <div class="card" id="share-card">
+        <h2>자랑하기 <span>서버가 그린 카드 — 공개 프로필 링크의 미리보기(OG 이미지)로도 쓰임</span></h2>
+        <div class="share-thumbs" id="share-thumbs">
+          <figure><img id="card-territory" data-kind="territory" alt="영토 카드"><figcaption>영토</figcaption></figure>
+          <figure><img id="card-recent" data-kind="recent" alt="최근 여행 카드"><figcaption>최근 여행</figcaption></figure>
+          <figure><img id="card-recap" data-kind="recap" alt="연간 리캡 카드"><figcaption>연간 리캡</figcaption></figure>
+        </div>
+        <div class="cards" style="margin-top:8px">
           <button class="btn primary" id="t-share">영토 카드</button>
           <button class="btn" id="t-recent-card">최근 여행 카드</button>
           <button class="btn" id="t-recap-card">연간 리캡 카드</button>
         </div>
-        <div class="url" style="margin-top:10px" id="share-url">https://territory.kr/u/kobi</div>
-        <div class="row"><button class="btn sm" id="t-copy">프로필 링크 복사</button></div>
+        <div class="url" style="margin-top:10px" id="share-url">로그인하면 공개 프로필 링크가 생겨요</div>
+        <div class="row"><button class="btn sm" id="t-copy" disabled>프로필 링크 복사</button><a class="btn sm" id="t-open-profile" target="_blank" rel="noopener" hidden>공개 프로필 열기</a></div>
+        <div class="share-privacy" id="share-privacy">
+          <button class="btn sm primary" id="t-publish">공개하기</button>
+          <label for="privacy-select">공개 범위</label>
+          <select id="privacy-select">
+            <option value="PRIVATE">비공개</option>
+            <option value="FRIENDS">친구 공개</option>
+            <option value="PUBLIC">전체 공개</option>
+          </select>
+          <p class="note" id="privacy-note">공개 프로필은 기본 비공개예요. "공개하기"를 켜야 링크가 열려요.</p>
+        </div>
+        <div class="share-vs" id="share-vs" hidden>
+          <input id="vs-handle" placeholder="친구 handle" maxlength="20" aria-label="비교할 친구 handle"><button class="btn sm" id="t-vs-server">VS 카드</button>
+        </div>
+        <div class="share-maps" id="share-maps" hidden></div>
       </div>
       <div class="card">
         <h2>칭호 <span>프로필에 보일 칭호를 고르세요</span></h2>
@@ -684,31 +728,63 @@ const localISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0
 const api = (() => {
   const ID_KEY = 'territory-explorer-id', TOKEN_KEY = 'territory-explorer-token', MAP_KEY = 'territory-map-id';
   const toServer = c => 'KR-' + c, toClient = c => String(c).replace(/^KR-/, '');
-  let explorerId = null, token = null, mapId = null;
+  let explorerId = null, token = null, mapId = null, loggedIn = false;
   try { explorerId = localStorage.getItem(ID_KEY); token = localStorage.getItem(TOKEN_KEY); mapId = localStorage.getItem(MAP_KEY); } catch(e){}
+  // 4단계: 로그인 세션(쿠키)이 있으면 그걸로 인증하고 토큰 헤더는 보내지 않는다. 세션 요청의 변경 메서드는 CSRF 토큰(쿠키 XSRF-TOKEN → 헤더)을 싣는다.
+  const cookie = name => { const hit = document.cookie.split('; ').find(c => c.startsWith(name + '=')); return hit ? decodeURIComponent(hit.slice(name.length + 1)) : null; };
+  const csrf = (method, headers) => { if (!['GET', 'HEAD'].includes(method)) { const x = cookie('XSRF-TOKEN'); if (x) headers['X-XSRF-TOKEN'] = x; } return headers; };
+  const remember = () => { try { if (explorerId) localStorage.setItem(ID_KEY, explorerId); else localStorage.removeItem(ID_KEY); if (token) localStorage.setItem(TOKEN_KEY, token); else localStorage.removeItem(TOKEN_KEY); } catch(e){} };
   const withMap = path => mapId ? path + (path.includes('?') ? '&' : '?') + 'mapId=' + encodeURIComponent(mapId) : path;
   class ApiError extends Error { constructor(status, code, message){ super(message); this.status = status; this.code = code; } }
   async function issue(){
-    const r = await fetch('/explorers', { method:'POST' });
+    const r = await fetch('/explorers', { method:'POST', headers: csrf('POST', {}) });
     if (!r.ok) throw new ApiError(r.status, 'ISSUE_FAILED', '탐험가 발급에 실패했어요');
     const b = await r.json(); explorerId = b.explorerId; token = b.accessToken; mapId = null;
     try { localStorage.setItem(ID_KEY, explorerId); localStorage.setItem(TOKEN_KEY, token); localStorage.removeItem(MAP_KEY); } catch(e){}
     return b;
   }
   async function call(method, path, body, retried){
-    if (!token) await issue();
-    const headers = { 'X-Explorer-Token': token };
+    if (!token && !loggedIn) await issue();
+    const headers = csrf(method, loggedIn ? {} : { 'X-Explorer-Token': token });
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     const r = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     if (r.ok) return r.status === 204 ? null : r.json();
     let err = {}; try { err = await r.json(); } catch(e){}
     // 서버 데이터가 초기화돼 저장된 탐험가가 없어졌으면 새로 발급받아 한 번만 재시도
-    if (!retried && ['EXPLORER_NOT_FOUND', 'EXPLORER_TOKEN_REQUIRED', 'EXPLORER_TOKEN_INVALID'].includes(err.code)) { token = null; await issue(); return call(method, path, body, true); }
+    if (!retried && ['EXPLORER_NOT_FOUND', 'EXPLORER_TOKEN_REQUIRED', 'EXPLORER_TOKEN_INVALID', 'ACCOUNT_NOT_FOUND'].includes(err.code)) { loggedIn = false; token = null; await issue(); return call(method, path, body, true); }
     throw new ApiError(r.status, err.code || 'HTTP_' + r.status, err.message || `서버 오류 (${r.status})`);
+  }
+  // 4단계 공유: 내 카드 PNG(인증 필요)는 <img src> 로 헤더를 못 실어 fetch → blob URL 로 넘긴다
+  async function image(path){
+    if (!token && !loggedIn) await issue();
+    const r = await fetch(path, { headers: loggedIn ? {} : { 'X-Explorer-Token': token } });
+    if (!r.ok) { let err = {}; try { err = await r.json(); } catch(e){} throw new ApiError(r.status, err.code || 'HTTP_' + r.status, err.message || `카드를 불러오지 못했어요 (${r.status})`); }
+    return URL.createObjectURL(await r.blob());
   }
   return {
     get explorerId(){ return explorerId; },
     get token(){ return token; },
+    get loggedIn(){ return loggedIn; },
+    // 4단계 공유: 내 카드(서버 PNG)·공개 범위·공개 프로필 링크로 지도 합류
+    myCards: () => call('GET', '/me/cards'),
+    cardImage: kind => image('/me/cards/' + kind + '.png'),
+    setPrivacy: visibility => call('PUT', '/me/privacy', { visibility }),
+    joinViaProfile: (handle, id) => call('POST', '/maps/join-via-profile/' + encodeURIComponent(handle), { mapId: id }),
+    // 4단계 계정: 세션 상태 → 로그인이면 그 계정 탐험가로 바꾸고 익명 토큰은 버린다(로그인하면 서버가 무효화한다)
+    async session(){
+      const r = await fetch('/auth/session'); const s = await r.json();
+      if (s.loggedIn) { loggedIn = true; explorerId = s.explorerId; token = null; remember(); } else loggedIn = false;
+      return s;
+    },
+    async loginIntent(){
+      const r = await fetch('/auth/login-intent', { method:'POST', headers: csrf('POST', token && !loggedIn ? { 'X-Explorer-Token': token } : {}) });
+      return r.json();
+    },
+    async logout(){
+      await fetch('/logout', { method:'POST', headers: csrf('POST', {}) });
+      loggedIn = false; explorerId = null; token = null; mapId = null; remember(); try { localStorage.removeItem(MAP_KEY); } catch(e){}
+    },
+    changeHandle: handle => call('PUT', '/me/handle', { handle }),
     get mapId(){ return mapId; },
     /** 지금 보는 지도(null = 개인 지도). 체크인·영토 조회가 이 지도로 간다. */
     setMap(id){ mapId = id || null; try { if (mapId) localStorage.setItem(MAP_KEY, mapId); else localStorage.removeItem(MAP_KEY); } catch(e){} },
@@ -826,7 +902,9 @@ function pollProgress(){
 const ERR_TITLE = { DAILY_CAP_EXCEEDED:'오늘은 여기까지', FUTURE_VISIT_DATE:'날짜를 확인해 주세요', MEMO_TOO_LONG:'메모가 길어요', DUPLICATE_VISIT:'이미 칠한 곳',
   QUEST_ALREADY_CLAIMED:'이미 받은 보상', QUEST_NOT_COMPLETED:'아직 달성 전', TITLE_NOT_EARNED:'아직 못 얻은 칭호',
   PHOTO_REQUIRED:'사진이 필요해요', NOT_A_MEMBER:'멤버가 아니에요', OWNER_ONLY:'지도장만 할 수 있어요', OWNER_CANNOT_LEAVE:'지도장은 탈퇴 전 양도',
-  INVITE_CODE_NOT_FOUND:'초대코드 확인', MAP_FULL:'지도가 가득 찼어요', ALREADY_MEMBER:'이미 멤버예요' };
+  INVITE_CODE_NOT_FOUND:'초대코드 확인', MAP_FULL:'지도가 가득 찼어요', ALREADY_MEMBER:'이미 멤버예요',
+  PROFILE_MAP_NOT_FOUND:'합류할 수 없는 지도', PROFILE_NOT_FOUND:'프로필 없음', INVALID_VISIBILITY:'공개 범위 확인', CARD_KIND_NOT_FOUND:'모르는 카드',
+  HANDLE_INVALID:'handle 형식 확인', HANDLE_RESERVED:'쓸 수 없는 handle', HANDLE_TAKEN:'이미 쓰는 handle', LOGIN_REQUIRED:'로그인이 필요해요', CSRF_INVALID:'새로고침이 필요해요' };
 function toastError(e){ toast('!', ERR_TITLE[e.code] || '요청 실패', e.message || String(e)); }
 const ym = d => d.slice(0,7);
 const CUR_YM = today.toISOString().slice(0,7);
@@ -1665,9 +1743,11 @@ async function claimQuest(btn){
   } catch (e) { toastError(e); btn.disabled = false; }
 }
 ['#quests-month', '#quests-long'].forEach(sel => $(sel).addEventListener('click', ev => { const b = ev.target.closest('[data-claim]'); if (b && !b.disabled) claimQuest(b); }));
-$('#t-share').onclick = () => withFonts(() => showCard(territoryCard()));
-$('#t-recap-card').onclick = () => withFonts(() => showCard(recapCard()));
-$('#t-recent-card').onclick = () => withFonts(() => { const c = ctx(); const last = c.list.slice().sort((a,b) => (b.date||'').localeCompare(a.date||'') || b.at - a.at)[0]; if (last) showCard(recentCard(last.code)); else toast('!', '아직 기록이 없어요', '지도를 먼저 칠해보세요'); });
+// 4단계: 자랑 카드는 서버가 그린 PNG(링크가 열릴 때 lazy 렌더 — 공개 프로필 OG 이미지와 같은 그림)
+const openServerCard = kind => api.cardImage(kind).then(showCard).catch(toastError);
+$('#t-share').onclick = () => openServerCard('territory');
+$('#t-recap-card').onclick = () => openServerCard('recap');
+$('#t-recent-card').onclick = () => openServerCard('recent');
 $('#t-close').onclick = () => { $('#modal').hidden = true; };
 $('#modal').addEventListener('click', ev => { if (ev.target === $('#modal')) $('#modal').hidden = true; });
 $('#checkin').addEventListener('click', ev => { if (ev.target === $('#checkin')) { $('#checkin').hidden = true; } });
@@ -1760,6 +1840,100 @@ $('#d-body').addEventListener('click', async ev => {
   catch (e) { toastError(e); }
 });
 
+/* ---------- 계정(4단계): 구글 로그인 · handle · 병합 안내 ---------- */
+let account = null, accountNotice = null;
+const NOTICE_TEXT = n => n.outcome === 'MERGED' ? `익명 기록 ${n.merge ? n.merge.movedRegions : 0}곳을 계정으로 옮겼어요${n.merge && n.merge.newRegions ? ` (새 지역 ${n.merge.newRegions}곳)` : ''}`
+  : n.outcome === 'LINKED' ? '지금까지의 영토를 계정에 연결했어요' : n.outcome === 'CREATED' ? '새 계정 탐험가를 만들었어요' : null;
+async function loadAccount(){
+  try { account = await api.session(); } catch (e) { account = null; }
+  const notice = account && account.mergeNotice;
+  if (notice && NOTICE_TEXT(notice)) {
+    accountNotice = NOTICE_TEXT(notice); toast('✓', '로그인했어요', accountNotice);
+    // 병합의 방문 이동·재계산은 비동기 — 잠시 뒤 다시 읽는다
+    if (notice.outcome === 'MERGED') [1500, 4000].forEach(ms => setTimeout(() => refresh().then(() => { render(); return refreshProgress(false); }).catch(() => {}), ms));
+  }
+  renderAccount();
+}
+function renderAccount(){
+  const body = $('#acct-body'); if (!body) return;
+  document.documentElement.dataset.loggedIn = account && account.loggedIn ? 'true' : 'false';
+  if (account && account.loggedIn) {
+    body.innerHTML = `<p class="who" id="acct-who"><b id="acct-handle">@${esc(account.handle)}</b> · ${esc(account.email || '')}</p>
+      ${accountNotice ? `<div class="merged" id="acct-notice">${esc(accountNotice)}</div>` : ''}
+      <div class="handle-row"><input id="acct-handle-input" value="${esc(account.handle)}" maxlength="20" aria-label="새 handle"><button class="btn sm" id="t-handle">handle 바꾸기</button></div>
+      <div class="row"><button class="btn sm" id="t-logout">로그아웃</button></div>`;
+    $('#t-handle').onclick = async () => {
+      try { const r = await api.changeHandle($('#acct-handle-input').value); account.handle = r.handle; renderAccount(); toast('✓', 'handle 변경', '@' + r.handle); }
+      catch (e) { toastError(e); }
+    };
+    $('#t-logout').onclick = async () => { await api.logout(); account = null; accountNotice = null; await loadAccount(); await refresh(); render(); toast('✓', '로그아웃', '이 기기는 새 익명 탐험가로 시작해요'); };
+    return;
+  }
+  const enabled = !!(account && account.googleLoginEnabled);
+  body.innerHTML = `<button class="btn primary" id="t-google" ${enabled ? '' : 'disabled'}>구글로 로그인</button>
+    <p class="note" id="acct-note">${enabled ? '로그인하면 지금 익명으로 칠한 영토가 계정으로 옮겨져요(이미 계정이 있으면 합쳐져요).' : '구글 로그인은 아직 준비 중이에요(서버에 구글 클라이언트 설정이 없음). 익명 탐험은 그대로 쓸 수 있어요.'}</p>`;
+  if (enabled) $('#t-google').onclick = async () => { try { const r = await api.loginIntent(); if (r.loginUrl) location.href = r.loginUrl; } catch (e) { toastError(e); } };
+}
+
+/* ---------- 공유(4단계): 카드 미리보기 · 공개 범위 · 프로필 링크 · 프로필에서 합류할 지도 ---------- */
+let sharing = null;
+async function loadSharing(){
+  try { sharing = await api.myCards(); } catch (e) { sharing = null; return; }
+  renderSharing();
+  for (const img of document.querySelectorAll('#share-thumbs img')) {
+    try { const url = await api.cardImage(img.dataset.kind); if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src); img.src = url; img.dataset.loaded = 'true'; }
+    catch (e) { img.dataset.loaded = 'error'; }
+  }
+  renderShareMaps();
+}
+function renderSharing(){
+  if (!sharing) return;
+  const link = sharing.profileUrl ? location.origin + sharing.profileUrl : null;
+  $('#share-url').textContent = link || '로그인하면 공개 프로필 링크가 생겨요';
+  $('#t-copy').disabled = !link;
+  $('#t-open-profile').hidden = !link; if (link) $('#t-open-profile').href = sharing.profileUrl;
+  $('#share-privacy').hidden = !sharing.handle;
+  $('#privacy-select').value = sharing.visibility;
+  $('#privacy-note').textContent = sharing.visibility === 'FRIENDS' ? '친구 공개는 친구 기능(5단계)이 생기기 전까지 비공개처럼 동작해요 — 공개 프로필이 열리지 않아요.'
+    : sharing.visibility === 'PRIVATE' ? '비공개(기본) — 공개 프로필·카드 링크가 열리지 않아요(존재 여부도 숨겨요). "공개하기"를 켜면 열려요.'
+    : '전체 공개 — 공개 프로필엔 색칠·집계만 보여요. 메모·사진은 비공개, 날짜는 월 단위로만.';
+  $('#t-publish').hidden = sharing.publiclyVisible;
+  $('#share-vs').hidden = !(sharing.handle && sharing.publiclyVisible);
+  document.documentElement.dataset.profileVisibility = sharing.visibility;
+}
+function renderShareMaps(){
+  const box = $('#share-maps');
+  const owned = sharing && sharing.handle ? myMaps.filter(m => m.kind === 'SHARED' && m.role === 'OWNER') : [];
+  box.hidden = !owned.length;
+  if (!owned.length) return;
+  box.innerHTML = '<div class="note">프로필 링크로 합류할 수 있는 지도(초대코드 없이)</div>' + owned.map(m => `<label><input type="checkbox" data-profile-map="${m.mapId}"> ${esc(m.name)} · ${m.memberCount}명</label>`).join('');
+  owned.forEach(m => api.mapDetail(m.mapId).then(d => { const box2 = document.querySelector(`[data-profile-map="${m.mapId}"]`); if (box2) box2.checked = d.settings.visibility === 'PUBLIC'; }).catch(() => {}));
+}
+async function changePrivacy(visibility, label){
+  try { const r = await api.setPrivacy(visibility); sharing.visibility = r.visibility; sharing.publiclyVisible = r.publiclyVisible; renderSharing(); toast('✓', '공개 범위', label); }
+  catch (e) { toastError(e); renderSharing(); }
+}
+$('#privacy-select').onchange = ev => changePrivacy(ev.target.value, ev.target.selectedOptions[0].textContent);
+$('#t-publish').onclick = () => changePrivacy('PUBLIC', '전체 공개 — 프로필 링크가 열렸어요');
+$('#share-thumbs').addEventListener('click', ev => { const img = ev.target.closest('img'); if (img && img.dataset.loaded === 'true') showCard(img.src); });
+$('#t-vs-server').onclick = () => { const other = $('#vs-handle').value.trim().replace(/^@/, ''); if (other && sharing && sharing.handle) showCard(`/u/${encodeURIComponent(sharing.handle)}/vs/${encodeURIComponent(other)}.png`); };
+$('#share-maps').addEventListener('change', async ev => {
+  const box = ev.target.closest('[data-profile-map]'); if (!box) return;
+  try { const d = await api.mapDetail(box.dataset.profileMap);
+    await api.saveSettings(d.mapId, { photoRequired: d.settings.photoRequired, dailyCheckInCap: d.settings.dailyCheckInCap, visibility: box.checked ? 'PUBLIC' : 'PRIVATE' });
+    toast('✓', box.checked ? '프로필에 지도 공개' : '프로필에서 지도 숨김', d.name);
+  } catch (e) { toastError(e); box.checked = !box.checked; }
+});
+$('#tabs').addEventListener('click', ev => { const b = ev.target.closest('[data-tab]'); if (b && b.dataset.tab === 'profile') loadSharing(); });
+/** 공개 프로필의 "이 지도에 합류"(/?joinProfile={handle}&map={mapId}) — 지금 탐험가로 합류하고 그 지도로 옮긴다. */
+async function joinFromProfileLink(){
+  const q = new URLSearchParams(location.search), handle = q.get('joinProfile'), id = q.get('map');
+  if (!handle || !id) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  try { const d = await api.joinViaProfile(handle, id); toast('✓', '지도에 합류했어요', `@${handle}의 ${d.name}`); await refreshMaps(); await switchMap(d.mapId); document.documentElement.dataset.joinedVia = 'profile'; }
+  catch (e) { toastError(e); }
+}
+
 /* ---------- boot ---------- */
 function start(hot){
   if (hot && hot.state) { state = hot.state; sampleMode = !!hot.sampleMode; }
@@ -1768,7 +1942,7 @@ function start(hot){
   const h = (location.hash || '').slice(1);
   if (['map','bag','sets','quests','rank','profile'].includes(h)) setTab(h);
   render();
-  refresh().then(() => refreshMaps()).then(() => refreshProgress(false)).then(() => refreshWardrobe(false)).catch(e => toastError(e));
+  loadAccount().then(() => refresh()).then(() => refreshMaps()).then(() => joinFromProfileLink()).then(() => refreshProgress(false)).then(() => refreshWardrobe(false)).then(() => { if (tab === 'profile') loadSharing(); }).catch(e => toastError(e));
 }
 if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => ({ state, sampleMode }));
 (window.claude && window.claude.hot && window.claude.hot.ready) ? window.claude.hot.ready(start) : start((window.claude && window.claude.hot && window.claude.hot.data) || {});

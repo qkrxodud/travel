@@ -7,15 +7,21 @@ import com.kobi.territory.common.error.TerritoryException;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
 import com.kobi.territory.common.identity.CurrentExplorer;
-import com.kobi.territory.exploration.api.query.ExplorerCredentials;
 import com.kobi.territory.exploration.application.ExplorationDevService;
 import com.kobi.territory.exploration.application.ExplorationDevService.SampleVisit;
 import com.kobi.territory.exploration.application.MapAccess;
 import com.kobi.territory.exploration.domain.explorer.Explorer;
 import com.kobi.territory.outbox.OutboxRedelivery;
 import com.kobi.territory.outbox.OutboxRelay;
+import com.kobi.territory.api.security.ExplorerAuthentication;
+import com.kobi.territory.api.security.GoogleLoginConfig;
+import com.kobi.territory.api.security.LoginResponse;
+import com.kobi.territory.api.security.SessionLogin;
+import com.kobi.territory.exploration.domain.explorer.AccountIdentity;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import com.kobi.territory.progression.application.RecalculateService;
@@ -33,6 +39,7 @@ import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.ResponseEntity;
@@ -41,13 +48,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 로컬 개발·E2E 전용 엔드포인트. local 프로파일에서만 빈이 생성된다(prod에서는 404).
+ * 로컬 개발·E2E 전용 엔드포인트. local 프로파일 <b>이면서</b> territory.dev.enabled=true(application-local.yml 에만 있음)일 때만 빈이
+ * 생성된다(prod·설정 없음이면 404 — QA P3-11: 기본 프로파일 local 에 기대지 않는 두 번째 안전장치).
  * 화면의 "예시 다시 채우기"·"전부 지우기" 버튼과 E2E fixture가 쓴다.
  * <ul>
  *   <li>{@code DELETE /dev/reset} — 전체 테이블 비우기(모든 탐험가·지도·방문·outbox). 204</li>
@@ -56,14 +63,16 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>{@code DELETE /dev/visits} — 현재 탐험가 개인 지도의 방문 전부 취소 + 진행 비우기. 200 {cleared}</li>
  *   <li>{@code POST /dev/explorers/age} {hours} — 현재 탐험가의 가입·지도 가입 시각을 hours 만큼 과거로(온보딩 예외 종료 시뮬레이션). 200</li>
  *   <li>{@code POST /dev/outbox/redeliver[?eventId=&subscriber=]} — FAILED 전달을 다시 보낸다(생략하면 전체). 200 {redelivered}</li>
- *   <li>{@code POST /dev/recalculate} — 진행·도감·퀘스트 재계산 배치. X-Explorer-Token 이 있으면 그 탐험가만, 없으면 전체.
+ *   <li>{@code POST /dev/recalculate} — 진행·도감·퀘스트 재계산 배치. 로그인 세션 또는 X-Explorer-Token 이 있으면 그 탐험가만, 없으면 전체.
  *       미전달 이벤트가 남은 탐험가는 보류(S3-3). 200 {recalculated, failed, deferred}</li>
+ *   <li>{@code POST /dev/login} {email, sub?} — 구글 로그인 대신 같은 계정 연결·병합 경로로 세션을 만든다(4단계, E2E). 200 LoginResponse</li>
  * </ul>
  * 시드는 샘플을 방문일 순으로 체크인하고 처리 시각을 샘플 날짜로 둔다(D6) — 스트릭·월간 퀘스트가 프로토타입과 비슷하게 나온다.
  * 시드·전부 지우기는 프로토타입 fillSample·clear 처럼 그 탐험가의 진행(XP·뱃지·칭호·도감·퀘스트)을 먼저 비운다 — 취소 비대칭으로
  * 남는 보너스나, 이미 이번 달에 체크인해 과거 날짜 샘플로 스트릭이 이어지지 않는 문제를 없애려는 dev 전용 동작이다.
  */
 @Profile("local")
+@ConditionalOnProperty(prefix = "territory.dev", name = "enabled", havingValue = "true")
 @RestController
 @RequestMapping("/dev")
 public class DevController {
@@ -72,7 +81,8 @@ public class DevController {
     private static final List<String> TABLES = List.of("outbox_delivery", "outbox", "owned_item_basis", "owned_item", "inventory_visit",
         "inventory", "scene", "xp_ledger", "badge_earned",
         "title_earned", "explorer_region_mark", "explorer_region", "set_progress", "quest_progress", "explorer_progress", "visit_generation", "visit", "territory",
-        "map_member", "expedition_map", "explorer");
+        "map_member", "expedition_map", "recalculation_request", "handle_reservation", "account", "share_card", "privacy_settings",
+        "invite_reward", "explorer");
 
     private final JdbcTemplate jdbc;
     private final ExplorationDevService exploration;
@@ -81,15 +91,23 @@ public class DevController {
     private final OutboxRedelivery redelivery;
     private final ObjectMapper objectMapper;
     private final Clock clock;
-    private final ExplorerCredentials credentials;
     private final InventoryRecalculateService inventoryRecalculate;
     private final ItemDefinitionCache itemDefinitions;
+    private final ObjectProvider<OutboxRelay> relay;
+    private final PlatformTransactionManager transactionManager;
+    private final ExplorerAuthentication authentication;
+    private final SessionLogin sessionLogin;
 
     public DevController(JdbcTemplate jdbc, ExplorationDevService exploration, MapAccess mapAccess,
                          RecalculateService recalculate, OutboxRedelivery redelivery, ObjectMapper objectMapper,
-                         Clock clock, ExplorerCredentials credentials, InventoryRecalculateService inventoryRecalculate,
-                         ItemDefinitionCache itemDefinitions) {
-        this.credentials = credentials;
+                         Clock clock, InventoryRecalculateService inventoryRecalculate,
+                         ItemDefinitionCache itemDefinitions, ObjectProvider<OutboxRelay> relay,
+                         PlatformTransactionManager transactionManager, ExplorerAuthentication authentication,
+                         SessionLogin sessionLogin) {
+        this.relay = relay;
+        this.transactionManager = transactionManager;
+        this.authentication = authentication;
+        this.sessionLogin = sessionLogin;
         this.inventoryRecalculate = inventoryRecalculate;
         this.itemDefinitions = itemDefinitions;
         this.redelivery = redelivery;
@@ -111,8 +129,9 @@ public class DevController {
         try {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
                 TABLES.forEach(table -> jdbc.update("DELETE FROM " + table));
-                // 운영 추가 아이템(event: 등)만 지운다 — 이관 데이터(region:·set:, 250+9)는 유지(QA P3-16)
-                jdbc.update("DELETE FROM item_definition WHERE item_id NOT LIKE 'region:%' AND item_id NOT LIKE 'set:%'");
+                // 운영 추가 아이템(event: 등)만 지운다 — 이관 데이터(region:·set:, 250+9 + V4_1 invite: 2)는 유지(QA P3-16)
+                jdbc.update("DELETE FROM item_definition WHERE item_id NOT LIKE 'region:%' AND item_id NOT LIKE 'set:%'"
+                    + " AND item_id NOT LIKE 'invite:%'");
             });
         } finally {
             relay.ifAvailable(OutboxRelay::resume);
@@ -120,12 +139,6 @@ public class DevController {
         itemDefinitions.invalidate();
         return ResponseEntity.noContent().build();
     }
-
-    @Autowired
-    private ObjectProvider<OutboxRelay> relay;
-
-    @Autowired
-    private PlatformTransactionManager transactionManager;
 
     @PostMapping("/seed")
     public Map<String, Integer> seed(@CurrentExplorer ExplorerId explorerId) {
@@ -180,22 +193,37 @@ public class DevController {
     }
 
     @PostMapping("/recalculate")
-    public Map<String, Object> recalculate(@RequestHeader(value = CurrentExplorer.HEADER, required = false) String token) {
-        if (token == null || token.isBlank()) {
+    public Map<String, Object> recalculate(HttpServletRequest request) {
+        Optional<ExplorerId> target = authentication.resolve(request); // 세션 → 토큰(4단계), 둘 다 없으면 전체
+        if (target.isEmpty()) {
             RecalculateService.RecalculationReport report = recalculate.recalculateAll();
             InventoryRecalculateService.RecalculationReport wardrobe = inventoryRecalculate.recalculateAll();
             return Map.of("recalculated", report.recalculated(), "failed", report.failedExplorerIds(),
                 "deferred", report.deferredExplorerIds(), "wardrobe", Map.of("recalculated", wardrobe.recalculated(),
                     "failed", wardrobe.failedExplorerIds(), "deferred", wardrobe.deferredExplorerIds()));
         }
-        String explorerId = credentials.explorerIdByToken(token)
-            .orElseThrow(() -> new TerritoryException("EXPLORER_TOKEN_INVALID", ErrorKind.UNAUTHENTICATED, "접근 토큰을 알 수 없어요."));
-        boolean done = recalculate.recalculateIfSettled(ExplorerId.of(explorerId));
-        boolean wardrobeDone = inventoryRecalculate.recalculateIfSettled(ExplorerId.of(explorerId));
+        String explorerId = target.get().value();
+        boolean done = recalculate.recalculateIfSettled(target.get());
+        boolean wardrobeDone = inventoryRecalculate.recalculateIfSettled(target.get());
         return Map.of("recalculated", done ? 1 : 0, "failed", List.of(), "deferred", done ? List.of() : List.of(explorerId),
             "wardrobe", Map.of("recalculated", wardrobeDone ? 1 : 0, "failed", List.of(),
                 "deferred", wardrobeDone ? List.of() : List.of(explorerId)));
     }
+
+    /**
+     * 구글 로그인 대신(local·E2E): 실제 OIDC 성공과 같은 계정 연결·병합 경로(SessionLogin → AccountService.login)를 타고 세션을 만든다.
+     * X-Explorer-Token 이 있으면 그 익명 탐험가가 연결·병합 대상. sub 생략 = "dev:{email}". 200 LoginResponse + Set-Cookie JSESSIONID.
+     */
+    @PostMapping("/login")
+    public LoginResponse login(@RequestBody DevLoginRequest body, HttpServletRequest request, HttpServletResponse response) {
+        String email = body == null ? null : body.email();
+        String subject = body == null || body.sub() == null || body.sub().isBlank() ? "dev:" + email : body.sub();
+        return sessionLogin.login(request, response,
+            new AccountIdentity(GoogleLoginConfig.REGISTRATION_ID, subject, String.valueOf(email)),
+            authentication.anonymous(request).orElse(null));
+    }
+
+    public record DevLoginRequest(String email, String sub) {}
 
     @PostMapping("/explorers/age")
     @Transactional

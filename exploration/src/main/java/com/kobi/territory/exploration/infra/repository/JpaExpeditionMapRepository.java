@@ -113,6 +113,11 @@ class JpaExpeditionMapRepository implements ExpeditionMapRepository {
     }
 
     @Override
+    public List<MapId> sharedMapIdsOf(ExplorerId explorerId) {
+        return members.sharedMapIdsOf(explorerId.value()).stream().map(MapId::of).toList();
+    }
+
+    @Override
     public List<ExpeditionMap> mapsOf(ExplorerId explorerId) {
         return mapIdsOf(explorerId).stream().map(this::findById).flatMap(Optional::stream)
             .sorted(Comparator.comparing((ExpeditionMap map) -> map.kind() != MapKind.PERSONAL)

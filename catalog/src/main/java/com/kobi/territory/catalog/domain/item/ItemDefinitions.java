@@ -46,7 +46,7 @@ public final class ItemDefinitions {
      */
     public void requireRegistrable(ItemDefinition item) {
         if (item.migrated()) {
-            throw CatalogError.INVALID_ITEM_DEFINITION.exception("region:·set: 으로 시작하는 id 는 이관 데이터 전용입니다: " + item.itemId());
+            throw CatalogError.INVALID_ITEM_DEFINITION.exception("region:·set:·invite: 으로 시작하는 id 는 이관 데이터 전용입니다: " + item.itemId());
         }
         if (byId.containsKey(item.itemId())) throw CatalogError.ITEM_ALREADY_EXISTS.exception(item.itemId());
     }
@@ -61,9 +61,14 @@ public final class ItemDefinitions {
         return stream().filter(item -> item.grantedByCheckIn(region, provinceCode, day, processedAt)).toList();
     }
 
-    /** 이 날짜의 테마(세트) 완성으로 받는 아이템(세트 배경 등). */
-    public List<ItemDefinition> grantedByThemeCompletion(String themeId, LocalDate day) {
-        return stream().filter(item -> item.grantedByThemeCompletion(themeId, day)).toList();
+    /** 완성 시각 completedAt(날짜 day)의 테마(세트) 완성으로 받는 아이템(세트 배경 + 정의 생성 뒤 완성분의 운영 추가 보상). */
+    public List<ItemDefinition> grantedByThemeCompletion(String themeId, LocalDate day, Instant completedAt) {
+        return stream().filter(item -> item.grantedByThemeCompletion(themeId, day, completedAt)).toList();
+    }
+
+    /** 이 날짜의 초대 합류에서 그 쪽(HOST·GUEST)이 받는 아이템. */
+    public List<ItemDefinition> grantedByInvitation(GrantRule.InvitationSide side, LocalDate day) {
+        return stream().filter(item -> item.grantedByInvitation(side, day)).toList();
     }
 
     /** 주어진 id 들 중 정의가 있는 것(요청 순서). */

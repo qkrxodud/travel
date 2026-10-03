@@ -31,6 +31,9 @@ public final class MapDtos {
 
     public record JoinMapRequest(@NotBlank String inviteCode) {}
 
+    /** POST /maps/join-via-profile/{handle} — 공개 프로필에 보인 지도(4단계). */
+    public record JoinViaProfileRequest(@NotBlank String mapId) {}
+
     public record TransferOwnerRequest(@NotBlank String explorerId) {}
 
     public record SettingsRequest(@NotNull Boolean photoRequired, @NotNull Integer dailyCheckInCap, String visibility) {}

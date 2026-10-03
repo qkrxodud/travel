@@ -1,10 +1,9 @@
 package com.kobi.territory.api;
 
-import com.kobi.territory.common.error.ErrorKind;
-import com.kobi.territory.common.error.TerritoryException;
+import com.kobi.territory.api.security.ExplorerAuthentication;
 import com.kobi.territory.common.identity.CurrentExplorer;
 import com.kobi.territory.common.model.ExplorerId;
-import com.kobi.territory.exploration.api.query.ExplorerCredentials;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
@@ -12,19 +11,20 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
- * {@code @CurrentExplorer ExplorerId} 파라미터를 X-Explorer-Token 헤더(비밀 접근 토큰)로 인증해 채운다(3단계 결정 2).
- * 여러 컨텍스트(탐험·진행·꾸미기…)의 컨트롤러가 함께 쓰므로 조립 모듈(app-api)에 둔다 — 컨텍스트끼리 web 패키지를 참조하지 않게(D7).
- * 헤더가 없으면 401 EXPLORER_TOKEN_REQUIRED, 모르는(또는 형식이 틀린) 토큰이면 401 EXPLORER_TOKEN_INVALID.
+ * {@code @CurrentExplorer ExplorerId} 파라미터를 채운다. 4단계부터 인증 공존 — 로그인 세션의 계정 → 그 탐험가, 없으면 X-Explorer-Token
+ * 헤더(비밀 접근 토큰, 3단계 결정 2). 판단은 {@link ExplorerAuthentication}.
+ * 여러 컨텍스트(탐험·진행·꾸미기·공유)의 컨트롤러가 함께 쓰므로 조립 모듈(app-api)에 둔다 — 컨텍스트끼리 web 패키지를 참조하지 않게(D7).
+ * 둘 다 없으면 401 EXPLORER_TOKEN_REQUIRED, 모르는(또는 형식이 틀린) 토큰이면 401 EXPLORER_TOKEN_INVALID, 세션 계정이 없으면 401 ACCOUNT_NOT_FOUND.
  */
 class CurrentExplorerArgumentResolver implements HandlerMethodArgumentResolver {
 
-    static final String REQUIRED = "EXPLORER_TOKEN_REQUIRED";
-    static final String INVALID = "EXPLORER_TOKEN_INVALID";
+    static final String REQUIRED = ExplorerAuthentication.TOKEN_REQUIRED;
+    static final String INVALID = ExplorerAuthentication.TOKEN_INVALID;
 
-    private final ExplorerCredentials credentials;
+    private final ExplorerAuthentication authentication;
 
-    CurrentExplorerArgumentResolver(ExplorerCredentials credentials) {
-        this.credentials = credentials;
+    CurrentExplorerArgumentResolver(ExplorerAuthentication authentication) {
+        this.authentication = authentication;
     }
 
     @Override
@@ -36,12 +36,6 @@ class CurrentExplorerArgumentResolver implements HandlerMethodArgumentResolver {
     @Override
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mav, NativeWebRequest request,
                                   WebDataBinderFactory binderFactory) {
-        String token = request.getHeader(CurrentExplorer.HEADER);
-        if (token == null || token.isBlank()) {
-            throw new TerritoryException(REQUIRED, ErrorKind.UNAUTHENTICATED,
-                CurrentExplorer.HEADER + " 헤더로 접근 토큰을 보내 주세요(POST /explorers 로 발급).");
-        }
-        return credentials.explorerIdByToken(token).map(ExplorerId::of).orElseThrow(() -> new TerritoryException(INVALID,
-            ErrorKind.UNAUTHENTICATED, "접근 토큰을 알 수 없어요. 다시 발급해 주세요(POST /explorers)."));
+        return authentication.require(request.getNativeRequest(HttpServletRequest.class));
     }
 }

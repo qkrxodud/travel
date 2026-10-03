@@ -58,9 +58,12 @@ public record ItemDefinition(
         return "region:" + code.value();
     }
 
-    /** 이관 데이터(V3_1 — 지역 특산물 region:·세트 배경 set:)의 id 인지. 운영 추가는 이 접두어를 쓸 수 없다. */
+    /**
+     * 이관 데이터(V3_1 — 지역 특산물 region:·세트 배경 set:, V4_1 — 초대 보상 invite:)의 id 인지. 운영 추가는 이 접두어를
+     * 쓸 수 없다(dev 초기화가 운영 추가분만 골라 지우는 기준).
+     */
     public boolean migrated() {
-        return itemId.startsWith("region:") || itemId.startsWith("set:");
+        return itemId.startsWith("region:") || itemId.startsWith("set:") || itemId.startsWith("invite:");
     }
 
     /** 지역 방문 규칙이면 그 지역(표시용 출처), 아니면 null. */
@@ -77,9 +80,19 @@ public record ItemDefinition(
             && (!grantRule.issue() || !processedAt.isBefore(createdAt));
     }
 
-    /** 이 날짜의 테마(세트) 완성으로 지급되는지. */
-    public boolean grantedByThemeCompletion(String themeId, LocalDate day) {
-        return grantRule.matchesThemeCompletion(themeId) && validPeriod.contains(day);
+    /**
+     * 완성 시각 completedAt(그 날짜 day)의 테마(세트) 완성으로 지급되는지. 운영이 추가한 THEME_COMPLETE 아이템은 정의가 생긴 뒤의
+     * 완성에만 — 소급 지급 없음(P3-R3-3·Q1 결정: 이벤트 누적·합류 경로·재계산이 모두 같은 기준). 이관 데이터(세트 배경 set:)는 처음부터
+     * 있던 보상이라 예외.
+     */
+    public boolean grantedByThemeCompletion(String themeId, LocalDate day, Instant completedAt) {
+        return grantRule.matchesThemeCompletion(themeId) && validPeriod.contains(day)
+            && (migrated() || !completedAt.isBefore(createdAt));
+    }
+
+    /** 이 날짜의 초대 합류에서 그 쪽(HOST·GUEST)이 받는지(한정 아이템 — 유효 기간으로 연다·닫는다). */
+    public boolean grantedByInvitation(GrantRule.InvitationSide side, LocalDate day) {
+        return grantRule.matchesInvitation(side) && validPeriod.contains(day);
     }
 
     private static RuntimeException invalid(String message) {

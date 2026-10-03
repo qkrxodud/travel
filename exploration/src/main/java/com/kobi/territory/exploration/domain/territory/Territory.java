@@ -142,6 +142,62 @@ public final class Territory {
         return hidden;
     }
 
+    /**
+     * 병합(claimExplorer, 사용자 확정 "기존 계정으로 병합"): 다른 지도(source — 보통 병합되는 익명 탐험가의 개인 지도)에 있는 from 의
+     * 보이는 방문을 이 지도의 into 방문으로 옮긴다. 같은 지역에 into 방문이 이미 있으면 <b>방문일이 더 이른 쪽</b>을 남기고(같으면 into 쪽),
+     * 메모·사진은 남는 쪽 것이다. 옮긴 방문은 into 의 다음 회차를 받는다. 다시 실행해도 결과가 같다(멱등 — 같은 날짜면 into 유지).
+     * source 는 읽기만 한다(정리는 따로 {@link #releaseMember}).
+     */
+    public AbsorbResult absorb(Territory source, ExplorerId from, ExplorerId into) {
+        List<RegionCode> added = new ArrayList<>();
+        List<RegionCode> replaced = new ArrayList<>();
+        for (Visit incoming : source.visits.of(from).chronological()) {
+            Optional<Visit> existing = visits.find(incoming.regionCode(), into);
+            if (existing.isPresent() && !incoming.earlierThan(existing.get())) continue;
+            existing.ifPresent(visits::remove);
+            visits.add(incoming.reassignedTo(into, generations.next(incoming.regionCode(), into)));
+            (existing.isPresent() ? replaced : added).add(incoming.regionCode());
+        }
+        return new AbsorbResult(mapId, from, into, added, replaced);
+    }
+
+    /**
+     * 병합(공유 지도 재귀속, 사용자 결정 Q2): 이 지도의 from(익명 탐험가) 방문을 into(계정 탐험가) 방문으로 바꾼다. 선점 순서를 유지하므로
+     * 다른 멤버의 선점은 바뀌지 않는다. 같은 지역에 into 방문이 이미 있으면 <b>선점 순서(claimRankAt)가 이른 쪽</b>을 남긴다(개인 지도
+     * 흡수의 "이른 방문일" 규칙과 다르다 — 지도 안 선점 위치를 지키는 것이 기준). 메모·사진은 남는 쪽 것. 숨긴 방문도 같은 규칙.
+     * from 방문이 남아 있지 않으면 아무것도 하지 않는다(멱등).
+     */
+    public ReassignResult reassignMember(ExplorerId from, ExplorerId into) {
+        List<RegionCode> reassigned = new ArrayList<>();
+        List<RegionCode> dropped = new ArrayList<>();
+        List<RegionCode> replaced = new ArrayList<>();
+        for (Visit incoming : visits.allOf(from)) {
+            Optional<Visit> existing = visits.find(incoming.regionCode(), into);
+            visits.remove(incoming);
+            if (existing.isPresent() && !incoming.claimsBefore(existing.get())) {
+                dropped.add(incoming.regionCode());
+                continue;
+            }
+            existing.ifPresent(visits::remove);
+            visits.add(incoming.reassignedKeepingRank(into, generations.next(incoming.regionCode(), into)));
+            (existing.isPresent() ? replaced : reassigned).add(incoming.regionCode());
+        }
+        return new ReassignResult(mapId, from, into, reassigned, replaced, dropped);
+    }
+
+    /** 병합 전 안내용 미리 계산 — source 의 from 방문을 이 지도의 into 에게 옮기면 몇 곳이 옮겨지고 그중 몇 곳이 새 지역인지. */
+    public MergeSummary mergeSummary(Territory source, ExplorerId from, ExplorerId into) {
+        Visits incoming = source.visits.of(from);
+        return new MergeSummary(incoming.size(), incoming.regionCountNotIn(visits.of(into)));
+    }
+
+    /** 병합 뒤 정리: 이 멤버의 방문(숨긴 것 포함)을 모두 지운다. 회차 기록은 남긴다. 멱등. @return 지운 방문 */
+    public List<Visit> releaseMember(ExplorerId member) {
+        List<Visit> mine = visits.allOf(member);
+        mine.forEach(visits::remove);
+        return mine;
+    }
+
     /** 지도장의 이의 표시/해제(권한 확인은 ExpeditionMap). 개인 영토·전체 랭킹에는 영향 없음. */
     public Visit dispute(RegionCode code, ExplorerId member, boolean disputed) {
         Visit visit = visits.require(code, member);

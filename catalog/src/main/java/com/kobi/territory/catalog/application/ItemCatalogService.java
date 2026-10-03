@@ -4,6 +4,7 @@ import com.kobi.territory.catalog.api.query.ItemCatalog;
 import com.kobi.territory.catalog.api.query.ItemView;
 import com.kobi.territory.catalog.domain.catalog.Catalog;
 import com.kobi.territory.catalog.domain.catalog.CatalogRepository;
+import com.kobi.territory.catalog.domain.item.GrantRule;
 import com.kobi.territory.catalog.domain.item.ItemDefinition;
 import com.kobi.territory.catalog.domain.item.ItemDefinitionRepository;
 import com.kobi.territory.common.model.RegionCode;
@@ -65,7 +66,14 @@ public class ItemCatalogService implements ItemCatalog {
     @Override
     @Transactional(readOnly = true)
     public List<ItemView> grantedByThemeCompletion(String setId, Instant completedAt) {
-        return cache.current().grantedByThemeCompletion(setId, dayOf(completedAt)).stream().map(ItemViews::of).toList();
+        return cache.current().grantedByThemeCompletion(setId, dayOf(completedAt), completedAt).stream().map(ItemViews::of).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ItemView> grantedByInvitation(String side, Instant joinedAt) {
+        return cache.current().grantedByInvitation(GrantRule.InvitationSide.valueOf(side), dayOf(joinedAt)).stream()
+            .map(ItemViews::of).toList();
     }
 
     private LocalDate dayOf(Instant at) {

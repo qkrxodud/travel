@@ -101,6 +101,16 @@ public final class Visits {
         return visible().filter(Visit::disputed).toList();
     }
 
+    /** 이 멤버의 방문 전부(숨긴 것 포함, 병합 정리용). */
+    public List<Visit> allOf(ExplorerId member) {
+        return items.stream().filter(visit -> visit.checkedInBy().equals(member)).toList();
+    }
+
+    /** 이 방문들의 지역 중 other 에 칠해지지 않은 지역 수(병합 안내 — 새 지역). */
+    public int regionCountNotIn(Visits other) {
+        return (int) regions().stream().filter(region -> !other.anyIn(region.code())).count();
+    }
+
     /** 이 멤버의 숨긴 방문(탈퇴 유예 중). */
     public List<Visit> hiddenOf(ExplorerId member) {
         return items.stream().filter(Visit::hidden).filter(visit -> visit.checkedInBy().equals(member)).toList();

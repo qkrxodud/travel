@@ -3,6 +3,7 @@ package com.kobi.territory.wardrobe.application;
 import com.kobi.territory.common.event.EventOutbox;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
+import com.kobi.territory.exploration.api.event.ExplorerMerged;
 import com.kobi.territory.exploration.api.event.MapCreated;
 import com.kobi.territory.exploration.api.event.MemberJoined;
 import com.kobi.territory.exploration.api.event.RegionVisited;
@@ -11,7 +12,10 @@ import com.kobi.territory.exploration.api.query.TerritoryQuery;
 import com.kobi.territory.progression.api.event.SetCompleted;
 import com.kobi.territory.progression.api.query.CollectionBookQuery;
 import com.kobi.territory.wardrobe.api.event.ItemGranted;
+import com.kobi.territory.wardrobe.api.event.InviteRewardOwed;
 import com.kobi.territory.wardrobe.api.event.ItemRevoked;
+import com.kobi.territory.wardrobe.domain.inventory.Invitation;
+import com.kobi.territory.wardrobe.domain.inventory.InvitationOutcome;
 import com.kobi.territory.wardrobe.domain.inventory.CheckInGrant;
 import com.kobi.territory.wardrobe.domain.inventory.Inventory;
 import com.kobi.territory.wardrobe.domain.inventory.InventoryChange;
@@ -36,6 +40,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class InventoryService {
 
     static final String AGGREGATE = "Inventory";
+    /** 카탈로그 INVITATION 규칙의 대상(초대한 쪽·초대받은 쪽). */
+    static final String HOST = "HOST";
+    static final String GUEST = "GUEST";
 
     private final InventoryRepository inventories;
     private final WardrobeCatalog catalog;
@@ -121,14 +128,46 @@ public class InventoryService {
         inventories.save(inventory);
     }
 
-    /** 지도 합류(재가입 포함) — 그 지도에서 이미 완성된 테마의 보상(세트 배경)만 새 멤버에게(XP·칭호 없음, 결정 1). */
+    /**
+     * 지도 합류(재가입 포함) — 그 지도에서 이미 완성된 테마의 보상(세트 배경)만 새 멤버에게(XP·칭호 없음, 결정 1).
+     * 4단계: 초대받아 처음 합류했으면(invitedBy) 초대 보상 — 초대받은 쪽은 여기서, 초대한 쪽은 InviteRewardOwed 로 그 사람
+     * Inventory 트랜잭션에서. 대상 판단(셀프·재가입·같은 쌍 1회)은 Inventory 가 한다.
+     */
     @Transactional
     public void onMemberJoined(MemberJoined event) {
         Inventory inventory = loadLocked(ExplorerId.of(event.explorerId()));
         InventoryChange change = inventory.grantRewards(
             catalog.grantedByThemeCompletions(collectionBooks.completedSets(event.mapId())), event.joinedAt());
+        InvitationOutcome invitation = inventory.acceptInvitation(
+            new Invitation(explorerIdOrNull(event.invitedBy()), event.mapId(), event.rejoined(), event.joinedAt()),
+            catalog.grantedByInvitation(GUEST, event.joinedAt()));
         inventories.save(inventory);
         publish(inventory, change);
+        publish(inventory, invitation.change());
+        invitation.inviterToReward().ifPresent(inviter -> outbox.append(AGGREGATE, inviter.value(),
+            new InviteRewardOwed(inviter.value(), event.explorerId(), event.mapId(), event.joinedAt())));
+    }
+
+    /** 초대한 쪽 보상(InviteRewardOwed) — 초대자 Inventory 하나만, 회수 없음. 아이템 단위로 멱등. */
+    @Transactional
+    public void onInviteRewardOwed(InviteRewardOwed event) {
+        Inventory inventory = loadLocked(ExplorerId.of(event.inviterId()));
+        InventoryChange change = inventory.grantRewards(catalog.grantedByInvitation(HOST, event.joinedAt()), event.joinedAt());
+        inventories.save(inventory);
+        publish(inventory, change);
+    }
+
+    /**
+     * 계정 병합(4단계, aggregate Explorer/into) — 익명 탐험가(from)만 가진 재생 불가 아이템(초대 보상 등)과 초대 기록을 계정
+     * 탐험가(into) Inventory 로 옮긴다(QA P3-6). into 하나만 잠가 고치고 from 은 읽기만 한다. 멱등.
+     */
+    @Transactional
+    public void onExplorerMerged(ExplorerMerged event) {
+        Inventory into = loadLocked(ExplorerId.of(event.intoExplorerId()));
+        Inventory merged = load(ExplorerId.of(event.fromExplorerId()));
+        InventoryChange change = into.absorbMerged(merged, event.mergedAt());
+        inventories.save(into);
+        publish(into, change);
     }
 
     /** GET /inventory — 탐험가가 없으면 404 EXPLORER_NOT_FOUND. */

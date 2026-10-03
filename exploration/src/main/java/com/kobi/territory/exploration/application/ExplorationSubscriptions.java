@@ -1,9 +1,12 @@
 package com.kobi.territory.exploration.application;
 
 import com.kobi.territory.common.event.EventSubscriber;
+import com.kobi.territory.exploration.api.event.ExplorerMerged;
 import com.kobi.territory.exploration.api.event.MemberJoined;
 import com.kobi.territory.exploration.api.event.MemberLeft;
 import com.kobi.territory.exploration.api.event.MemberPurged;
+import com.kobi.territory.exploration.api.event.MemberReassigned;
+import com.kobi.territory.exploration.api.event.VisitsMerged;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -15,11 +18,26 @@ import org.springframework.context.annotation.Configuration;
 public class ExplorationSubscriptions {
 
     @Bean
-    EventSubscriber territorySubscriber(TerritoryMembershipService membership) {
-        return EventSubscriber.named("exploration.territory")
+    EventSubscriber territorySubscriber(TerritoryMembershipService membership, ExplorerMergeService merges) {
+        return EventSubscriber.named(TERRITORY_SUBSCRIBER)
             .on(MemberLeft.class, membership::onMemberLeft)
             .on(MemberJoined.class, membership::onMemberJoined)
             .on(MemberPurged.class, membership::onMemberPurged)
+            // 4단계 병합(claimExplorer): B 개인 지도로 방문 흡수 → A 개인 지도 정리
+            .on(ExplorerMerged.class, merges::onExplorerMerged)
+            .on(VisitsMerged.class, merges::onVisitsMerged)
+            .on(MemberReassigned.class, merges::onMemberReassigned)
             .build();
     }
+
+    /** 4단계: 지도(ExpeditionMap) 애그리거트 구독자 — 병합 때 공유 지도 자리 정리(탐험 내부 이벤트). */
+    @Bean
+    EventSubscriber expeditionMapSubscriber(ExplorerMergeService merges) {
+        return EventSubscriber.named("exploration.expedition-map")
+            .on(MembershipHandover.class, merges::onMembershipHandover)
+            .build();
+    }
+
+    /** 영토 구독자 id — 재계산 보류 판정(진행·꾸미기)이 이 구독자의 미전달 이벤트도 본다(P3-R3-1). */
+    public static final String TERRITORY_SUBSCRIBER = "exploration.territory";
 }

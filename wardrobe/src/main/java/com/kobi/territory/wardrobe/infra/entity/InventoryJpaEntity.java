@@ -1,6 +1,7 @@
 package com.kobi.territory.wardrobe.infra.entity;
 
 import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.wardrobe.domain.inventory.Invitations;
 import com.kobi.territory.wardrobe.domain.inventory.Inventory;
 import com.kobi.territory.wardrobe.domain.inventory.OwnedItems;
 import com.kobi.territory.wardrobe.domain.inventory.VisitTraces;
@@ -49,9 +50,10 @@ public class InventoryJpaEntity {
     }
 
     public Inventory toDomain(List<OwnedItemJpaEntity> itemRows, List<OwnedItemBasisJpaEntity> basisRows,
-                              List<VisitTraceJpaEntity> traceRows) {
+                              List<VisitTraceJpaEntity> traceRows, List<InvitationJpaEntity> invitationRows) {
         return Inventory.restore(ExplorerId.of(explorerId),
             OwnedItems.of(itemRows.stream().map(itemRow -> itemRow.toDomain(basisRows)).toList()),
-            VisitTraces.of(traceRows.stream().map(VisitTraceJpaEntity::toDomain).toList()), updatedAt);
+            VisitTraces.of(traceRows.stream().map(VisitTraceJpaEntity::toDomain).toList()),
+            Invitations.of(invitationRows.stream().map(InvitationJpaEntity::toDomain).toList()), updatedAt);
     }
 }

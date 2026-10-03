@@ -22,8 +22,14 @@ public final class ExplorationDtos {
     static final Map<Rarity, String> RARITY_LABEL = Map.of(Rarity.COMMON, "일반", Rarity.RARE, "희귀", Rarity.LEGEND, "전설");
 
     /** @param accessToken 비밀 접근 토큰(X-Explorer-Token) — 발급(POST /explorers) 응답에만 실린다. 그 밖에는 null */
+    /** @param handle 계정 연결된 탐험가의 공개 handle(4단계, 익명은 null) */
     public record ExplorerResponse(String explorerId, String personalMapId, boolean anonymous, Instant createdAt,
-                                   String accessToken) {}
+                                   String accessToken, String handle) {}
+
+    /** PUT /me/handle */
+    public record HandleRequest(String handle) {}
+
+    public record HandleResponse(String explorerId, String handle) {}
 
     /** @param mapId 생략하면 개인 지도 */
     public record CheckInRequest(@NotBlank String regionCode, @NotNull LocalDate visitDate, String memo, String photoUrl,

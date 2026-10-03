@@ -1,5 +1,11 @@
 dependencies {
     api project(':common')
+    // 4단계: 카탈로그(지역·GeoJSON·진행 정의 api.query)와 모든 컨텍스트의 공개 계약(api.event·api.query)을 구독·조회한다(§1 sharing:
+    // common, catalog, 모든 컨텍스트의 api). 다른 패키지(domain·application·infra·api.web) 참조는 ArchUnit 이 막는다.
+    implementation project(':catalog')
+    implementation project(':exploration')
+    implementation project(':progression')
+    implementation project(':wardrobe')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

@@ -9,6 +9,9 @@ import com.kobi.territory.exploration.api.web.MapDtos.CreateMapRequest;
 import com.kobi.territory.exploration.api.web.MapDtos.DisputeRequest;
 import com.kobi.territory.exploration.api.web.MapDtos.InviteCodeResponse;
 import com.kobi.territory.exploration.api.web.MapDtos.JoinMapRequest;
+import com.kobi.territory.exploration.api.web.MapDtos.JoinViaProfileRequest;
+import com.kobi.territory.exploration.domain.ExplorationError;
+import com.kobi.territory.exploration.domain.ExplorationException;
 import com.kobi.territory.exploration.api.web.MapDtos.LeaveResponse;
 import com.kobi.territory.exploration.api.web.MapDtos.MapDetailResponse;
 import com.kobi.territory.exploration.api.web.MapDtos.MapSummaryResponse;
@@ -73,6 +76,25 @@ public class MapController {
     public MapDetailResponse join(@CurrentExplorer ExplorerId explorerId, @Valid @RequestBody JoinMapRequest req) {
         var joined = maps.join(explorerId, req.inviteCode());
         return detail(explorerId, joined.map().id(), joined.rejoined());
+    }
+
+    /**
+     * 공개 프로필 링크로 합류(4단계 — 초대코드 노출 없이). handle 의 주인이 지도장인 PUBLIC 공유 지도만, 아니면 404
+     * PROFILE_MAP_NOT_FOUND(handle 이 없는지·지도가 닫혔는지 숨긴다).
+     */
+    @PostMapping("/join-via-profile/{handle}")
+    public MapDetailResponse joinViaProfile(@CurrentExplorer ExplorerId explorerId, @PathVariable("handle") String handle,
+                                            @Valid @RequestBody JoinViaProfileRequest req) {
+        var joined = maps.joinViaProfile(explorerId, handle, profileMapId(req.mapId()));
+        return detail(explorerId, joined.map().id(), joined.rejoined());
+    }
+
+    private static MapId profileMapId(String mapId) {
+        try {
+            return MapId.of(mapId);
+        } catch (ExplorationException malformed) {
+            throw ExplorationError.PROFILE_MAP_NOT_FOUND.exception();
+        }
     }
 
     @PostMapping("/{mapId}/leave")

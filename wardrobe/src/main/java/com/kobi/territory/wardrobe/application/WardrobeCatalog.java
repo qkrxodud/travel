@@ -43,6 +43,11 @@ public class WardrobeCatalog {
             .flatMap(completed -> grantedByThemeCompletion(completed.setId(), completed.completedAt()).stream()).toList();
     }
 
+    /** 초대 합류 보상 — side = HOST(초대한 쪽) | GUEST(초대받은 쪽), 기간은 합류 시각으로 판정(4단계). */
+    public List<ItemSpec> grantedByInvitation(String side, Instant joinedAt) {
+        return items.grantedByInvitation(side, joinedAt).stream().map(WardrobeCatalog::specOf).toList();
+    }
+
     public ItemSpecs specsOf(Collection<String> itemIds) {
         return ItemSpecs.of(views(itemIds).stream().map(WardrobeCatalog::specOf).toList());
     }

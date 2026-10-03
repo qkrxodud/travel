@@ -31,13 +31,14 @@ public class ExplorerController {
     public ExplorerResponse register() {
         var registration = explorers.registerAnonymous();
         return new ExplorerResponse(registration.explorer().id().value(), registration.personalMap().id().value(),
-            registration.explorer().anonymous(), registration.explorer().createdAt(), registration.accessToken().value());
+            registration.explorer().anonymous(), registration.explorer().createdAt(), registration.accessToken().value(), null);
     }
 
     @GetMapping("/me")
     public ExplorerResponse me(@CurrentExplorer ExplorerId explorerId) {
         var explorer = mapAccess.requireExplorer(explorerId);
         var map = mapAccess.resolve(explorerId, MapSelector.PERSONAL).map();
-        return new ExplorerResponse(explorer.id().value(), map.id().value(), explorer.anonymous(), explorer.createdAt(), null);
+        return new ExplorerResponse(explorer.id().value(), map.id().value(), explorer.anonymous(), explorer.createdAt(), null,
+            explorer.handle() == null ? null : explorer.handle().value());
     }
 }

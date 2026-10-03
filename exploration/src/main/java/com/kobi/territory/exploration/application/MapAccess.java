@@ -22,8 +22,21 @@ public class MapAccess {
         this.maps = maps;
     }
 
+    /**
+     * 활성 탐험가 — 없거나 병합돼 비활성이면 404 EXPLORER_NOT_FOUND. READ_COMMITTED 커맨드가 territory 를 잠근 <b>뒤</b> 이것으로
+     * 다시 확인하므로, 병합(로그인)이 커밋된 뒤의 체크인은 여기서 거절된다(병합 중 체크인 경합 — AccountService 참고).
+     */
     public Explorer requireExplorer(ExplorerId id) {
-        return explorers.findById(id).orElseThrow(ExplorationError.EXPLORER_NOT_FOUND::exception);
+        return explorers.findById(id).filter(Explorer::active).orElseThrow(ExplorationError.EXPLORER_NOT_FOUND::exception);
+    }
+
+    /**
+     * 잠금 뒤 "아직 활성인가" 확인 — 탐험가 행 공유 잠금(FOR SHARE)으로 최신 상태를 읽는다. 체크인은 territory 잠금 뒤, 지도 커맨드는
+     * 지도 잠금 뒤에 부른다. 병합(로그인, 탐험가 행 배타 잠금)과 직렬화돼 병합 뒤의 쓰기는 404, 병합 전 쓰기는 병합이 기다렸다 읽는다.
+     */
+    public Explorer requireActiveLocked(ExplorerId id) {
+        return explorers.findLockedShared(id).filter(Explorer::active)
+            .orElseThrow(ExplorationError.EXPLORER_NOT_FOUND::exception);
     }
 
     /**

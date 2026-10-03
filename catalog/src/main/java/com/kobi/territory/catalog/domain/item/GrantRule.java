@@ -12,6 +12,7 @@ import java.util.Objects;
  *   <li>{@link ProvinceCheckIn} 특정 시·도 체크인(이슈 아이템, 회수 없음)</li>
  *   <li>{@link ThemeComplete} 도감 테마(세트) 완성 — 세트 배경 등, 완성 시점 지도 멤버 전원</li>
  *   <li>{@link Manual} 자동 지급하지 않는다(운영 수동 지급용 예약)</li>
+ *   <li>{@link Invitation} 초대로 공유 지도에 처음 합류(4단계 — 초대한 쪽 HOST·초대받은 쪽 GUEST, 회수 없음, 같은 쌍 1회는 꾸미기)</li>
  * </ul>
  * 저장·공개 표현은 (type, ref) 두 값이다.
  */
@@ -31,12 +32,17 @@ public sealed interface GrantRule {
         return false;
     }
 
+    /** 초대 합류의 한쪽(HOST·GUEST)이 받는 규칙인지. */
+    default boolean matchesInvitation(InvitationSide side) {
+        return false;
+    }
+
     /** 체크인으로 받는 이슈 아이템 규칙(기간 내 체크인·특정 시·도)인지 — 정의가 생긴 뒤의 체크인에만 지급한다. */
     default boolean issue() {
         return false;
     }
 
-    enum Type { REGION_VISIT, PERIOD_CHECK_IN, PROVINCE_CHECK_IN, THEME_COMPLETE, MANUAL }
+    enum Type { REGION_VISIT, PERIOD_CHECK_IN, PROVINCE_CHECK_IN, THEME_COMPLETE, MANUAL, INVITATION }
 
     /** 저장·입력 값(type, ref)으로 만든다. ref 형식이 틀리면 INVALID_ITEM_DEFINITION. */
     static GrantRule of(Type type, String ref) {
@@ -47,6 +53,7 @@ public sealed interface GrantRule {
             case PROVINCE_CHECK_IN -> new ProvinceCheckIn(ref);
             case THEME_COMPLETE -> new ThemeComplete(ref);
             case MANUAL -> new Manual();
+            case INVITATION -> new Invitation(InvitationSide.parse(ref));
         };
     }
 
@@ -111,5 +118,31 @@ public sealed interface GrantRule {
     record Manual() implements GrantRule {
         @Override public Type type() { return Type.MANUAL; }
         @Override public String ref() { return null; }
+    }
+
+    /** 초대 합류의 어느 쪽인가. HOST = 초대한 탐험가, GUEST = 초대받아 합류한 탐험가. */
+    enum InvitationSide {
+        HOST, GUEST;
+
+        static InvitationSide parse(String ref) {
+            for (InvitationSide side : values()) {
+                if (side.name().equals(ref)) return side;
+            }
+            throw CatalogError.INVALID_ITEM_DEFINITION.exception("초대 규칙의 대상은 HOST 또는 GUEST 입니다: " + ref);
+        }
+    }
+
+    record Invitation(InvitationSide side) implements GrantRule {
+        public Invitation {
+            Objects.requireNonNull(side, "side");
+        }
+
+        @Override public Type type() { return Type.INVITATION; }
+        @Override public String ref() { return side.name(); }
+
+        @Override
+        public boolean matchesInvitation(InvitationSide invited) {
+            return side == invited;
+        }
     }
 }

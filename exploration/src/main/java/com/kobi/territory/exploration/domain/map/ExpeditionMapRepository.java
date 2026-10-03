@@ -42,6 +42,9 @@ public interface ExpeditionMapRepository {
     /** 탐험가가 지금 멤버인 지도 id 전부(탈퇴 유예 중 제외). */
     List<MapId> mapIdsOf(ExplorerId explorerId);
 
+    /** 탐험가가 지금 멤버인 공유 지도 id(탈퇴 유예 중 제외 — 병합 때 자리 정리 대상). */
+    List<MapId> sharedMapIdsOf(ExplorerId explorerId);
+
     /** 탐험가가 지금 멤버인 지도 전부(개인 지도 먼저, 그다음 만든 순). */
     List<ExpeditionMap> mapsOf(ExplorerId explorerId);
 

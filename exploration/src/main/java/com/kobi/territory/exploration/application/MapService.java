@@ -7,6 +7,7 @@ import com.kobi.territory.exploration.api.event.MapSettingsChanged;
 import com.kobi.territory.exploration.api.event.MemberJoined;
 import com.kobi.territory.exploration.api.event.MemberLeft;
 import com.kobi.territory.exploration.api.event.MemberPurged;
+import com.kobi.territory.exploration.api.query.ExplorerProfileQuery;
 import com.kobi.territory.exploration.domain.ExplorationError;
 import com.kobi.territory.exploration.domain.map.CountryCode;
 import com.kobi.territory.exploration.domain.map.Departure;
@@ -50,10 +51,15 @@ public class MapService {
     private final InviteCodes inviteCodes;
     private final EventOutbox outbox;
     private final ExplorationSettings settings;
+    private final ExplorerProfileQuery profiles;
+    private final ProfileJoinGate profileGate;
     private final Clock clock;
 
     public MapService(ExpeditionMapRepository maps, TerritoryRepository territories, MapAccess mapAccess,
-                      InviteCodes inviteCodes, EventOutbox outbox, ExplorationSettings settings, Clock clock) {
+                      InviteCodes inviteCodes, EventOutbox outbox, ExplorationSettings settings, ExplorerProfileQuery profiles,
+                      ProfileJoinGate profileGate, Clock clock) {
+        this.profiles = profiles;
+        this.profileGate = profileGate;
         this.maps = maps;
         this.territories = territories;
         this.mapAccess = mapAccess;
@@ -66,7 +72,8 @@ public class MapService {
     /** 공유 지도 만들기 — 만든 사람이 지도장. 설정은 기본값(하루 상한 = territory.check-in.daily-cap). */
     @Transactional
     public ExpeditionMap create(ExplorerId owner, String name, String countryCode) {
-        mapAccess.requireExplorer(owner);
+        mapAccess.requireActiveLocked(owner); // 병합(로그인)과 직렬화 — 병합이 읽는 "공유 지도 목록"에서 새 지도가 빠지지 않게
+
         Instant now = clock.instant();
         ExpeditionMap map = ExpeditionMap.create(MapId.newId(), owner, name, CountryCode.orKorea(countryCode), inviteCodes.issue(),
             MapKind.SHARED, MapSettings.defaults(settings.defaultDailyCap()), now);
@@ -87,14 +94,41 @@ public class MapService {
         MapId mapId = maps.findIdByInviteCode(code)
             .orElseThrow(() -> ExplorationError.INVITE_CODE_NOT_FOUND.exception(code.value()));
         ExpeditionMap map = lock(mapId);
+        mapAccess.requireActiveLocked(explorerId); // 지도 X → 탐험가 S(병합과 직렬화, 4단계)
         Instant now = clock.instant();
         JoinResult result = map.join(explorerId, now, settings.leaveGrace());
         maps.save(map);
+        publishJoined(map, explorerId, result, now);
+        return new Joined(map, result.rejoined());
+    }
+
+    /**
+     * 공개 프로필 링크로 합류(4단계, 초대코드 노출 없음). 프로필이 공개(ProfileJoinGate)이고 그 주인이 지도장인 PUBLIC 공유 지도만 — handle 을 모르거나 프로필이 비공개거나
+     * 지도가 열려 있지 않으면 PROFILE_MAP_NOT_FOUND(어느 쪽인지 숨긴다). 초대 보상의 초대자 = 프로필 주인(MemberJoined.invitedBy).
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public Joined joinViaProfile(ExplorerId explorerId, String handle, MapId mapId) {
+        mapAccess.requireExplorer(explorerId);
+        ExplorerId profileOwner = profiles.explorerIdByHandle(handle).map(ExplorerId::of)
+            .orElseThrow(ExplorationError.PROFILE_MAP_NOT_FOUND::exception);
+        if (maps.findById(mapId).filter(candidate -> candidate.openToProfileOf(profileOwner)).isEmpty()) {
+            throw ExplorationError.PROFILE_MAP_NOT_FOUND.exception();
+        }
+        ExpeditionMap map = lock(mapId);
+        mapAccess.requireActiveLocked(explorerId); // 지도 X → 탐험가 S(병합과 직렬화, 4단계)
+        Instant now = clock.instant();
+        JoinResult result = map.joinViaProfile(profileOwner, profileGate.profileOpen(profileOwner), explorerId, now,
+            settings.leaveGrace());
+        maps.save(map);
+        publishJoined(map, explorerId, result, now);
+        return new Joined(map, result.rejoined());
+    }
+
+    private void publishJoined(ExpeditionMap map, ExplorerId explorerId, JoinResult result, Instant now) {
         result.purgedDeparture().ifPresent(expired -> outbox.append(AGGREGATE, map.id().value(),
             new MemberPurged(map.id().value(), expired.explorerId().value(), now)));
         outbox.append(AGGREGATE, map.id().value(), new MemberJoined(map.id().value(), explorerId.value(),
-            result.member().role().name(), now, result.rejoined()));
-        return new Joined(map, result.rejoined());
+            result.member().role().name(), now, result.rejoined(), result.invitedBy().value()));
     }
 
     /** 탈퇴(유예 시작). 방문 숨김·선점 이전은 MemberLeft 구독자가. @return 유예 정보 + 숨겨질 내 영토 수 */
@@ -176,7 +210,9 @@ public class MapService {
      */
     private ExpeditionMap lockAsMember(ExplorerId explorerId, MapId mapId) {
         mapAccess.requireMembership(explorerId, mapId);
-        return lock(mapId);
+        ExpeditionMap map = lock(mapId);
+        mapAccess.requireActiveLocked(explorerId); // 지도 X → 탐험가 S(병합과 직렬화, 4단계)
+        return map;
     }
 
     private ExpeditionMap lock(MapId mapId) {

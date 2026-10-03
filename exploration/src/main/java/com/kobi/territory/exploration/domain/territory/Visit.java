@@ -67,6 +67,34 @@ public final class Visit {
         return new Visit(region, member, date, memo, photo, Verification.NONE, at, generation, at, null, false);
     }
 
+    /**
+     * 병합(claimExplorer): 이 방문을 member 의 방문으로 옮긴 사본. 방문일·메모·사진·검증·처리 시각은 그대로, 회차는 member 의 다음 회차,
+     * 선점 순서는 처리 시각, 숨김·이의는 없음.
+     */
+    Visit reassignedTo(ExplorerId member, int nextGeneration) {
+        return new Visit(region, member, visitDate, memo, photo, verification, visitedAt, nextGeneration, visitedAt, null, false);
+    }
+
+    /**
+     * 병합(공유 지도 재귀속, Q2): 이 방문을 member 의 방문으로 바꾼 사본. 선점 순서(claimRankAt)·처리 시각·방문일·메모·사진·숨김·이의를
+     * 그대로 두어 지도 안 순위가 바뀌지 않는다. 회차만 member 의 다음 회차(회차는 (지도, 지역, 멤버)별로 단조 증가).
+     */
+    Visit reassignedKeepingRank(ExplorerId member, int nextGeneration) {
+        return new Visit(region, member, visitDate, memo, photo, verification, visitedAt, nextGeneration, claimRankAt, hiddenAt,
+            disputed);
+    }
+
+    /** 선점 순서(claimRankAt, 같으면 처리 시각)가 other 보다 앞서는지 — 공유 지도 재귀속 충돌 시 앞선 쪽을 남긴다. */
+    boolean claimsBefore(Visit other) {
+        int byRank = claimRankAt.compareTo(other.claimRankAt);
+        return byRank != 0 ? byRank < 0 : visitedAt.isBefore(other.visitedAt);
+    }
+
+    /** 방문일이 other 보다 이른지(같으면 false) — 병합 충돌 시 이른 쪽을 남긴다. */
+    boolean earlierThan(Visit other) {
+        return visitDate.value().isBefore(other.visitDate.value());
+    }
+
     void edit(VisitDate visitDate, Memo memo, PhotoRef photo) {
         this.visitDate = Objects.requireNonNull(visitDate, "visitDate");
         this.memo = memo == null ? Memo.EMPTY : memo;

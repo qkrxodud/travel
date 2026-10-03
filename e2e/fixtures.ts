@@ -25,8 +25,21 @@ export type DevApi = {
   idOf: (page: Page) => Promise<string>;
   /** 진행 조회 (GET /progress) — 2단계 */
   progress: (token: string) => Promise<any>;
-  /** 개발용 로그인 (POST /dev/login). 4단계 구현 예정 — 지금 호출하면 에러를 던진다. */
-  login: (userId?: string) => Promise<void>;
+  /**
+   * 개발용 로그인 (POST /dev/login, 4단계) — 실제 구글 OIDC 성공과 같은 계정 연결·병합 경로. 세션 쿠키는 넘긴 컨텍스트에 실린다:
+   * 화면을 로그인시키려면 `page`(= page.request, 브라우저와 쿠키 공유)를 넘긴다. token 을 주면 그 익명 탐험가가 연결·병합 대상.
+   */
+  login: (target: Page | APIRequestContext, opts: { email: string; sub?: string; token?: string }) => Promise<LoginResult>;
+};
+
+/** POST /dev/login 응답(_workspace/04_contracts.md A4). */
+export type LoginResult = {
+  explorerId: string;
+  handle: string;
+  email: string;
+  personalMapId: string;
+  outcome: 'CREATED' | 'LINKED' | 'MERGED' | 'SIGNED_IN';
+  merge: { fromExplorerId: string; movedRegions: number; newRegions: number } | null;
 };
 
 async function expectOk(res: Awaited<ReturnType<APIRequestContext['get']>>, what: string) {
@@ -71,8 +84,14 @@ export const test = base.extend<{ dev: DevApi }>({
           await expectOk(res, 'GET /progress');
           return res.json();
         },
-        login: async () => {
-          throw new Error('dev.login 은 아직 구현되지 않았다 (4단계에서 /dev/login 연결)');
+        login: async (target, { email, sub, token }) => {
+          const client = 'request' in target ? (target as Page).request : (target as APIRequestContext);
+          const res = await client.post('/dev/login', {
+            headers: token ? { [EXPLORER_HEADER]: token } : {},
+            data: { email, ...(sub ? { sub } : {}) },
+          });
+          await expectOk(res, 'POST /dev/login');
+          return res.json();
         },
       };
       await dev.reset();

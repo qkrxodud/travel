@@ -64,6 +64,13 @@ public final class Members {
         return new Members(next);
     }
 
+    /** 병합: leaving 의 자리를 replacement 로 바꾼다(인원 그대로 — 역할은 replacement 가 가진 값). */
+    Members replace(ExplorerId leaving, Member replacement) {
+        Member current = require(leaving);
+        if (find(replacement.explorerId()).isPresent()) throw ExplorationError.ALREADY_MEMBER.exception();
+        return new Members(items.stream().map(member -> member == current ? replacement : member).toList());
+    }
+
     /** 지도장 넘기기: 현재 OWNER 는 MEMBER, 대상은 OWNER. */
     Members transferOwnerTo(ExplorerId newOwner) {
         require(newOwner);

@@ -39,4 +39,10 @@ public interface TerritoryQuery {
 
     /** 이 탐험가가 어느 지도에든 이 지역 방문(숨기지 않은 것)을 갖고 있는지 — 탐험가 단위 회수 판단 보조. */
     boolean visitsRegionAnywhere(String explorerId, String regionCode);
+
+    /**
+     * 이 탐험가의 공개 프로필에서 합류할 수 있는 공유 지도(그가 지도장이고 공개 범위 PUBLIC, 4단계). 초대코드는 싣지 않는다 —
+     * 합류는 POST /maps/join-via-profile/{handle}. 탐험가가 없으면 빈 목록.
+     */
+    List<ProfileMapView> profileMapsOf(String explorerId);
 }

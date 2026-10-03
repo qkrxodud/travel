@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -61,7 +62,8 @@ public class OutboxRelay {
     private final Clock clock;
     /** 재시도 시각(백오프)은 벽시계로 잰다 — 업무 시계(Clock 빈, 테스트에선 멈춘 가변 시계)와 무관한 인프라 타이밍이다. */
     private final Clock retryClock = Clock.systemUTC();
-    private volatile boolean paused;
+    /** 일시정지 요청 수(P3-R3-4 — /dev/reset 동시 호출: 마지막 resume 이 끝나야 다시 돈다). */
+    private final AtomicInteger pauses = new AtomicInteger();
     private final int maxAttempts;
     private final Duration conflictRetryLimit;
     private final RetryBackoff backoff;
@@ -89,18 +91,21 @@ public class OutboxRelay {
         log.info("outbox 구독자 {}개: {}", this.subscribers.size(), this.subscribers);
     }
 
-    /** local 전용(/dev/reset): 릴레이를 멈춘다. relay() 와 같은 모니터라 진행 중인 주기가 끝날 때까지 기다린다(QA R2-1). */
+    /**
+     * local 전용(/dev/reset): 릴레이를 멈춘다. relay() 와 같은 모니터라 진행 중인 주기가 끝날 때까지 기다린다(QA R2-1).
+     * 카운터라 동시에 두 번 멈추면 두 번 resume 해야 다시 돈다(P3-R3-4). 반드시 finally 에서 resume 과 짝을 맞춘다.
+     */
     public synchronized void pause() {
-        paused = true;
+        pauses.incrementAndGet();
     }
 
     public void resume() {
-        paused = false;
+        pauses.updateAndGet(count -> Math.max(0, count - 1));
     }
 
     @Scheduled(fixedDelayString = "${territory.outbox.relay.delay-ms:1000}")
     public synchronized void relay() {
-        if (paused) return;
+        if (pauses.get() > 0) return;
         Set<String> stalledLanes = new HashSet<>(); // 이번 주기에 앞 이벤트가 끝나지 않아 멈춘 (aggregateId|구독자)
         long cursor = 0;
         List<OutboxEventEntity> page;

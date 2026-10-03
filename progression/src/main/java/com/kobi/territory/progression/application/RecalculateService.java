@@ -145,17 +145,23 @@ public class RecalculateService {
     }
 
     /**
-     * 탐험가와 그가 속한 지도의 outbox 이벤트 중 진행 구독자(progression.*)에게 아직 전달되지 않은 것이 없는지 — 진행과 무관한
-     * 구독자(꾸미기·탐험)가 멈춰 있어도 재계산을 막지 않는다(QA P3-6).
+     * 탐험가와 그가 속한 지도의 outbox 이벤트 중 진행 구독자(progression.*)·탐험 영토 구독자(exploration.territory, P3-R3-1)에게
+     * 아직 전달되지 않은 것이 없는지 — 그 밖의 구독자(꾸미기 등)가 멈춰 있어도 재계산을 막지 않는다(QA P3-6).
      */
     private boolean settled(ExplorerId explorerId) {
         List<String> aggregateIds = new ArrayList<>(territories.mapIdsOf(explorerId.value()));
         aggregateIds.add(explorerId.value());
-        return !backlog.hasUndelivered(aggregateIds, SUBSCRIBER_PREFIX);
+        return !backlog.hasUndelivered(aggregateIds, HOLD_SUBSCRIBERS);
     }
 
     /** 진행 컨텍스트 구독자 id 접두사(ProgressionSubscriptions). */
     static final String SUBSCRIBER_PREFIX = "progression.";
+
+    /**
+     * 보류 판정 구독자: 진행 구독자 + 탐험 영토 구독자(exploration.territory — 탈퇴 숨김·재가입 복구·병합 흡수가 아직 영토에 반영되지
+     * 않았으면 재계산이 그 지도를 덜 읽어 회수해 버린다, P3-R3-1).
+     */
+    static final List<String> HOLD_SUBSCRIBERS = List.of(SUBSCRIBER_PREFIX, "exploration.territory", "exploration.expedition-map");
 
     /**
      * @param failedExplorerIds   재시도를 다 쓰고도 실패한 탐험가(다시 돌리면 된다)

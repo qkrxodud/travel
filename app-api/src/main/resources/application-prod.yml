@@ -9,7 +9,17 @@ spring:
   flyway:
     enabled: true
 
+server:
+  # TLS 를 끝내는 프록시 뒤 — X-Forwarded-Proto/Host 를 스프링이 반영(세션·CSRF 쿠키 Secure, 스킴). 절대 주소는 public-base-url 로.
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        secure: true
+
 territory:
+  # 공개 기준 주소 — 환경변수 필수(og:image·og:url, 예: https://territory.kr). 없으면 기동 실패.
+  public-base-url: ${TERRITORY_PUBLIC_BASE_URL}
   admin:
     # 운영 관리자 토큰 — 환경변수 필수(없으면 기동 실패).
     token: ${TERRITORY_ADMIN_TOKEN}

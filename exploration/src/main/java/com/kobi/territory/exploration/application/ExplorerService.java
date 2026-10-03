@@ -55,7 +55,11 @@ public class ExplorerService implements ExplorerCredentials {
 
     @Transactional
     public RegisteredExplorer registerAnonymous() {
-        Instant now = clock.instant();
+        return create(clock.instant());
+    }
+
+    /** 익명 탐험가 + 개인 지도 + 빈 territory 행 + MapCreated — 호출자 트랜잭션 안에서(로그인의 새 계정 경로도 쓴다). */
+    RegisteredExplorer create(Instant now) {
         AccessToken token = AccessToken.generate(random);
         Explorer explorer = Explorer.anonymous(ExplorerId.newId(), token.hash(), now);
         explorers.save(explorer);

@@ -1,5 +1,6 @@
 package com.kobi.territory.config;
 
+import com.kobi.territory.exploration.application.AccountSettings;
 import com.kobi.territory.exploration.application.ExplorationSettings;
 import java.time.Clock;
 import java.time.ZoneId;
@@ -25,5 +26,11 @@ public class TerritoryConfig {
     public ExplorationSettings explorationSettings(TerritoryProperties props) {
         return new ExplorationSettings(props.checkIn().dailyCap(), props.checkIn().onboardingGraceHours(),
             props.map().leaveGraceDays());
+    }
+
+    /** 계정 규칙 값(4단계): 바꾸기 전 handle 예약 기간. */
+    @Bean
+    public AccountSettings accountSettings(@Value("${territory.account.handle-reservation-days:30}") int handleReservationDays) {
+        return new AccountSettings(handleReservationDays);
     }
 }

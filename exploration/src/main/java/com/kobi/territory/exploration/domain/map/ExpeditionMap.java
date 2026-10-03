@@ -84,6 +84,21 @@ public final class ExpeditionMap {
      * 지우고(숨긴 방문 삭제 대상) 새 멤버로 들어온다.
      */
     public JoinResult join(ExplorerId explorerId, Instant now, Duration leaveGrace) {
+        return admit(explorerId, ownerId, now, leaveGrace);
+    }
+
+    /**
+     * 공개 프로필 링크로 합류(4단계). 프로필 주인의 공개 프로필이 열려 있고(profileOpen — 공유의 공개 범위, QA P3-5), 그가
+     * 지도장이고 공개 범위가 PUBLIC 인 공유 지도만 열려 있다 — 아니면 PROFILE_MAP_NOT_FOUND(어느 조건이 틀렸는지 숨긴다).
+     * 초대한 사람 = 프로필 주인.
+     */
+    public JoinResult joinViaProfile(ExplorerId profileOwner, boolean profileOpen, ExplorerId explorerId, Instant now,
+                                     Duration leaveGrace) {
+        if (!profileOpen || !openToProfileOf(profileOwner)) throw ExplorationError.PROFILE_MAP_NOT_FOUND.exception();
+        return admit(explorerId, profileOwner, now, leaveGrace);
+    }
+
+    private JoinResult admit(ExplorerId explorerId, ExplorerId inviter, Instant now, Duration leaveGrace) {
         requireShared("합류");
         Optional<Departure> departure = departures.find(explorerId);
         Departure expired = departure.filter(previous -> previous.expired(now, leaveGrace)).orElse(null);
@@ -91,7 +106,7 @@ public final class ExpeditionMap {
         Member member = new Member(explorerId, MemberRole.MEMBER, rejoined ? departure.get().joinedAt() : now);
         members = members.with(member);
         departure.ifPresent(departures::remove);
-        return new JoinResult(member, rejoined, expired);
+        return new JoinResult(member, rejoined, expired, inviter);
     }
 
     /** 탈퇴(유예 시작). 지도장은 넘긴 뒤에만. */
@@ -105,11 +120,45 @@ public final class ExpeditionMap {
         return departure;
     }
 
+    /**
+     * 병합(claimExplorer): 익명 탐험가 from 이 계정 탐험가 into 로 병합될 때 이 지도의 from 자리를 into 에게 넘긴다(사용자 결정 Q2 —
+     * from 의 방문·선점은 탈퇴가 아니라 재귀속으로 into 에게 간다, Territory.reassignMember). 그래서 from 의 탈퇴 유예 기록은 만들지 않는다.
+     * <ul>
+     *   <li>into 가 이미 멤버 → from 만 멤버에서 빠진다. from 이 지도장이었으면 into 가 지도장.</li>
+     *   <li>into 가 멤버가 아님 → into 가 from 의 자리(역할·가입 시각 — 온보딩 예외 재사용 방지)를 잇는다. into 가 유예 중 탈퇴 기록이
+     *       있으면 재가입(원래 가입 시각, 숨긴 방문 복구 대상), 유예가 끝난 기록이면 지운다(숨긴 방문 삭제 대상). 자리는 from 이 비운 자리라 늘 있다.</li>
+     * </ul>
+     * from 이 이미 멤버가 아니면 빈 값(멱등 — 재전달 안전).
+     */
+    public Optional<Handover> handOver(ExplorerId from, ExplorerId into, Instant now, Duration leaveGrace) {
+        requireShared("병합");
+        Optional<Member> found = members.find(from);
+        if (found.isEmpty()) return Optional.empty();
+        Member leaving = found.get();
+        if (members.find(into).isPresent()) {
+            if (leaving.owner()) transferOwnershipTo(into);
+            members = members.without(from);
+            return Optional.of(new Handover(null, false, null));
+        }
+        Optional<Departure> previous = departures.find(into);
+        Departure expired = previous.filter(earlier -> earlier.expired(now, leaveGrace)).orElse(null);
+        boolean rejoined = previous.isPresent() && expired == null;
+        Member joined = new Member(into, leaving.role(), rejoined ? previous.get().joinedAt() : leaving.joinedAt());
+        members = members.replace(from, joined);
+        if (leaving.owner()) ownerId = into;
+        previous.ifPresent(departures::remove);
+        return Optional.of(new Handover(joined, rejoined, expired));
+    }
+
     /** 지도장 넘기기(지도장만, 대상은 현재 멤버). */
     public void transferOwner(ExplorerId requester, ExplorerId newOwner) {
         requireShared("지도장 넘기기");
         requireOwner(requester);
         if (requester.equals(newOwner)) return;
+        transferOwnershipTo(newOwner);
+    }
+
+    private void transferOwnershipTo(ExplorerId newOwner) {
         members = members.transferOwnerTo(newOwner);
         ownerId = newOwner;
     }
@@ -164,6 +213,15 @@ public final class ExpeditionMap {
 
     public boolean shared() {
         return kind == MapKind.SHARED;
+    }
+
+    /** 이 탐험가의 공개 프로필에서 합류할 수 있는 지도인지 — 그가 지도장인 공유 지도이고 공개 범위가 PUBLIC(4단계). */
+    public boolean openToProfileOf(ExplorerId profileOwner) {
+        return shared() && ownerId.equals(profileOwner) && settings.visibility().openToProfile();
+    }
+
+    public int memberCount() {
+        return members.size();
     }
 
     public MapId id() { return id; }

@@ -81,10 +81,21 @@ class ItemDefinitionRulesTest {
 
     @Test
     void 테마_완성은_그_세트_보상만_수동_아이템은_자동_지급되지_않는다() {
-        assertThat(ALL.grantedByThemeCompletion("han", DAY)).containsExactly(HAN_BG);
-        assertThat(ALL.grantedByThemeCompletion("jiri", DAY)).isEmpty();
+        assertThat(ALL.grantedByThemeCompletion("han", DAY, NOON)).containsExactly(HAN_BG);
+        assertThat(ALL.grantedByThemeCompletion("jiri", DAY, NOON)).isEmpty();
         assertThat(ALL.stream().filter(item -> item.grantedByCheckIn(JONGNO, "KR-11", DAY, NOON)))
             .doesNotContain(MANUAL);
+    }
+
+    @Test
+    void 운영이_추가한_테마_완성_보상은_정의가_생긴_뒤의_완성에만_세트_배경은_예외_P3_R3_3() {
+        ItemDefinition hanBonus = item("event:han-bonus", ItemSlot.BADGE, new GrantRule.ThemeComplete("han"), null);
+        ItemDefinitions withBonus = ItemDefinitions.of(List.of(HAN_BG, hanBonus));
+        Instant beforeDefinition = CREATED.minusSeconds(60);
+        // 정의 생성 전 완성: 세트 배경(이관)만, 운영 보상은 소급 없음
+        assertThat(withBonus.grantedByThemeCompletion("han", LocalDate.of(2026, 10, 2), beforeDefinition)).containsExactly(HAN_BG);
+        // 생성 시각 이후 완성: 둘 다
+        assertThat(withBonus.grantedByThemeCompletion("han", LocalDate.of(2026, 10, 2), CREATED)).containsExactly(HAN_BG, hanBonus);
     }
 
     @Test

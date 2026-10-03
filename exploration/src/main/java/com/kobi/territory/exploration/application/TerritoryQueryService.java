@@ -2,6 +2,7 @@ package com.kobi.territory.exploration.application;
 
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
+import com.kobi.territory.exploration.api.query.ProfileMapView;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
 import com.kobi.territory.exploration.domain.territory.ConquestRate;
 import com.kobi.territory.exploration.domain.map.ExpeditionMap;
@@ -67,9 +68,10 @@ public class TerritoryQueryService implements TerritoryQuery {
         return maps.mapIdsOf(ExplorerId.of(explorerId)).stream().map(MapId::value).toList();
     }
 
+    /** 활성 탐험가 id(병합돼 비활성인 탐험가 제외 — 재계산 배치 대상). */
     @Override
     public List<String> explorerIds() {
-        return explorers.allIds().stream().map(ExplorerId::value).toList();
+        return explorers.activeIds().stream().map(ExplorerId::value).toList();
     }
 
     @Override
@@ -95,4 +97,12 @@ public class TerritoryQueryService implements TerritoryQuery {
      * @param claims 지역마다 선점 방문
      */
     public record TerritoryOverview(ExpeditionMap map, ConquestRate conquest, List<VisitView> visits, List<Visit> claims) {}
+
+    @Override
+    public List<ProfileMapView> profileMapsOf(String explorerId) {
+        ExplorerId owner = ExplorerId.of(explorerId);
+        return maps.mapsOf(owner).stream().filter(map -> map.openToProfileOf(owner))
+            .map(map -> new ProfileMapView(map.id().value(), map.name(), map.memberCount(), ExpeditionMap.MAX_MEMBERS))
+            .toList();
+    }
 }

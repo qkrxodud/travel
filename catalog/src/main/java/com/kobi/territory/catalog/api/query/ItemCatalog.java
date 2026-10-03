@@ -26,4 +26,11 @@ public interface ItemCatalog {
 
     /** 도감 테마(세트) 완성으로 받는 아이템(세트 배경 set:{setId} 등). 기간은 <b>완성 시각</b>의 날짜로 본다(Q-R2-1). */
     List<ItemView> grantedByThemeCompletion(String setId, Instant completedAt);
+
+    /**
+     * 초대로 공유 지도에 처음 합류했을 때 한쪽이 받는 한정 아이템(INVITATION 규칙, 4단계). 기간은 합류 시각의 날짜로 본다.
+     *
+     * @param side HOST(초대한 탐험가) | GUEST(초대받아 합류한 탐험가)
+     */
+    List<ItemView> grantedByInvitation(String side, Instant joinedAt);
 }

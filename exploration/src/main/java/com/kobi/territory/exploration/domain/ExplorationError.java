@@ -24,7 +24,15 @@ public enum ExplorationError {
     OWNER_CANNOT_LEAVE(ErrorKind.RULE_VIOLATION, "지도장은 다른 멤버에게 지도장을 넘긴 뒤 탈퇴할 수 있어요."),
     PERSONAL_MAP_ONLY_ME(ErrorKind.RULE_VIOLATION, "개인 지도에서는 할 수 없어요: %s"),
     INVITE_CODE_NOT_FOUND(ErrorKind.NOT_FOUND, "초대코드를 찾을 수 없어요: %s"),
-    INVALID_SETTINGS(ErrorKind.INVALID, "지도 설정이 올바르지 않습니다: %s");
+    PROFILE_MAP_NOT_FOUND(ErrorKind.NOT_FOUND, "프로필에서 합류할 수 있는 지도가 아니에요."),
+    INVALID_SETTINGS(ErrorKind.INVALID, "지도 설정이 올바르지 않습니다: %s"),
+    // ---- 4단계 계정·로그인 ----
+    HANDLE_INVALID(ErrorKind.INVALID, "핸들은 영문 소문자·숫자·밑줄·하이픈 %d~%d자로, 첫 글자는 영문이나 숫자여야 해요."),
+    HANDLE_RESERVED(ErrorKind.INVALID, "쓸 수 없는 핸들이에요: %s"),
+    HANDLE_TAKEN(ErrorKind.CONFLICT, "이미 누가 쓰고 있는 핸들이에요: %s"),
+    ACCOUNT_INVALID(ErrorKind.INVALID, "로그인 정보가 올바르지 않습니다: %s"),
+    LOGIN_REQUIRED(ErrorKind.UNAUTHENTICATED, "로그인해야 할 수 있어요."),
+    MERGE_NOT_ALLOWED(ErrorKind.CONFLICT, "이 탐험가는 병합할 수 없어요: %s");
 
     private final ErrorKind kind;
     private final String template;

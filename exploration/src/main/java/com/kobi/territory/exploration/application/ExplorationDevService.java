@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @Profile("local")
+@ConditionalOnProperty(prefix = "territory.dev", name = "enabled", havingValue = "true")
 public class ExplorationDevService {
 
     private final CheckInService checkIns;

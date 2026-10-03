@@ -16,7 +16,8 @@ import org.springframework.test.context.ActiveProfiles;
     "DB_URL=jdbc:h2:mem:prodprofiletest;MODE=MySQL;DB_CLOSE_DELAY=-1",
     "DB_USERNAME=sa",
     "DB_PASSWORD=",
-    "TERRITORY_ADMIN_TOKEN=prod-profile-test-token"
+    "TERRITORY_ADMIN_TOKEN=prod-profile-test-token",
+    "TERRITORY_PUBLIC_BASE_URL=https://territory.example"
 })
 @ActiveProfiles("prod")
 class DevControllerProdProfileTest {
@@ -27,5 +28,6 @@ class DevControllerProdProfileTest {
     void prod_프로파일에서는_DevController_빈이_없다() {
         assertThat(context.getBeansOfType(DevController.class)).isEmpty();
         assertThat(context.containsBean("devController")).isFalse();
+        assertThat(context.getEnvironment().getProperty("territory.dev.enabled")).isNull(); // local 파일에만 있다
     }
 }

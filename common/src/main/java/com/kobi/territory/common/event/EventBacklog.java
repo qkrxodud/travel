@@ -14,6 +14,11 @@ public interface EventBacklog {
      */
     boolean hasUndelivered(Collection<String> aggregateIds, String subscriberPrefix);
 
+    /** 접두사 여러 개 중 하나라도 미전달이 있는지(재계산 보류 — 자기 구독자 + 탐험 영토 구독자, P3-R3-1). */
+    default boolean hasUndelivered(Collection<String> aggregateIds, Collection<String> subscriberPrefixes) {
+        return subscriberPrefixes.stream().anyMatch(prefix -> hasUndelivered(aggregateIds, prefix));
+    }
+
     /** aggregateIds 의 이벤트 중 어느 구독자에게든 아직 전달되지 않은 것이 있는지(접두사 없음 = 모든 구독자). */
     default boolean hasPending(Collection<String> aggregateIds) {
         return hasUndelivered(aggregateIds, "");

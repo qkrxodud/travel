@@ -49,6 +49,9 @@ import org.springframework.transaction.annotation.Transactional;
  *     탈퇴 커밋 뒤의 체크인은 잠금 뒤 멤버 재확인에서 403, 탈퇴 전 체크인은 탈퇴 시각보다 앞선 처리 시각을 갖는다.
  *     잠금 순서가 언제나 지도 → territory 이고 지도 커맨드는 territory 를 잠그지 않으므로 순환이 없다.
  *     방문(Territory)은 반드시 잠금 뒤에 읽는다.
+ *  4) (4단계) territory 잠금 뒤 탐험가 행 공유 잠금으로 활성 여부를 다시 본다 — 로그인 병합(탐험가 행 배타 잠금)과 직렬화돼,
+ *     병합이 커밋된 뒤의 체크인은 거절되고 병합 전에 잠근 체크인은 병합이 그 커밋을 기다린다(옮겨질 방문을 놓치지 않는다).
+ *     잠금 순서: 지도 S → territory X → 탐험가 S. 병합은 탐험가 X 만 잡으므로 순환이 없다.
  */
 @Service
 public class CheckInService {
@@ -172,6 +175,7 @@ public class CheckInService {
         MapId mapId = mapAccess.mapIdOf(explorerId, selector);
         mapAccess.requireMembership(explorerId, mapId);              // 비멤버는 잠그기 전에 거른다(N2)
         if (!maps.lockShared(mapId) || !territories.lock(mapId)) throw selector.notFound(); // 지도 S → territory X
+        mapAccess.requireActiveLocked(explorerId);                   // → 탐험가 S: 그사이 커밋된 병합(로그인)이면 404(4단계)
         return mapAccess.resolve(explorerId, MapSelector.of(mapId)); // 잠금 뒤 다시 확인 — 그사이 커밋된 탈퇴면 403
     }
 

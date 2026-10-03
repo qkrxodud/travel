@@ -17,6 +17,9 @@ spring:
       path: /h2-console
 
 territory:
+  dev:
+    # /dev/**(reset·seed·login 등) 켜기 — 이 파일에만 둔다. local 프로파일 + 이 값이 모두 있어야 빈이 생긴다(QA P3-11).
+    enabled: true
   admin:
     # 로컬 전용 관리자 토큰(X-Admin-Token). http/stage3-wardrobe.http·E2E 가 쓴다.
     token: local-admin-token
@@ -27,6 +30,8 @@ territory:
       backoff:
         initial-ms: 100
         max-ms: 2000
+  recalculation:
+    delay-ms: 300
 
 logging:
   level:

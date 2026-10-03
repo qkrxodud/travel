@@ -55,6 +55,14 @@ public final class OwnedItems {
         return Optional.of(put(OwnedItem.asReward(itemId, grantKind, at)));
     }
 
+    /** 병합된 탐험가의 재생 불가 아이템(수동·초대 보상)을 받는다 — 처음 얻은 시각 유지, 이미 있으면 no-op. @return 새로 얻은 것 */
+    List<OwnedItem> adoptUnreplayable(OwnedItems merged) {
+        List<OwnedItem> adopted = new ArrayList<>();
+        merged.byId.values().stream().filter(item -> !item.grantKind().replayable() && !byId.containsKey(item.itemId()))
+            .forEach(item -> adopted.add(put(OwnedItem.asReward(item.itemId(), item.grantKind(), item.acquiredAt()))));
+        return adopted;
+    }
+
     /** 방문이 취소됐다 — 그 방문을 근거에서 빼고, 근거가 남지 않은 아이템을 회수한다. @return 회수한 것 */
     List<OwnedItem> withdraw(VisitKey visit) {
         List<OwnedItem> revoked = new ArrayList<>();

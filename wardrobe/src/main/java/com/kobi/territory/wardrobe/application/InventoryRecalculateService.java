@@ -46,6 +46,9 @@ public class InventoryRecalculateService {
     private static final Logger log = LoggerFactory.getLogger(InventoryRecalculateService.class);
     private static final int MAX_ATTEMPTS = 3;
     private static final String SUBSCRIBER_PREFIX = "wardrobe.";
+    /** 보류 판정 구독자: 꾸미기 구독자 + 탐험 영토 구독자(숨김·복구·병합 흡수 반영 전 재계산 방지, P3-R3-1). */
+    private static final List<String> HOLD_SUBSCRIBERS = List.of(SUBSCRIBER_PREFIX, "exploration.territory",
+        "exploration.expedition-map");
 
     private final InventoryRepository inventories;
     private final SceneRepository scenes;
@@ -117,11 +120,11 @@ public class InventoryRecalculateService {
         return Optional.of(rebuilt);
     }
 
-    /** 탐험가(인벤토리·장면 이벤트)와 그가 속한 지도에 꾸미기 구독자가 아직 받지 못한 이벤트가 없는지. */
+    /** 탐험가(인벤토리·장면 이벤트)와 그가 속한 지도에 꾸미기 구독자·탐험 영토 구독자가 아직 받지 못한 이벤트가 없는지(P3-R3-1). */
     private boolean settled(ExplorerId explorerId, Set<String> mapIds) {
         List<String> aggregateIds = new ArrayList<>(mapIds);
         aggregateIds.add(explorerId.value());
-        return !backlog.hasUndelivered(aggregateIds, SUBSCRIBER_PREFIX);
+        return !backlog.hasUndelivered(aggregateIds, HOLD_SUBSCRIBERS);
     }
 
     /** 모든 탐험가 — 탐험가마다 트랜잭션·재시도를 나누고 실패를 격리한다. */
