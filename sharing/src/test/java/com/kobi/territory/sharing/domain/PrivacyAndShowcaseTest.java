@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.sharing.domain.card.CardKind;
+import com.kobi.territory.common.model.TerritoryComparison;
+import com.kobi.territory.sharing.domain.privacy.PrivacyRoster;
 import com.kobi.territory.sharing.domain.privacy.PrivacySettings;
 import com.kobi.territory.sharing.domain.privacy.ProfileVisibility;
 import com.kobi.territory.sharing.domain.showcase.CardComposer;
@@ -20,6 +22,7 @@ import com.kobi.territory.sharing.domain.showcase.ShowcaseProgress;
 import com.kobi.territory.sharing.domain.showcase.ShowcaseScene;
 import com.kobi.territory.sharing.domain.showcase.Tone;
 import com.kobi.territory.sharing.domain.showcase.VisitFact;
+import com.kobi.territory.sharing.domain.showcase.VersusTally;
 import com.kobi.territory.sharing.domain.showcase.VisitMonth;
 import com.kobi.territory.sharing.domain.showcase.YearRecap;
 import java.time.Instant;
@@ -27,9 +30,10 @@ import java.time.LocalDate;
 import java.time.Year;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
-/** D1: PrivacySettings(FRIENDS 는 PRIVATE 처럼), 날짜 월 단위, 공개 집계·리캡·VS, 카드 문구에 정확한 날짜 없음. */
+/** D1: PrivacySettings(FRIENDS 는 맞팔로우에게만 — 5단계), 날짜 월 단위, 공개 집계·리캡·VS, 카드 문구에 정확한 날짜 없음. */
 class PrivacyAndShowcaseTest {
 
     static final ExplorerId EXPLORER = ExplorerId.of(UUID.randomUUID().toString());
@@ -47,7 +51,7 @@ class PrivacyAndShowcaseTest {
     }
 
     @Test
-    void 공개_범위_기본은_PRIVATE_공개하기를_켜야_열리고_FRIENDS_는_5단계_전까지_PRIVATE_처럼_404() {
+    void 공개_범위_기본은_PRIVATE_공개하기를_켜야_열리고_FRIENDS_는_익명에게_PRIVATE_처럼_404() {
         PrivacySettings settings = PrivacySettings.defaults(EXPLORER);
         assertThat(settings.visibility()).isEqualTo(ProfileVisibility.PRIVATE);
         assertThatThrownBy(settings::requireVisibleToPublic).hasFieldOrPropertyWithValue("code", "PROFILE_NOT_FOUND");
@@ -63,6 +67,53 @@ class PrivacyAndShowcaseTest {
         assertThat(settings.change(ProfileVisibility.PRIVATE, T0)).isFalse();
         assertThat(ProfileVisibility.parse(" public ")).isEqualTo(ProfileVisibility.PUBLIC);
         assertThatThrownBy(() -> ProfileVisibility.parse("everyone")).hasFieldOrPropertyWithValue("code", "INVALID_VISIBILITY");
+    }
+
+    @Test
+    void FRIENDS_는_서로_팔로우한_친구에게만_보이고_PRIVATE_는_친구에게도_안_보인다() {
+        ExplorerId friend = ExplorerId.of(UUID.randomUUID().toString());
+        ExplorerId stranger = ExplorerId.of(UUID.randomUUID().toString());
+        Predicate<ExplorerId> mutualWithOwner = friend::equals;
+        PrivacySettings settings = PrivacySettings.defaults(EXPLORER);
+
+        settings.change(ProfileVisibility.FRIENDS, T0);
+        assertThat(settings.visibleTo(friend, mutualWithOwner)).isTrue();
+        assertThat(settings.visibleTo(stranger, mutualWithOwner)).isFalse();
+        assertThat(settings.visibleTo(null, mutualWithOwner)).isFalse();
+        assertThat(settings.visibleTo(EXPLORER, viewer -> false)).isTrue(); // 주인 본인은 항상(리더 결정 2 — 미리보기)
+        settings.requireVisibleTo(friend, mutualWithOwner);
+        assertThatThrownBy(() -> settings.requireVisibleTo(stranger, mutualWithOwner))
+            .hasFieldOrPropertyWithValue("code", "PROFILE_NOT_FOUND");
+
+        settings.change(ProfileVisibility.PRIVATE, T0);
+        assertThat(settings.visibleTo(friend, mutualWithOwner)).isFalse();
+        assertThat(settings.visibleTo(EXPLORER, mutualWithOwner)).isTrue();
+        settings.change(ProfileVisibility.PUBLIC, T0);
+        assertThat(settings.visibleTo(null, viewer -> { throw new AssertionError("PUBLIC 은 친구 관계를 묻지 않는다"); })).isTrue();
+    }
+
+    @Test
+    void 여러_주인의_공개_범위는_저장된_행이_없으면_PRIVATE_로_채운다() {
+        ExplorerId open = ExplorerId.of(UUID.randomUUID().toString());
+        ExplorerId friendsOnly = ExplorerId.of(UUID.randomUUID().toString());
+        ExplorerId unset = ExplorerId.of(UUID.randomUUID().toString());
+        ExplorerId viewer = ExplorerId.of(UUID.randomUUID().toString());
+        PrivacyRoster roster = PrivacyRoster.of(List.of(open, friendsOnly, unset), List.of(
+            PrivacySettings.restore(open, ProfileVisibility.PUBLIC, T0),
+            PrivacySettings.restore(friendsOnly, ProfileVisibility.FRIENDS, T0),
+            PrivacySettings.restore(viewer, ProfileVisibility.PUBLIC, T0)));
+
+        assertThat(roster.visibleTo(viewer, (owner, candidate) -> false)).containsExactly(open);
+        assertThat(roster.visibleTo(viewer, (owner, candidate) -> owner.equals(friendsOnly) && candidate.equals(viewer)))
+            .containsExactlyInAnyOrder(open, friendsOnly);
+    }
+
+    @Test
+    void VS_는_공유_커널_비교와_같은_수를_낸다() {
+        PublicVisits mine = PublicVisits.of(List.of(fact("KR-11010", "2026-01-01", 1), fact("KR-11020", "2026-01-02", 2)), ATLAS);
+        PublicVisits theirs = PublicVisits.of(List.of(fact("KR-11020", "2026-01-01", 1), fact("KR-37430", "2026-01-02", 2)), ATLAS);
+        assertThat(mine.versus(theirs)).isEqualTo(VersusTally.of(TerritoryComparison.of(mine.paintedCodes(), theirs.paintedCodes())))
+            .isEqualTo(new VersusTally(1, 1, 1));
     }
 
     @Test

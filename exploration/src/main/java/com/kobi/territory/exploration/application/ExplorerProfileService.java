@@ -36,6 +36,11 @@ public class ExplorerProfileService implements ExplorerProfileQuery {
         return find(explorerId).filter(Explorer::publicProfile).isPresent();
     }
 
+    @Override
+    public Optional<String> mergedInto(String explorerId) {
+        return find(explorerId).flatMap(Explorer::mergedInto).map(ExplorerId::value);
+    }
+
     private Optional<Explorer> find(String explorerId) {
         try {
             return explorers.findById(ExplorerId.of(explorerId));

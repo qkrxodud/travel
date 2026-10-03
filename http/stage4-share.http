@@ -2,7 +2,8 @@
 ### 서버: ./gradlew :app-api:bootRun   (8080이 점유돼 있으면 --args='--server.port=18081' 으로 띄우고 아래 @host 를 바꾼다)
 ### 로그인은 local 전용 POST /dev/login(파트 A, 세션 쿠키 JSESSIONID — 클라이언트가 자동 보관). 세션 변경 요청은 X-XSRF-TOKEN 필요.
 ### 카드 원천 무효화·초대 보상은 outbox 릴레이로 비동기(local 300ms) — 1초쯤 뒤에 조회한다.
-### 공개 경로 /u/** 는 인증 없이 열린다. 공개 범위가 PUBLIC 이 아니면 404(존재 숨김, FRIENDS 는 5단계 전까지 PRIVATE 처럼).
+### 공개 경로 /u/** 는 인증 없이 열린다. 공개 범위가 PUBLIC 이 아니면 방문자에게 404(존재 숨김, FRIENDS 는 맞팔에게만 — 5단계).
+### 주인 본인(세션)은 공개 범위와 무관하게 자기 프로필·카드를 본다(5단계 리더 결정 2 — 미리보기). 방문자 확인은 `Cookie: JSESSIONID=none`.
 ### 공개 범위 기본값은 PRIVATE(사용자 결정 Q1) — 7-1 에서 "공개하기"(PUT /me/privacy PUBLIC).
 ### 쿠키를 유지하는 클라이언트(IntelliJ HTTP Client)에서도 그대로 돈다: 로그인 뒤의 다른 익명 탐험가 요청(15~17·19)은
 ### `Cookie: JSESSIONID=none` 으로 세션을 떼고 보낸다(세션이 토큰보다 먼저라서 — 안 떼면 계정 탐험가로 처리된다).
@@ -43,10 +44,14 @@ GET {{host}}/me/cards
 ### 6. 내 영토 카드 미리보기(첫 요청에 렌더) → 200 image/png 1200×630
 GET {{host}}/me/cards/territory.png
 
-### 7. 공개 범위 → 200 {visibility:PRIVATE, publiclyVisible:false} (기본 비공개) — 이때 /u/{handle} 은 404
+### 7. 공개 범위 → 200 {visibility:PRIVATE, publiclyVisible:false} (기본 비공개) — 이때 방문자에게 /u/{handle} 은 404
 GET {{host}}/me/privacy
 
-###
+### 7-0. 방문자(세션 뗌) → 404
+GET {{host}}/u/{{handle}}
+Cookie: JSESSIONID=none
+
+### 7-0-1. 주인 본인(세션) → 200(미리보기, Cache-Control: private)
 GET {{host}}/u/{{handle}}
 
 ### 7-1. 공개하기 → 200 {visibility:PUBLIC, publiclyVisible:true}
@@ -128,10 +133,15 @@ Content-Type: application/json
 
 {"visibility": "PRIVATE"}
 
-### 21. 공개 프로필·카드 → 404(존재 숨김)
+### 21. 방문자에게 공개 프로필·카드 → 404(존재 숨김)
 GET {{host}}/u/{{handle}}
+Cookie: JSESSIONID=none
 
 ###
+GET {{host}}/u/{{handle}}/card/territory.png
+Cookie: JSESSIONID=none
+
+### 21-0. 주인 본인은 비공개여도 자기 카드 → 200
 GET {{host}}/u/{{handle}}/card/territory.png
 
 ### 21-1. 프로필이 비공개면 지도가 PUBLIC 이어도 프로필 합류 404(초대 보상 없음)
@@ -148,7 +158,7 @@ Content-Type: application/json
 
 {"mapId": "{{mapId}}"}
 
-### 22. FRIENDS(5단계 전까지 PRIVATE 처럼) → 200 {visibility:FRIENDS, publiclyVisible:false} → 공개 프로필 404
+### 22. FRIENDS(맞팔에게만 — 5단계) → 200 {visibility:FRIENDS, publiclyVisible:false} → 친구 아닌 방문자에게 공개 프로필 404
 PUT {{host}}/me/privacy
 X-XSRF-TOKEN: {{xsrf}}
 Content-Type: application/json
@@ -157,6 +167,7 @@ Content-Type: application/json
 
 ###
 GET {{host}}/u/{{handle}}
+Cookie: JSESSIONID=none
 
 ### 23. 잘못된 공개 범위 → 400 INVALID_VISIBILITY
 PUT {{host}}/me/privacy

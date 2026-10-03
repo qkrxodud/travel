@@ -1,5 +1,6 @@
 package com.kobi.territory.sharing.domain.showcase;
 
+import com.kobi.territory.common.model.TerritoryComparison;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Year;
@@ -128,12 +129,9 @@ public final class PublicVisits {
             .collect(Collectors.joining(","));
     }
 
-    /** 두 탐험가 비교(VS): 나만 · 둘 다 · 상대만 간 곳. */
+    /** 두 탐험가 비교(VS): 나만 · 둘 다 · 상대만 간 곳 — 계산은 소셜 영토 비교와 같은 공유 커널 함수(5단계, 중복 구현 금지). */
     public VersusTally versus(PublicVisits other) {
-        Set<String> mine = paintedCodes();
-        Set<String> theirs = other.paintedCodes();
-        int both = (int) mine.stream().filter(theirs::contains).count();
-        return new VersusTally(mine.size() - both, both, theirs.size() - both);
+        return VersusTally.of(TerritoryComparison.of(paintedCodes(), other.paintedCodes()));
     }
 
     private static Map<String, Long> countByProvince(List<Entry> visits) {

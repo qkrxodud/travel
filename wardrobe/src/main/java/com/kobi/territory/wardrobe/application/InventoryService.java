@@ -8,6 +8,7 @@ import com.kobi.territory.exploration.api.event.MapCreated;
 import com.kobi.territory.exploration.api.event.MemberJoined;
 import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.event.VisitCancelled;
+import com.kobi.territory.exploration.api.query.ExplorerProfileQuery;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
 import com.kobi.territory.progression.api.event.SetCompleted;
 import com.kobi.territory.progression.api.query.CollectionBookQuery;
@@ -48,13 +49,15 @@ public class InventoryService {
     private final WardrobeCatalog catalog;
     private final CollectionBookQuery collectionBooks;
     private final TerritoryQuery territories;
+    private final ExplorerProfileQuery profiles;
     private final EventOutbox outbox;
     private final Clock clock;
     private final TransactionTemplate writeTx;
 
     public InventoryService(InventoryRepository inventories, WardrobeCatalog catalog, CollectionBookQuery collectionBooks,
-                            TerritoryQuery territories, EventOutbox outbox, Clock clock,
+                            TerritoryQuery territories, ExplorerProfileQuery profiles, EventOutbox outbox, Clock clock,
                             PlatformTransactionManager transactionManager) {
+        this.profiles = profiles;
         this.inventories = inventories;
         this.catalog = catalog;
         this.collectionBooks = collectionBooks;
@@ -135,7 +138,7 @@ public class InventoryService {
      */
     @Transactional
     public void onMemberJoined(MemberJoined event) {
-        Inventory inventory = loadLocked(ExplorerId.of(event.explorerId()));
+        Inventory inventory = loadLocked(recipientOf(event.explorerId()));
         InventoryChange change = inventory.grantRewards(
             catalog.grantedByThemeCompletions(collectionBooks.completedSets(event.mapId())), event.joinedAt());
         InvitationOutcome invitation = inventory.acceptInvitation(
@@ -151,7 +154,7 @@ public class InventoryService {
     /** 초대한 쪽 보상(InviteRewardOwed) — 초대자 Inventory 하나만, 회수 없음. 아이템 단위로 멱등. */
     @Transactional
     public void onInviteRewardOwed(InviteRewardOwed event) {
-        Inventory inventory = loadLocked(ExplorerId.of(event.inviterId()));
+        Inventory inventory = loadLocked(recipientOf(event.inviterId()));
         InventoryChange change = inventory.grantRewards(catalog.grantedByInvitation(HOST, event.joinedAt()), event.joinedAt());
         inventories.save(inventory);
         publish(inventory, change);
@@ -186,6 +189,15 @@ public class InventoryService {
             inventories.save(inventory);
             return item;
         });
+    }
+
+    /**
+     * 재생 불가 아이템(초대 보상·합류 시 테마 보상)의 받는 사람(4단계 QA N1, 5단계 처리): 병합돼 비활성인 탐험가(from) 앞으로 병합 뒤에
+     * 도착한 지급은 계정 탐험가(into)에게 — 병합 흡수(ExplorerMerged)와 레인이 달라 순서가 보장되지 않아도 비활성 from 가방에 남지 않는다.
+     * 같은 쌍 1회·셀프 초대 판단은 into 의 Inventory 가 그대로 한다(멱등).
+     */
+    private ExplorerId recipientOf(String explorerId) {
+        return ExplorerId.of(profiles.mergedInto(explorerId).orElse(explorerId));
     }
 
     /** 이벤트 처리용: 루트 행을 먼저 잠그고 불러온다 — 재계산과 같은 잠금 순서(루트 → 자식). */

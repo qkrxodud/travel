@@ -45,4 +45,10 @@ public interface TerritoryQuery {
      * 합류는 POST /maps/join-via-profile/{handle}. 탐험가가 없으면 빈 목록.
      */
     List<ProfileMapView> profileMapsOf(String explorerId);
+
+    /**
+     * 지도 안 랭킹용 방문(5단계): 지도에 보이는 방문(숨긴 방문 제외)마다 탐험가·지역·희귀도·선점 여부·이의 여부. 지도가 없으면 빈 목록.
+     * 접근 확인(멤버인지)은 호출자가 {@link #resolveMapId} 로 먼저 한다.
+     */
+    List<MapVisitView> mapVisits(String mapId);
 }

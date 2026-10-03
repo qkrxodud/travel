@@ -9,8 +9,8 @@ import java.time.Year;
 import org.springframework.stereotype.Service;
 
 /**
- * 공개 프로필(/u/{handle}) 유스케이스. 공개 범위가 PUBLIC 일 때만(PRIVATE·FRIENDS → PROFILE_NOT_FOUND, 존재 숨김 — FRIENDS 는
- * 5단계 친구 기능 전까지 PRIVATE 처럼). 보여 주는 것은 색칠·집계·월 단위 시기뿐이다(Showcase, §7).
+ * 공개 프로필(/u/{handle}) 유스케이스. 공개 범위가 보는 사람에게 열려 있을 때만(PUBLIC 은 누구나, FRIENDS 는 서로 팔로우한
+ * 친구만 — 5단계, 그 밖엔 PROFILE_NOT_FOUND 존재 숨김). 보여 주는 것은 색칠·집계·월 단위 시기뿐이다(Showcase, §7).
  */
 @Service
 public class PublicProfileService {
@@ -30,10 +30,11 @@ public class PublicProfileService {
         this.clock = clock;
     }
 
-    public PublicProfile profile(String handle) {
+    /** @param viewer 보는 사람(로그인 세션·토큰, 익명 방문자면 null) */
+    public PublicProfile profile(String handle, ExplorerId viewer) {
         ExplorerId owner = profiles.explorerIdByHandle(handle).map(ExplorerId::of)
             .orElseThrow(SharingError.PROFILE_NOT_FOUND::exception);
-        privacy.requireVisibleToPublic(owner);
+        privacy.requireVisibleTo(owner, viewer);
         String canonical = profiles.handleOf(owner.value()).orElseThrow(SharingError.PROFILE_NOT_FOUND::exception);
         return new PublicProfile(showcases.read(owner.value(), canonical), territories.profileMapsOf(owner.value()),
             Year.now(clock));

@@ -198,6 +198,20 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
 .feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .feed li{display:flex;gap:10px;font-size:12px;align-items:flex-start}
 .feed .av{width:28px;height:28px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--display);font-size:12px}
+.feed time{display:block;color:var(--muted);font-size:11px}
+/* 5단계 소셜: 친구(팔로우)·지역 평균·영토 비교 지도 */
+.friends{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.friends li{display:flex;align-items:center;gap:8px;font-size:12px}
+.friends li b{font-weight:600}
+.friends .tag{font-size:10px;padding:1px 6px;border-radius:9px;background:var(--unvisited);color:var(--muted)}
+.friends .tag.mutual{background:var(--accent-soft);color:var(--accent-deep)}
+.friends li .sp{flex:1}
+.social-row{display:flex;gap:6px;margin-top:8px}
+.social-row input{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px}
+.baseline{margin-top:10px;padding:8px 10px;border-radius:8px;background:var(--accent-soft);font-size:12px;line-height:1.5}
+.vsmap{width:100%;max-width:420px;display:block;margin:10px auto 0}
+.vsmap path{fill:var(--unvisited);stroke:#fff;stroke-width:.4}
+.vsmap path.vs-mine{fill:var(--accent)} .vsmap path.vs-both{fill:var(--legend)} .vsmap path.vs-theirs{fill:var(--gold)}
 .feed time{color:var(--muted);display:block;font-size:11px}
 
 /* 프로필 */
@@ -476,20 +490,32 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
     </div>
   </section>
 
-  <!-- 랭킹 -->
+  <!-- 랭킹(5단계: 친구 랭킹·친구·친구 소식·지도 안 랭킹·영토 비교 — 서버 값) -->
   <section id="tab-rank" hidden class="grid2">
     <div class="side">
-      <div class="card">
-        <h2>친구 랭킹 <span>정복 지역 수 · 이름을 누르면 비교</span></h2>
+      <div class="card" id="rank-card">
+        <h2>친구 랭킹 <span>서로 팔로우한 친구 · 정복 지역 수 · 이름을 누르면 비교</span></h2>
         <ul class="rank" id="rank"></ul>
+        <div class="baseline" id="rank-baseline" hidden></div>
+      </div>
+      <div class="card" id="friends-card">
+        <h2>친구 <span id="friends-sub">handle 로 팔로우 — 서로 팔로우하면 친구</span></h2>
+        <div class="note" id="friends-login" hidden>로그인하면 친구를 팔로우하고 친구 랭킹·소식을 볼 수 있어요. <button class="btn sm primary" id="t-rank-login">로그인하러 가기</button></div>
+        <div class="social-row" id="follow-row"><input id="follow-handle" placeholder="@handle" maxlength="21" aria-label="팔로우할 handle"><button class="btn sm primary" id="t-follow">팔로우</button></div>
+        <ul class="friends" id="friends"></ul>
       </div>
       <div class="card">
-        <h2>친구 소식 <span>최근</span></h2>
+        <h2>친구 소식 <span>내가 팔로우한 사람 · 최근</span></h2>
         <ul class="feed" id="feed"></ul>
+      </div>
+      <div class="card" id="map-rank-card" hidden>
+        <h2>지도 안 랭킹 <span id="map-rank-sub">영토 · 선점 · 전설 (이의 표시 제외)</span></h2>
+        <ul class="rank" id="map-rank"></ul>
       </div>
     </div>
     <div class="card" id="vs">
       <h2>영토 비교 <span id="vs-sub"></span></h2>
+      <div class="social-row"><input id="compare-handle" placeholder="@handle 과 비교" maxlength="21" aria-label="비교할 handle"><button class="btn sm" id="t-compare">비교</button></div>
       <div id="vs-body"></div>
     </div>
   </section>
@@ -526,7 +552,7 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
           <p class="note" id="privacy-note">공개 프로필은 기본 비공개예요. "공개하기"를 켜야 링크가 열려요.</p>
         </div>
         <div class="share-vs" id="share-vs" hidden>
-          <input id="vs-handle" placeholder="친구 handle" maxlength="20" aria-label="비교할 친구 handle"><button class="btn sm" id="t-vs-server">VS 카드</button>
+          <input id="vs-handle" placeholder="친구 handle" maxlength="20" aria-label="비교할 친구 handle"><button class="btn sm" id="t-vs-server">VS 카드</button><span class="note" id="share-vs-basis">개인 지도 기준(랭킹 탭 비교는 모든 지도 기준)</span>
         </div>
         <div class="share-maps" id="share-maps" hidden></div>
       </div>
@@ -690,31 +716,8 @@ const SAMPLE = [
   ['강원','동해시',-2,9,'묵호 논골담길'],['강원','삼척시',-2,10,'해상케이블카'],['경기','양평군',-1,22,'두물머리'],['서울','광진구',0,1,'뚝섬 한강'],
 ];
 
-const FRIENDS = [
-  { id:'jiwoo', name:'지우', color:'#d9541b', k:62,  ttl:'전국 유랑객' },
-  { id:'minjun', name:'민준', color:'#3b6fd6', k:48, ttl:'길 위의 사람' },
-  { id:'haneul', name:'하늘', color:'#8b4bd6', k:33, ttl:'동네 산책러' },
-  { id:'seoyeon', name:'서연', color:'#c2187a', k:27, ttl:'동네 산책러' },
-  { id:'doyun', name:'도윤', color:'#5d6b3a', k:12, ttl:'초보 탐험가' },
-];
-function seeded(seed){ let s = seed; return () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; }; }
-FRIENDS.forEach((f, i) => {
-  const rnd = seeded(97 + i * 31);
-  const pool = FEATURES.slice().sort(() => 0.5 - rnd());
-  const picked = [];
-  for (const ft of pool) { if (picked.length >= f.k) break; const r = rarity(ft); if (r==='legend' && rnd() < .85) continue; if (r==='rare' && rnd() < .55) continue; picked.push(ft.properties.code); }
-  f.codes = new Set(picked);
-});
-const FEED = [
-  ['jiwoo', '전설 지역 <b>울릉군</b>을 획득했어요', '2시간 전'],
-  ['minjun', '<b>동해안 종주</b> 세트를 완성했어요 · 칭호 「동해의 파도」', '어제'],
-  ['haneul', '<b>강원 평창군</b>에 발 도장 · 32번째 영토', '2일 전'],
-  ['seoyeon', '9월 퀘스트 3개를 모두 끝냈어요', '3일 전'],
-  ['jiwoo', 'Lv.9 달성 · 칭호 「전국 유랑객」', '5일 전'],
-];
-
 /* ---------- state ---------- */
-const BLANK = () => ({ visits:{}, badges:[], title:null, vsFriend:'jiwoo', equip:{}, gender:'m' });
+const BLANK = () => ({ visits:{}, badges:[], title:null, equip:{}, gender:'m' });
 let state = BLANK();
 let mode = 'paint', selected = null, sampleMode = false, tab = 'map', highlight = null;
 const KEY = 'territory-mvp-v3';
@@ -817,6 +820,15 @@ const api = (() => {
     scene: () => call('GET', '/scene'),
     editScene: body => call('PUT', '/scene', body),
     favorite: (itemId, favorite) => call('PUT', '/inventory/' + encodeURIComponent(itemId) + '/favorite', { favorite }),
+    // 5단계(소셜): 친구(팔로우 — 로그인 필요)·친구 소식·랭킹 두 층·상위 %·영토 비교
+    friends: () => call('GET', '/friends'),
+    follow: handle => call('POST', '/friends/' + encodeURIComponent(handle)),
+    unfollow: handle => call('DELETE', '/friends/' + encodeURIComponent(handle)),
+    feed: () => call('GET', '/feed'),
+    friendRanking: () => call('GET', '/rankings/friends'),
+    mapRanking: id => call('GET', '/rankings/maps/' + encodeURIComponent(id)),
+    percentile: () => call('GET', '/rankings/me/percentile'),
+    compare: handle => call('GET', '/compare/' + encodeURIComponent(handle)),
   };
 })();
 let server = null; // 마지막 GET /territory 응답(정복률·시도별·일지의 기준)
@@ -903,7 +915,8 @@ const ERR_TITLE = { DAILY_CAP_EXCEEDED:'오늘은 여기까지', FUTURE_VISIT_DA
   QUEST_ALREADY_CLAIMED:'이미 받은 보상', QUEST_NOT_COMPLETED:'아직 달성 전', TITLE_NOT_EARNED:'아직 못 얻은 칭호',
   PHOTO_REQUIRED:'사진이 필요해요', NOT_A_MEMBER:'멤버가 아니에요', OWNER_ONLY:'지도장만 할 수 있어요', OWNER_CANNOT_LEAVE:'지도장은 탈퇴 전 양도',
   INVITE_CODE_NOT_FOUND:'초대코드 확인', MAP_FULL:'지도가 가득 찼어요', ALREADY_MEMBER:'이미 멤버예요',
-  PROFILE_MAP_NOT_FOUND:'합류할 수 없는 지도', PROFILE_NOT_FOUND:'프로필 없음', INVALID_VISIBILITY:'공개 범위 확인', CARD_KIND_NOT_FOUND:'모르는 카드',
+  PROFILE_MAP_NOT_FOUND:'합류할 수 없는 지도', PROFILE_NOT_FOUND:'프로필 없음',
+  ALREADY_FOLLOWING:'이미 팔로우 중', NOT_FOLLOWING:'팔로우하지 않았어요', CANNOT_FOLLOW_SELF:'나는 팔로우할 수 없어요', CANNOT_COMPARE_SELF:'나와는 비교할 수 없어요', INVALID_VISIBILITY:'공개 범위 확인', CARD_KIND_NOT_FOUND:'모르는 카드',
   HANDLE_INVALID:'handle 형식 확인', HANDLE_RESERVED:'쓸 수 없는 handle', HANDLE_TAKEN:'이미 쓰는 handle', LOGIN_REQUIRED:'로그인이 필요해요', CSRF_INVALID:'새로고침이 필요해요' };
 function toastError(e){ toast('!', ERR_TITLE[e.code] || '요청 실패', e.message || String(e)); }
 const ym = d => d.slice(0,7);
@@ -1374,7 +1387,7 @@ function ctx(){
   let legend = 0, gun = 0;
   list.forEach(e => { pc[e.f.properties.prov]++; const r = rarity(e.f); if (r==='legend') legend++; if (r!=='common') gun++; });
   const c = { n:list.length, list, pc, legend, gun, p:p => pc[p], full:p => pc[p] === PROV_TOTAL[p] };
-  c.top = c.n === 0 ? 100 : Math.max(1, Math.round(100 * Math.exp(-c.n / 35)));
+  c.top = social.percentile && social.percentile.computed ? social.percentile.topPercent : '—'; // 5단계: 서버 일 1회 배치 값
   return c;
 }
 /** 화면에 보일 칭호(서버: 선택 칭호, 없으면 레벨 칭호). */
@@ -1505,7 +1518,7 @@ function render(){
   const cq = server ? server.conquest : { visited:c.n, total:FEATURES.length, percent:Math.round(100 * c.n / FEATURES.length) };
   const pct = cq.percent;
   $('#s-pct').textContent = pct; $('#s-cnt').textContent = `${cq.visited} / ${cq.total}`; $('#s-bar').style.width = pct + '%';
-  $('#s-top').textContent = c.top; $('#s-rank').textContent = `약 ${(Math.round(12840 * c.top / 100)).toLocaleString()}위`;
+  renderPercentile();
   // 헤더 Lv·XP·스트릭·칭호는 서버 진행 값(없으면 시작 상태)
   const P = prog || { xp:0, level:1, currentLevelXp:0, nextLevelXp:40, streak:{ months:0 } };
   $('#s-streak').textContent = P.streak.months;
@@ -1607,29 +1620,117 @@ function renderQuests(c){
   $('#streak').innerHTML = Array.from({length:12}, (_,i) => { const k = ymShift(i-11); return `<span class="${run.has(k)?'on':''} ${k===curYm?'now':''}">${k.slice(5)}월</span>`; }).join('');
 }
 
+/* ---------- 소셜(5단계): 서버 값 — 친구 랭킹·친구·친구 소식·지도 안 랭킹·영토 비교·상위 % ---------- */
+const social = { ranking:null, friends:null, feed:null, mapRanking:null, percentile:null, vs:null, rev:0 };
+const PROV_BY_PREFIX = {}; FEATURES.forEach(f => { PROV_BY_PREFIX[f.properties.code.slice(0, 2)] = f.properties.prov; });
+const provName = code => code ? (PROV_BY_PREFIX[String(code).replace(/^KR-/, '')] || code) : '';
+const AV_COLORS = ['#d9541b', '#3b6fd6', '#8b4bd6', '#c2187a', '#5d6b3a', '#0b6b5f', '#b5651d'];
+const avColor = key => { let h = 0; for (const ch of String(key)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return AV_COLORS[h % AV_COLORS.length]; };
+const who = handle => handle ? '@' + handle : '탐험가';
+const regionLabel = code => { const f = BY_CODE.get(api.toClient(code)); return f ? label(f) : code; };
+async function loadSocial(){
+  const [ranking, friends, feed] = await Promise.all([api.friendRanking(), api.friends(), api.feed()]);
+  social.ranking = ranking; social.friends = friends; social.feed = feed;
+  social.mapRanking = mapInfo ? await api.mapRanking(mapInfo.mapId).catch(() => null) : null;
+  await loadPercentile();
+  if (social.vs) social.vs = await api.compare(social.vs.other.handle).catch(() => null);
+  document.documentElement.dataset.social = String(++social.rev);
+  render();
+}
+async function loadPercentile(){ try { social.percentile = await api.percentile(); } catch (e) { social.percentile = null; } }
+function renderPercentile(){
+  const p = social.percentile;
+  $('#s-top').textContent = p && p.computed ? p.topPercent : '—';
+  $('#s-rank').textContent = p && p.computed ? `${p.rank.toLocaleString()}위 / ${p.population.toLocaleString()}명` : '하루 한 번 집계해요';
+  document.documentElement.dataset.percentile = p && p.computed ? String(p.topPercent) : 'none';
+}
 function renderRank(c){
-  const rows = [...FRIENDS.map(f => ({ id:f.id, name:f.name, color:f.color, n:f.codes.size, ttl:f.ttl })), { id:'me', name:'나 (Kobi)', color:null, n:c.n, ttl:currentTitle(), me:true }].sort((a,b) => b.n - a.n);
-  $('#rank').innerHTML = rows.map((r, i) => `<li class="${r.me?'me':''}"><button data-vs="${r.me?'':r.id}"><span class="pos ${i<3?'top':''}">${i+1}</span><span class="av" style="background:${r.color||'var(--accent)'}">${r.me?'K':esc(r.name[0])}</span><span class="nm">${esc(r.name)}<small>${esc(r.ttl)}</small></span><span class="sc">${r.n}<small>${Math.round(100*r.n/FEATURES.length)}%</small></span></button></li>`).join('');
-  $('#feed').innerHTML = FEED.map(([id, html, t]) => { const f = FRIENDS.find(x => x.id===id); return `<li><span class="av" style="background:${f.color}">${esc(f.name[0])}</span><div><b>${esc(f.name)}</b>님이 ${html}<time>${t}</time></div></li>`; }).join('');
-  const fr = FRIENDS.find(x => x.id === state.vsFriend) || FRIENDS[0];
-  const mine = new Set(Object.keys(state.visits));
-  const both = [...mine].filter(x => fr.codes.has(x)), onlyMe = [...mine].filter(x => !fr.codes.has(x)), onlyFr = [...fr.codes].filter(x => !mine.has(x));
-  const tot = both.length + onlyMe.length + onlyFr.length || 1;
-  const diff = mine.size - fr.codes.size;
-  $('#vs-sub').textContent = `나 vs ${fr.name}`;
-  const names = arr => arr.slice(0,6).map(cd => esc(BY_CODE.get(cd).properties.name)).join(', ') + (arr.length > 6 ? ` 외 ${arr.length-6}곳` : '');
-  const neither = FEATURES.filter(f => !mine.has(f.properties.code) && !fr.codes.has(f.properties.code));
+  const r = social.ranking;
+  // 서버 랭킹 전: 내 줄만(이 지도 기준 지역 수) — 2단계 회귀(본인 줄·칭호)
+  const rows = r ? r.rows : [{ me:true, handle:null, rank:1, regionCount:c.n, level:prog ? prog.level : 1, titleName:currentTitle() }];
+  const loggedIn = !!(account && account.loggedIn);
+  $('#rank').innerHTML = rows.map(row => `<li class="${row.me ? 'me' : ''}" data-handle="${esc(row.handle || '')}"><button data-vs="${row.me ? '' : esc(row.handle || '')}"><span class="pos ${row.rank <= 3 ? 'top' : ''}">${row.rank}</span><span class="av" style="background:${row.me ? 'var(--accent)' : avColor(row.handle)}">${row.me ? 'K' : esc((row.handle || '?')[0].toUpperCase())}</span><span class="nm">${row.me ? (row.handle ? `나 (@${esc(row.handle)})` : '나 (Kobi)') : esc(who(row.handle))}<small>Lv.${row.level} · ${esc(row.titleName || '')}</small></span><span class="sc">${row.regionCount}<small>${Math.round(100 * row.regionCount / FEATURES.length)}%</small></span></button></li>`).join('');
+  const base = r && r.baseline, mine = r ? (r.rows.find(row => row.me) || { regionCount:0 }).regionCount : c.n;
+  $('#rank-baseline').hidden = !(r && r.friendCount === 0);
+  $('#rank-baseline').innerHTML = !r || r.friendCount > 0 ? ''
+    : base ? `친구가 아직 없어요 — <b>${base.nationwide ? '전국' : esc(provName(base.provinceCode))} 평균 유저</b>는 <b data-baseline-avg>${base.averageRegionCount}</b>곳, 나는 <b>${mine}</b>곳 (${base.explorerCount.toLocaleString()}명 기준 · 하루 한 번 집계)`
+    : '친구가 아직 없어요 — 지역 평균은 하루 한 번 집계된 뒤에 보여요.';
+  renderFriends(loggedIn);
+  renderFeed(loggedIn);
+  renderMapRank();
+  renderVs(c);
+}
+function renderFriends(loggedIn){
+  const f = social.friends;
+  $('#friends-login').hidden = loggedIn;
+  $('#follow-row').hidden = !loggedIn;
+  $('#friends-sub').textContent = f && loggedIn ? `친구 ${f.mutualCount}명 · 서로 팔로우하면 친구` : 'handle 로 팔로우 — 서로 팔로우하면 친구';
+  const people = f ? f.people : [];
+  $('#friends').innerHTML = !loggedIn ? '' : people.length === 0 ? '<li class="empty">아직 팔로우한 사람이 없어요. 친구의 handle 을 입력해 보세요.</li>'
+    : people.map(p => { const rel = p.mutual ? 'mutual' : p.following ? 'following' : 'follower';
+      return `<li data-handle="${esc(p.handle || '')}" data-relation="${rel}"><span class="av" style="width:22px;height:22px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;background:${avColor(p.handle)}">${esc((p.handle || '?')[0].toUpperCase())}</span><b>${esc(who(p.handle))}</b><span class="tag ${p.mutual ? 'mutual' : ''}">${p.mutual ? '친구' : p.following ? '팔로잉' : '나를 팔로우'}</span><span class="sp"></span>${p.handle ? `<button class="btn sm" data-compare="${esc(p.handle)}">비교</button>` : ''}${p.following ? `<button class="btn sm" data-unfollow="${esc(p.handle)}">언팔로우</button>` : p.handle ? `<button class="btn sm primary" data-follow="${esc(p.handle)}">맞팔로우</button>` : ''}</li>`; }).join('');
+}
+function feedText(item){
+  if (item.kind === 'VISIT') return `<b>${esc(regionLabel(item.regionCode))}</b>에 발 도장${item.rarity === 'LEGEND' ? ' · 전설 지역' : item.rarity === 'RARE' ? ' · 희귀 지역' : ''}`;
+  if (item.kind === 'THEME_COMPLETED') { const s = dex && dex.sets.find(x => x.id === item.themeId); return `<b>${esc(s ? s.name : item.themeId)}</b> 테마를 완성했어요`; }
+  if (item.kind === 'LEVEL_UP') return `<b>Lv.${item.level}</b> 달성`;
+  const b = prog && prog.badges.find(x => x.id === item.badgeId); return `뱃지 「${esc(b ? b.name : item.badgeId)}」를 얻었어요`;
+}
+function renderFeed(loggedIn){
+  const f = social.feed, items = f ? f.items : [];
+  $('#feed').innerHTML = items.length ? items.map(item => `<li data-kind="${item.kind}" data-handle="${esc(item.handle || '')}" data-region="${esc(item.regionCode || '')}"><span class="av" style="background:${avColor(item.handle)}">${esc((item.handle || '?')[0].toUpperCase())}</span><div><b>${esc(who(item.handle))}</b>님이 ${feedText(item)}<time>${esc(item.when)}</time></div></li>`).join('')
+    : `<li class="empty">${loggedIn ? '아직 소식이 없어요 — 친구를 팔로우하면 칠한 곳·완성한 테마·레벨 업이 여기 보여요(비공개 친구 제외).' : '로그인하고 친구를 팔로우하면 친구 소식이 보여요.'}</li>`;
+}
+function renderMapRank(){
+  const m = social.mapRanking;
+  $('#map-rank-card').hidden = !(mapInfo && m && m.mapId === mapInfo.mapId);
+  if ($('#map-rank-card').hidden) return;
+  $('#map-rank-sub').textContent = `영토 · 선점 · 전설${m.disputedExcluded ? ` (이의 표시 ${m.disputedExcluded}건 제외)` : ' (이의 표시 제외)'}`;
+  $('#map-rank').innerHTML = m.rows.map(row => { const mem = memberOf(row.explorerId);
+    return `<li class="${row.me ? 'me' : ''}" data-explorer="${row.explorerId}"><span class="pos ${row.rank <= 3 ? 'top' : ''}">${row.rank}</span><span class="av" style="background:${mem ? mem.color : '#999'}">${row.me ? 'K' : esc((row.handle || 'M')[0].toUpperCase())}</span><span class="nm">${row.me ? '나' : row.handle ? esc('@' + row.handle) : '멤버 ' + row.explorerId.slice(0, 4)}<small>선점 ${row.claims} · 전설 ${row.legends}</small></span><span class="sc">${row.territories}<small>영토</small></span></li>`; }).join('');
+}
+function renderVs(c){
+  const v = social.vs;
+  if (!v) {
+    $('#vs-sub').textContent = '';
+    $('#vs-body').innerHTML = '<p class="empty">친구 랭킹에서 이름을 누르거나 handle 을 입력하면 두 영토를 비교해요 — 서로 팔로우한 친구이거나 공개 프로필만.</p>';
+    return;
+  }
+  const other = who(v.other.handle), mineN = v.me.regionCount, theirsN = v.other.regionCount;
+  const tot = v.onlyMine.length + v.both.length + v.onlyTheirs.length || 1;
+  const names = arr => arr.slice(0, 6).map(regionLabel).map(esc).join(', ') + (arr.length > 6 ? ` 외 ${arr.length - 6}곳` : '');
+  const cls = {}; v.onlyMine.forEach(cd => cls[api.toClient(cd)] = 'vs-mine'); v.both.forEach(cd => cls[api.toClient(cd)] = 'vs-both'); v.onlyTheirs.forEach(cd => cls[api.toClient(cd)] = 'vs-theirs');
+  $('#vs-sub').textContent = `나 vs ${other}${v.mutual ? ' · 친구' : ''} · 모든 지도 기준`;
   $('#vs-body').innerHTML = `
-    <div class="vs"><div><div class="big" style="color:var(--accent)">${mine.size}</div><div class="who">나</div></div><div class="mid">${diff > 0 ? `${diff}곳 앞섬` : diff < 0 ? `${-diff}곳 뒤짐` : '동점'}</div><div><div class="big" style="color:${fr.color}">${fr.codes.size}</div><div class="who">${esc(fr.name)}</div></div></div>
-    <div class="vsbar"><i class="a" style="width:${100*onlyMe.length/tot}%"></i><i class="c" style="width:${100*both.length/tot}%"></i><i class="b" style="width:${100*onlyFr.length/tot}%"></i></div>
-    <div class="vskey"><span class="a">나만 간 곳 ${onlyMe.length}</span><span class="c">둘 다 ${both.length}</span><span class="b">${esc(fr.name)}만 ${onlyFr.length}</span></div>
+    <div class="vs"><div><div class="big" style="color:var(--accent)" data-vs-mine>${mineN}</div><div class="who">나</div></div><div class="mid">${v.lead > 0 ? `${v.lead}곳 앞섬` : v.lead < 0 ? `${-v.lead}곳 뒤짐` : '동점'}</div><div><div class="big" style="color:var(--gold)" data-vs-theirs>${theirsN}</div><div class="who">${esc(other)}</div></div></div>
+    <div class="vsbar"><i class="a" style="width:${100 * v.onlyMine.length / tot}%"></i><i class="c" style="width:${100 * v.both.length / tot}%"></i><i class="b" style="width:${100 * v.onlyTheirs.length / tot}%"></i></div>
+    <p class="sub" id="vs-basis" style="margin:6px 0 0">모든 지도(개인·공유)에서 칠한 곳을 탐험가 단위로 센 값이에요 — 친구 랭킹과 같은 기준, 프로필 탭 VS 카드는 개인 지도 기준.</p>
+    <div class="vskey"><span class="a" data-vs-only-mine="${v.onlyMine.length}">나만 간 곳 ${v.onlyMine.length}</span><span class="c" data-vs-both="${v.both.length}">둘 다 ${v.both.length}</span><span class="b" data-vs-only-theirs="${v.onlyTheirs.length}">${esc(other)}만 ${v.onlyTheirs.length}</span></div>
+    <svg class="vsmap" id="vs-map" viewBox="0 0 ${W} ${H}" role="img" aria-label="영토 비교 지도">${FEATURES.map(f => `<path d="${path(f)}" data-code="${f.properties.code}" class="${cls[f.properties.code] || ''}"></path>`).join('')}</svg>
     <div class="vslist">
-      <div><b>나만 간 곳</b> · ${names(onlyMe) || '없음'}</div>
-      <div><b>${esc(fr.name)}만 간 곳</b> · ${names(onlyFr) || '없음'}</div>
-      <div><b>둘 다 안 간 곳</b> · ${neither.length}곳 남음 — 먼저 가면 「선점」 표시가 붙어요</div>
+      <div><b>나만 간 곳</b> · ${names(v.onlyMine) || '없음'}</div>
+      <div><b>${esc(other)}만 간 곳</b> · ${names(v.onlyTheirs) || '없음'}</div>
+      <div><b>둘 다 안 간 곳</b> · ${FEATURES.length - tot}곳 남음</div>
     </div>
     <div class="row"><button class="btn sm" id="t-vs-card">비교 카드 만들기</button></div>`;
-  $('#t-vs-card').onclick = () => showCard(vsCard(fr, onlyMe.length, both.length, onlyFr.length));
+  $('#t-vs-card').onclick = () => showCard(vsCard(v));
+}
+async function compareWith(handle){
+  const h = String(handle || '').trim().replace(/^@/, '');
+  if (!h) return;
+  try { social.vs = await api.compare(h); render(); document.documentElement.dataset.vs = h; }
+  catch (e) { toastError(e.code === 'PROFILE_NOT_FOUND' ? Object.assign(e, { message: '비교할 수 없어요 — 서로 팔로우한 친구이거나 공개 프로필만 비교돼요.' }) : e); }
+}
+async function followHandle(handle){
+  const h = String(handle || '').trim().replace(/^@/, '');
+  if (!h) return;
+  try { const r = await api.follow(h); toast('✓', r.mutual ? '친구가 됐어요' : '팔로우했어요', r.mutual ? `@${r.handle}님과 서로 팔로우` : `@${r.handle}님도 팔로우하면 친구가 돼요`); $('#follow-handle').value = ''; await loadSocial(); }
+  // 없는 handle 과 비공개·친구 공개 프로필은 같은 응답(존재 숨김) — 비공개 프로필이라도 팔로우는 남아 상대가 맞팔하면 친구가 된다
+  catch (e) { if (e.code === 'PROFILE_NOT_FOUND') { toast('!', '프로필 없음', 'handle 을 확인해 주세요. 비공개·친구 공개 프로필이라면 상대도 나를 팔로우해야 친구가 돼요.'); $('#follow-handle').value = ''; } else toastError(e); }
+}
+async function unfollowHandle(handle){
+  try { await api.unfollow(handle); toast('✓', '언팔로우', '@' + handle); if (social.vs && social.vs.other.handle === handle) social.vs = null; await loadSocial(); }
+  catch (e) { toastError(e); }
 }
 
 function renderProfile(c){
@@ -1703,14 +1804,16 @@ function recapCard(){
   [['가장 많이 간 시·도', yr.topProv || '—'], ['가장 희귀한 곳', yr.rarest || '—']].forEach(([k,v], i) => { const yy = 450 + i*44; x.font = font(20); x.fillStyle = '#8fb3ad'; x.fillText(k, 640, yy); x.font = font(28, true); x.fillStyle = '#fff'; x.fillText(v, 860, yy-4); });
   footer(x); return cv.toDataURL('image/png');
 }
-function vsCard(fr, onlyMe, both, onlyFr){
+function vsCard(v){
+  // 5단계: 서버 영토 비교(GET /compare/{handle}) 결과로 그린다 — 나만·둘 다·상대만
   const [cv, x] = canvas();
-  const mine = state.visits;
-  drawMap(x, [[50,50],[560,580]], cd => { const a = !!mine[cd], b = fr.codes.has(cd); return a && b ? '#b48af0' : a ? '#2fc3ad' : b ? '#ffd166' : null; });
-  x.font = font(22, false, 500); x.fillStyle = '#8fb3ad'; x.fillText('영토 전쟁', 640, 70);
-  x.font = font(84, true); x.fillStyle = '#2fc3ad'; x.fillText(`${Object.keys(mine).length}`, 634, 105);
+  const fr = { name: who(v.other.handle) }, onlyMe = v.onlyMine.length, both = v.both.length, onlyFr = v.onlyTheirs.length;
+  const mine = new Set([...v.onlyMine, ...v.both].map(api.toClient)), theirs = new Set([...v.onlyTheirs, ...v.both].map(api.toClient));
+  drawMap(x, [[50,50],[560,580]], cd => { const a = mine.has(cd), b = theirs.has(cd); return a && b ? '#b48af0' : a ? '#2fc3ad' : b ? '#ffd166' : null; });
+  x.font = font(22, false, 500); x.fillStyle = '#8fb3ad'; x.fillText('영토 전쟁 · 모든 지도 기준', 640, 70);
+  x.font = font(84, true); x.fillStyle = '#2fc3ad'; x.fillText(`${mine.size}`, 634, 105);
   x.fillStyle = '#5f8f87'; x.font = font(40, true); x.fillText('vs', 800, 130);
-  x.fillStyle = '#ffd166'; x.font = font(84, true); x.fillText(`${fr.codes.size}`, 880, 105);
+  x.fillStyle = '#ffd166'; x.font = font(84, true); x.fillText(`${theirs.size}`, 880, 105);
   x.font = font(24); x.fillStyle = '#cfe6e1'; x.fillText(`KOBI`, 640, 200); x.fillText(fr.name, 880, 200);
   [['나만 간 곳', onlyMe, '#2fc3ad'], ['둘 다 간 곳', both, '#b48af0'], [`${fr.name}만 간 곳`, onlyFr, '#ffd166']].forEach(([k,v,col], i) => { const yy = 280 + i*58; x.fillStyle = col; x.fillRect(640, yy+8, 14, 14); x.font = font(22); x.fillStyle = '#8fb3ad'; x.fillText(k, 668, yy); x.font = font(34, true); x.fillStyle = '#fff'; x.fillText(`${v}곳`, 900, yy-6); });
   footer(x); return cv.toDataURL('image/png');
@@ -1728,7 +1831,19 @@ $('#t-detail').onclick = () => setMode('detail');
 $('#t-reset-view').onclick = () => { highlight = null; render(); resetView(); };
 $('#prov').addEventListener('click', ev => { const b = ev.target.closest('[data-prov]'); if (b) zoomTo(FEATURES.filter(f => f.properties.prov === b.dataset.prov)); });
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-show]'); if (b) showOnMap(b.dataset.show); });
-$('#rank').addEventListener('click', ev => { const b = ev.target.closest('[data-vs]'); if (b && b.dataset.vs) { state.vsFriend = b.dataset.vs; save(); render(); } });
+$('#rank').addEventListener('click', ev => { const b = ev.target.closest('[data-vs]'); if (b && b.dataset.vs) compareWith(b.dataset.vs); });
+$('#friends').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.compare) compareWith(b.dataset.compare);
+  else if (b.dataset.unfollow) unfollowHandle(b.dataset.unfollow);
+  else if (b.dataset.follow) followHandle(b.dataset.follow);
+});
+$('#t-follow').onclick = () => followHandle($('#follow-handle').value);
+$('#follow-handle').addEventListener('keydown', ev => { if (ev.key === 'Enter') followHandle($('#follow-handle').value); });
+$('#t-compare').onclick = () => compareWith($('#compare-handle').value);
+$('#compare-handle').addEventListener('keydown', ev => { if (ev.key === 'Enter') compareWith($('#compare-handle').value); });
+$('#t-rank-login').onclick = () => setTab('profile');
+$('#tabs').addEventListener('click', ev => { const b = ev.target.closest('[data-tab]'); if (b && b.dataset.tab === 'rank') loadSocial().catch(e => toastError(e)); });
 $('#titles').addEventListener('click', async ev => {
   const b = ev.target.closest('[data-title]'); if (!b || b.disabled) return;
   try { prog = await api.selectTitle(b.dataset.title); render(); toast('✓', '칭호 변경', prog.title.name); }
@@ -1894,7 +2009,7 @@ function renderSharing(){
   $('#t-open-profile').hidden = !link; if (link) $('#t-open-profile').href = sharing.profileUrl;
   $('#share-privacy').hidden = !sharing.handle;
   $('#privacy-select').value = sharing.visibility;
-  $('#privacy-note').textContent = sharing.visibility === 'FRIENDS' ? '친구 공개는 친구 기능(5단계)이 생기기 전까지 비공개처럼 동작해요 — 공개 프로필이 열리지 않아요.'
+  $('#privacy-note').textContent = sharing.visibility === 'FRIENDS' ? '친구 공개 — 서로 팔로우한 친구에게만 공개 프로필·카드가 열려요. 그 밖의 사람에겐 비공개처럼 보이지 않아요.'
     : sharing.visibility === 'PRIVATE' ? '비공개(기본) — 공개 프로필·카드 링크가 열리지 않아요(존재 여부도 숨겨요). "공개하기"를 켜면 열려요.'
     : '전체 공개 — 공개 프로필엔 색칠·집계만 보여요. 메모·사진은 비공개, 날짜는 월 단위로만.';
   $('#t-publish').hidden = sharing.publiclyVisible;
@@ -1942,7 +2057,7 @@ function start(hot){
   const h = (location.hash || '').slice(1);
   if (['map','bag','sets','quests','rank','profile'].includes(h)) setTab(h);
   render();
-  loadAccount().then(() => refresh()).then(() => refreshMaps()).then(() => joinFromProfileLink()).then(() => refreshProgress(false)).then(() => refreshWardrobe(false)).then(() => { if (tab === 'profile') loadSharing(); }).catch(e => toastError(e));
+  loadAccount().then(() => refresh()).then(() => refreshMaps()).then(() => joinFromProfileLink()).then(() => refreshProgress(false)).then(() => refreshWardrobe(false)).then(() => { if (tab === 'profile') loadSharing(); }).then(() => tab === 'rank' ? loadSocial() : loadPercentile().then(() => render())).catch(e => toastError(e));
 }
 if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => ({ state, sampleMode }));
 (window.claude && window.claude.hot && window.claude.hot.ready) ? window.claude.hot.ready(start) : start((window.claude && window.claude.hot && window.claude.hot.data) || {});

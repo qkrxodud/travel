@@ -132,6 +132,12 @@ public final class Visits {
             .min(Comparator.comparing(Visit::claimRankAt).thenComparing(Visit::visitedAt));
     }
 
+    /** 지역 안 선점 순서(1 = 선점, 2 = 다음 …) — 보이는 방문 중 이 방문보다 선점 순서가 앞선 방문 수 + 1(5단계 지도 안 랭킹). */
+    public int claimOrder(Visit visit) {
+        return 1 + (int) visible().filter(other -> other != visit && other.regionCode().equals(visit.regionCode()))
+            .filter(other -> other.claimsBefore(visit)).count();
+    }
+
     /** 지역마다 선점 방문(지역 코드 순). */
     public List<Visit> claims() {
         return regions().stream().map(region -> claimOf(region.code()).orElseThrow())

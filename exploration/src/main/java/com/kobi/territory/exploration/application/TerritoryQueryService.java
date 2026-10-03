@@ -2,6 +2,7 @@ package com.kobi.territory.exploration.application;
 
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
+import com.kobi.territory.exploration.api.query.MapVisitView;
 import com.kobi.territory.exploration.api.query.ProfileMapView;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
 import com.kobi.territory.exploration.domain.territory.ConquestRate;
@@ -103,6 +104,15 @@ public class TerritoryQueryService implements TerritoryQuery {
         ExplorerId owner = ExplorerId.of(explorerId);
         return maps.mapsOf(owner).stream().filter(map -> map.openToProfileOf(owner))
             .map(map -> new ProfileMapView(map.id().value(), map.name(), map.memberCount(), ExpeditionMap.MAX_MEMBERS))
+            .toList();
+    }
+
+    @Override
+    public List<MapVisitView> mapVisits(String mapId) {
+        Territory territory = territories.load(MapId.of(mapId));
+        return territory.visits().stream()
+            .map(visit -> new MapVisitView(visit.checkedInBy().value(), visit.regionCode().value(), visit.region().rarity(),
+                territory.claimOrderOf(visit), visit.disputed()))
             .toList();
     }
 }

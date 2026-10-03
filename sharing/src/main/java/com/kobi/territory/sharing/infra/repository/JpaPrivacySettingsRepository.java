@@ -4,6 +4,8 @@ import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.sharing.domain.privacy.PrivacySettings;
 import com.kobi.territory.sharing.domain.privacy.PrivacySettingsRepository;
 import com.kobi.territory.sharing.infra.entity.PrivacySettingsJpaEntity;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -20,6 +22,12 @@ class JpaPrivacySettingsRepository implements PrivacySettingsRepository {
     @Override
     public Optional<PrivacySettings> find(ExplorerId explorerId) {
         return rows.findById(explorerId.value()).map(PrivacySettingsJpaEntity::toDomain);
+    }
+
+    @Override
+    public List<PrivacySettings> findAll(Collection<ExplorerId> explorerIds) {
+        return rows.findAllById(explorerIds.stream().map(ExplorerId::value).toList()).stream()
+            .map(PrivacySettingsJpaEntity::toDomain).toList();
     }
 
     @Override

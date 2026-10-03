@@ -271,7 +271,17 @@ public final class Territory {
 
     /** viewer 가 보는 방문 한 건(이 지도의 선점 여부 포함). */
     public VisitView viewOf(Visit visit, ExplorerId viewer) {
-        return VisitView.of(visit, viewer, visits.claimOf(visit.regionCode()).filter(claim -> claim == visit).isPresent());
+        return VisitView.of(visit, viewer, isClaim(visit));
+    }
+
+    /** 이 방문이 지금 그 지역의 선점(보이는 방문 중 선점 순서가 가장 이른 것)인지. */
+    public boolean isClaim(Visit visit) {
+        return visits.claimOf(visit.regionCode()).filter(claim -> claim == visit).isPresent();
+    }
+
+    /** 지역 안 선점 순서(1 = 선점) — 지도 안 랭킹(5단계)이 이의 방문을 빼고 다음 방문을 선점으로 셀 때 쓴다(QA Q1). */
+    public int claimOrderOf(Visit visit) {
+        return visits.claimOrder(visit);
     }
 
     /** 지도에 칠해진 지역(멤버 무관, 중복 제거). */

@@ -143,7 +143,7 @@ class Java2dCardRenderer implements CardRenderer {
     }
 
     private void versus(Graphics2D graphics, CardContent.Versus card) {
-        text(graphics, "영토 전쟁", 640, 70, fonts.bold(22), LABEL, 520);
+        text(graphics, "영토 전쟁 · 개인 지도 기준", 640, 70, fonts.bold(22), LABEL, 520); // 5단계 리더 결정 3 — 랭킹 탭 비교(모든 지도)와 기준이 다름
         text(graphics, String.valueOf(card.tally().mine()), 634, 105, fonts.display(84), MINE, 160);
         text(graphics, "vs", 800, 130, fonts.display(40), FOOTER, 70);
         text(graphics, String.valueOf(card.tally().theirs()), 880, 105, fonts.display(84), HIGHLIGHT, 260);

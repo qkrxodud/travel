@@ -15,4 +15,10 @@ public interface ExplorerProfileQuery {
 
     /** 계정 연결된 활성 탐험가인지(로그인 여부). */
     boolean accountLinked(String explorerId);
+
+    /**
+     * 병합돼 비활성인 탐험가(from)면 병합된 계정 탐험가(into) id, 아니면 빈 값(5단계 — 병합 뒤 늦게 도착한 from 앞 이벤트를 into 로
+     * 돌릴 때: 소셜 피드 귀속, 꾸미기 초대 보상 N1).
+     */
+    Optional<String> mergedInto(String explorerId);
 }

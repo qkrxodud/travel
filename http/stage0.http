@@ -9,8 +9,14 @@ GET {{host}}/health
 ### Actuator 헬스 → {"status":"UP"}
 GET {{host}}/actuator/health
 
-### [local 전용] 전체 데이터 초기화 (0단계 no-op) → 204
+### [local 전용] 전체 데이터 초기화 → 204
 DELETE {{host}}/dev/reset
 
-### [local 전용] 테스트 시드 투입 (0단계 no-op) → 204
+### 익명 탐험가 발급 → 201 {explorerId, personalMapId, accessToken}
+POST {{host}}/explorers
+
+> {% client.global.set("token", response.body.accessToken); %}
+
+### [local 전용] 프로토타입 예시 시드(현재 탐험가 — X-Explorer-Token 필수, 1단계부터. 토큰 없으면 401 EXPLORER_TOKEN_REQUIRED — 4단계 QA N2 정정) → 200 {seeded:45}
 POST {{host}}/dev/seed
+X-Explorer-Token: {{token}}

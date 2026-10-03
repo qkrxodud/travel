@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
@@ -64,6 +65,13 @@ public class OutboxRelay {
     private final Clock retryClock = Clock.systemUTC();
     /** 일시정지 요청 수(P3-R3-4 — /dev/reset 동시 호출: 마지막 resume 이 끝나야 다시 돈다). */
     private final AtomicInteger pauses = new AtomicInteger();
+    /** 전달을 멈춘 구독자(5단계 친구 소식 재구성 — 그 구독자만 멈추고 나머지는 계속 전달한다). */
+    private final Set<String> pausedSubscribers = ConcurrentHashMap.newKeySet();
+    /**
+     * 멈춘 구독자 몫만 남은 행(그 밖의 구독자에겐 모두 전달됨) — 정지 동안 주기마다 전달 기록 조회·역직렬화를 다시 하지 않고 건너뛴다
+     * (QA r2 P3-C). 구독자를 재개하면 비운다.
+     */
+    private final Set<Long> parkedRows = ConcurrentHashMap.newKeySet();
     private final int maxAttempts;
     private final Duration conflictRetryLimit;
     private final RetryBackoff backoff;
@@ -103,23 +111,42 @@ public class OutboxRelay {
         pauses.updateAndGet(count -> Math.max(0, count - 1));
     }
 
+    /**
+     * 한 구독자만 멈춘다(5단계 — 읽기 모델 재구성 동안 그 구독자 몫은 대기로 남고, 다른 구독자는 계속 받는다). 즉시 효력(QA r2 P3-C — 진행
+     * 중인 주기를 기다리지 않는다): 이 주기의 다음 행부터 그 구독자에게 보내지 않는다. 그 순간 이미 처리 중인 한 건은 끝까지 가지만 투영이
+     * 멱등이고 그 행은 outbox 에 있어 재생에도 포함되므로 결과는 같다. 반드시 finally 에서 {@link #resumeSubscriber} 와 짝.
+     */
+    public void pauseSubscriber(String subscriberId) {
+        pausedSubscribers.add(subscriberId);
+    }
+
+    public void resumeSubscriber(String subscriberId) {
+        pausedSubscribers.remove(subscriberId);
+        parkedRows.clear();
+    }
+
     @Scheduled(fixedDelayString = "${territory.outbox.relay.delay-ms:1000}")
     public synchronized void relay() {
         if (pauses.get() > 0) return;
         Set<String> stalledLanes = new HashSet<>(); // 이번 주기에 앞 이벤트가 끝나지 않아 멈춘 (aggregateId|구독자)
         long cursor = 0;
-        List<OutboxEventEntity> page;
+        int fetched;
         do {
-            page = events.findByPublishedAtIsNullAndIdGreaterThanOrderByIdAsc(cursor, Limit.of(PAGE));
-            Map<Long, Map<String, OutboxDeliveryEntity>> pageState = deliveries
-                .findByEventIdIn(page.stream().map(OutboxEventEntity::id).toList()).stream()
+            // 정지 중 건너뛸 행(parkedRows)이 있으면 id 만 먼저 읽고 나머지 행만 불러온다 — 본문(payload)·전달 기록을 매 주기 다시 읽지 않게
+            List<Long> ids = events.findUnpublishedIdsAfter(cursor, Limit.of(PAGE));
+            fetched = ids.size();
+            if (ids.isEmpty()) break;
+            cursor = ids.get(ids.size() - 1);
+            List<Long> activeIds = ids.stream().filter(id -> !parkedRows.contains(id)).toList();
+            if (activeIds.isEmpty()) continue;
+            List<OutboxEventEntity> page = events.findByIdInOrderByIdAsc(activeIds);
+            Map<Long, Map<String, OutboxDeliveryEntity>> pageState = deliveries.findByEventIdIn(activeIds).stream()
                 .collect(Collectors.groupingBy(OutboxDeliveryEntity::eventId,
                     Collectors.toMap(OutboxDeliveryEntity::subscriber, Function.identity())));
             for (OutboxEventEntity row : page) {
-                cursor = row.id();
                 relayRow(row, pageState.getOrDefault(row.id(), Map.of()), stalledLanes);
             }
-        } while (page.size() == PAGE);
+        } while (fetched == PAGE);
         reportStalled();
     }
 
@@ -141,11 +168,13 @@ public class OutboxRelay {
         DomainEvent event = parsed.get();
         Instant now = retryClock.instant();
         boolean allDelivered = true;
+        boolean onlyPausedLeft = true;
         for (EventSubscriber subscriber : subscribersOf(event)) {
             OutboxDeliveryEntity delivery = state.get(subscriber.id());
             if (delivery != null && delivery.delivered()) continue;
             String lane = row.aggregateId() + "|" + subscriber.id();
-            boolean blocked = stalledLanes.contains(lane)
+            if (!pausedSubscribers.contains(subscriber.id())) onlyPausedLeft = false;
+            boolean blocked = stalledLanes.contains(lane) || pausedSubscribers.contains(subscriber.id())
                 || (delivery != null && (delivery.failed() || delivery.waitingAt(now)));
             if (blocked || !deliver(row, event, subscriber)) {
                 stalledLanes.add(lane);
@@ -155,6 +184,8 @@ public class OutboxRelay {
         if (allDelivered) {
             markPublished(row.id());
             notifyListeners(event);
+        } else if (onlyPausedLeft) {
+            parkedRows.add(row.id());
         }
     }
 

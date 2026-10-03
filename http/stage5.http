@@ -1,0 +1,254 @@
+### 5단계(소셜) 왕복 확인 — IntelliJ HTTP Client / VS Code REST Client(쿠키를 유지하는 클라이언트 기준으로 순서대로 통과)
+### 서버: ./gradlew :app-api:bootRun   (8080이 점유돼 있으면 --args='--server.port=18080' 으로 띄우고 아래 @host 를 바꾼다)
+### 두 사람(김·이)을 한 쿠키 저장소로 다루므로 /dev/login 으로 번갈아 로그인한다(같은 이메일로 다시 로그인하면 SIGNED_IN — 같은 탐험가).
+### 세션 변경 요청은 쿠키 XSRF-TOKEN 값을 헤더 X-XSRF-TOKEN 으로. 다른 익명 탐험가 단계만 `Cookie: JSESSIONID=none` 으로 세션을 뗀다.
+### 친구 소식·탐험가 단위 지역 수는 outbox 릴레이(비동기, local 300ms)로 반영 — 체크인 뒤 1초쯤 뒤에 조회한다.
+@host = http://localhost:8080
+
+### 0. [local] 전체 초기화 → 204
+DELETE {{host}}/dev/reset
+
+### 1. 세션 상태(XSRF 쿠키 받기) → 200 {loggedIn:false}
+GET {{host}}/auth/session
+
+> {% const xsrf = (response.headers.valuesOf("Set-Cookie") || []).find(v => v.startsWith("XSRF-TOKEN=")); if (xsrf) client.global.set("xsrf", xsrf.split(";")[0].substring("XSRF-TOKEN=".length)); %}
+
+### 2. 이 로그인(새 계정) → 200 {outcome:CREATED, handle:explorer-xxxx}
+POST {{host}}/dev/login
+Content-Type: application/json
+
+{"email": "lee.social@example.com"}
+
+> {% client.global.set("leeHandle", response.body.handle); client.global.set("leeId", response.body.explorerId); %}
+
+### 3. 이 체크인: 종로 → 201
+POST {{host}}/visits
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"regionCode": "KR-11010", "visitDate": "2026-10-01"}
+
+### 4. 이 체크인: KR-26010(울산 중구) → 201
+POST {{host}}/visits
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"regionCode": "KR-26010", "visitDate": "2026-10-02"}
+
+### 5. 이 공개 범위 = 친구 공개 → 200 {visibility:FRIENDS, publiclyVisible:false}
+PUT {{host}}/me/privacy
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"visibility": "FRIENDS"}
+
+### 5-1. 주인 본인은 친구 공개여도 자기 공개 프로필을 본다(미리보기) → 200 HTML, Cache-Control: private, Vary: Cookie
+GET {{host}}/u/{{leeHandle}}
+
+### 6. 김 로그인(새 계정) → 200 {outcome:CREATED}
+POST {{host}}/dev/login
+Content-Type: application/json
+
+{"email": "kim.social@example.com"}
+
+> {% client.global.set("kimHandle", response.body.handle); client.global.set("kimId", response.body.explorerId); %}
+
+### 7. 김 체크인: 종로 → 201
+POST {{host}}/visits
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"regionCode": "KR-11010", "visitDate": "2026-10-01"}
+
+### 8. 김 체크인: 울릉군(전설) → 201
+POST {{host}}/visits
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"regionCode": "KR-37430", "visitDate": "2026-10-02"}
+
+### 9. 김 → 이의 공개 프로필: 친구 공개인데 아직 친구가 아님 → 404(비공개와 같은 응답)
+GET {{host}}/u/{{leeHandle}}
+
+### 10. 김이 이를 팔로우 — 이는 친구 공개(김에게 숨은 프로필) → 404 PROFILE_NOT_FOUND(없는 handle 과 같은 응답). 팔로우는 기록된다
+POST {{host}}/friends/{{leeHandle}}
+X-XSRF-TOKEN: {{xsrf}}
+
+### 11. 다시 팔로우 → 404(숨은 대상은 409 로도 존재를 알리지 않는다)
+POST {{host}}/friends/{{leeHandle}}
+X-XSRF-TOKEN: {{xsrf}}
+
+### 12. 자기 자신 → 422 CANNOT_FOLLOW_SELF
+POST {{host}}/friends/{{kimHandle}}
+X-XSRF-TOKEN: {{xsrf}}
+
+### 13. 없는 handle → 404 PROFILE_NOT_FOUND
+POST {{host}}/friends/nobody-zz
+X-XSRF-TOKEN: {{xsrf}}
+
+### 14. 한쪽 팔로우 + 친구 공개 → 영토 비교 404 PROFILE_NOT_FOUND
+GET {{host}}/compare/{{leeHandle}}
+
+### 14-1. 김의 친구 목록 — 숨은 대상에 대한 한쪽 팔로우는 보이지 않는다 → 200 {mutualCount:0, people:[]}
+GET {{host}}/friends
+
+### 15. 이 로그인(같은 이메일 → SIGNED_IN) → 200
+POST {{host}}/dev/login
+Content-Type: application/json
+
+{"email": "lee.social@example.com"}
+
+### 15-1. 이의 친구 목록 — 김이 나를 팔로우 중 → 200 {people:[{handle:김, following:false, follower:true, mutual:false}]}
+GET {{host}}/friends
+
+### 16. 이가 김을 팔로우(김은 비공개지만 나를 팔로우 중 → 맞팔 = 친구) → 201 {following:true, follower:true, mutual:true}
+POST {{host}}/friends/{{kimHandle}}
+X-XSRF-TOKEN: {{xsrf}}
+
+### 17. 김 로그인(SIGNED_IN) → 200
+POST {{host}}/dev/login
+Content-Type: application/json
+
+{"email": "kim.social@example.com"}
+
+### 18. 친구 목록 → 200 {loggedIn:true, mutualCount:1, people:[{handle:이, following:true, follower:true, mutual:true}]}
+GET {{host}}/friends
+
+### 18-1. 이제 이의 프로필이 김에게 보이므로 중복 팔로우는 → 409 ALREADY_FOLLOWING
+POST {{host}}/friends/{{leeHandle}}
+X-XSRF-TOKEN: {{xsrf}}
+
+### 19. 친구가 된 뒤 이의 공개 프로필 → 200 HTML(친구 공개 — 맞팔에게만)
+GET {{host}}/u/{{leeHandle}}
+
+### 20. 영토 비교 → 200 {mutual:true, onlyMine:[KR-37430], both:[KR-11010], onlyTheirs:[KR-26010], lead:0}
+GET {{host}}/compare/{{leeHandle}}
+
+### 21. 친구 랭킹 → 200 {friendCount:1, baseline:null, rows:[…2명 — 탐험가 단위 중복 제거 지역 수·레벨]} (이는 친구 공개라 맞팔인 김에게 보임)
+GET {{host}}/rankings/friends
+
+### 22. 친구 소식 → 200 {items:[이의 KR-26010·KR-11010 발 도장(when "오늘"), 레벨·뱃지 소식…]} — 정확한 시각·메모 없음
+GET {{host}}/feed
+
+### 23. 김이 공유 지도 만들기 → 201 {mapId, inviteCode}
+POST {{host}}/maps
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"name": "울릉 원정대"}
+
+> {% client.global.set("mapId", response.body.mapId); client.global.set("inviteCode", response.body.inviteCode); %}
+
+### 24. 김 공유 지도 체크인: 울릉군(선점) → 201
+POST {{host}}/visits
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"regionCode": "KR-37430", "visitDate": "2026-10-02", "mapId": "{{mapId}}"}
+
+### 25. 이 로그인 → 200
+POST {{host}}/dev/login
+Content-Type: application/json
+
+{"email": "lee.social@example.com"}
+
+### 26. 이 초대코드로 합류 → 200
+POST {{host}}/maps/join
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"inviteCode": "{{inviteCode}}"}
+
+### 27. 이 공유 지도 체크인: 울릉군(선점 아님) → 201
+POST {{host}}/visits
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"regionCode": "KR-37430", "visitDate": "2026-10-03", "mapId": "{{mapId}}"}
+
+### 28. 이 공유 지도 체크인: 경주시(선점 — 곧 이의 표시) → 201
+POST {{host}}/visits
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"regionCode": "KR-37020", "visitDate": "2026-10-03", "mapId": "{{mapId}}"}
+
+### 29. 김 로그인 → 200
+POST {{host}}/dev/login
+Content-Type: application/json
+
+{"email": "kim.social@example.com"}
+
+### 29-1. 김 공유 지도 체크인: 경주시(두 번째 — 이의 뒤엔 선점으로 센다) → 201
+POST {{host}}/visits
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"regionCode": "KR-37020", "visitDate": "2026-10-03", "mapId": "{{mapId}}"}
+
+### 30. 지도장 김이 이의 경주시 방문에 이의 표시 → 200 {disputed:true}
+PUT {{host}}/maps/{{mapId}}/visits/KR-37020/{{leeId}}/dispute
+X-XSRF-TOKEN: {{xsrf}}
+Content-Type: application/json
+
+{"disputed": true}
+
+### 31. 지도 안 랭킹 → 200 {disputedExcluded:1, rows:[김 영토2·선점2·전설1 1위(경주시 선점이 이의 표시된 이에서 김으로), 이 영토1·선점0·전설1 2위]}
+GET {{host}}/rankings/maps/{{mapId}}
+
+### 32. 상위 % (배치 전) → 200 {computed:false}
+GET {{host}}/rankings/me/percentile
+
+### 33. [local] 일 1회 집계 배치 수동 실행 → 200 {population:2(지역 1곳 이상인 활성 탐험가 — 김·이), ranked:2, regions:4, provinces:2(경북 + 전국), overflowed:0}
+POST {{host}}/dev/batch/rank
+
+### 34. 김의 상위 % → 200 {computed:true, rank:2, population:2, topPercent:100, regionCount:3} — 이가 4곳(경주시 포함, 이의 표시는 탐험가 단위 집계와 무관)
+GET {{host}}/rankings/me/percentile
+
+### 35. 지역별 방문자 비율 → 200 {population:2, regions:[{regionCode:KR-11010, visitorCount:2, visitorPercent:100.0}, …]}
+GET {{host}}/catalog/region-stats
+
+### 36. [local] 친구 소식 재구성(운영 /admin/rebuild/feed 와 같은 작업 — 다음 세대에 재생 후 교체, 끝날 때까지 기다림) → 200 {state:SUCCEEDED, generation:(다음 세대), replayed, skipped:0, unreadable:0}
+POST {{host}}/dev/rebuild/feed
+
+### 36-1. [운영] 재구성 시작(관리자 토큰, 비동기 — 운영 도구는 세션 없이 호출, 세션이 있으면 CSRF 도 필요) → 202 {state:RUNNING, generation:(다음 세대)} (이미 진행 중이면 409)
+POST {{host}}/admin/rebuild/feed
+X-Admin-Token: local-admin-token
+Cookie: JSESSIONID=none
+
+### 36-2. [운영] 재구성 상태 → 200 {state:RUNNING|SUCCEEDED, generation, replayed, skipped}
+GET {{host}}/admin/rebuild/feed
+X-Admin-Token: local-admin-token
+
+### 36-3. 관리자 토큰 없이 → 401
+GET {{host}}/admin/rebuild/feed
+
+### 37. 재구성 뒤 친구 소식 → 200 (22번과 같은 소식 + 이의 공유 지도 발 도장 — 같은 지역은 한 번만)
+GET {{host}}/feed
+
+### 38. 언팔로우 → 204
+DELETE {{host}}/friends/{{leeHandle}}
+X-XSRF-TOKEN: {{xsrf}}
+
+### 39. 다시 언팔로우 → 204(멱등 — 없는 handle·팔로우 안 함도 같은 응답)
+DELETE {{host}}/friends/{{leeHandle}}
+X-XSRF-TOKEN: {{xsrf}}
+
+### 40. 친구가 아니게 되자 이의 공개 프로필 → 404
+GET {{host}}/u/{{leeHandle}}
+
+### 41. 다른 기기의 익명 탐험가 발급(세션 뗌) → 201
+POST {{host}}/explorers
+Cookie: JSESSIONID=none
+
+> {% client.global.set("anonToken", response.body.accessToken); %}
+
+### 42. 익명은 팔로우할 수 없다 → 401 LOGIN_REQUIRED
+POST {{host}}/friends/{{kimHandle}}
+X-Explorer-Token: {{anonToken}}
+Cookie: JSESSIONID=none
+
+### 43. 익명 친구 랭킹 → 200 {loggedIn:false, rows:[나 한 줄], baseline:{전국 평균}}
+GET {{host}}/rankings/friends
+X-Explorer-Token: {{anonToken}}
+Cookie: JSESSIONID=none

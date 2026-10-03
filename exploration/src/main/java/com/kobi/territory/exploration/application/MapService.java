@@ -117,7 +117,7 @@ public class MapService {
         ExpeditionMap map = lock(mapId);
         mapAccess.requireActiveLocked(explorerId); // 지도 X → 탐험가 S(병합과 직렬화, 4단계)
         Instant now = clock.instant();
-        JoinResult result = map.joinViaProfile(profileOwner, profileGate.profileOpen(profileOwner), explorerId, now,
+        JoinResult result = map.joinViaProfile(profileOwner, profileGate.profileOpenTo(profileOwner, explorerId), explorerId, now,
             settings.leaveGrace());
         maps.save(map);
         publishJoined(map, explorerId, result, now);

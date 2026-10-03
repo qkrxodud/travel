@@ -33,7 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 면제, 요약이 바뀌면 최소 TTL 뒤). 렌더(PNG)·이미지 저장은 트랜잭션 밖, 기록만 짧은 트랜잭션. 이미지 키에 기준 해시가 들어가므로
  * 동시 렌더가 엇갈려도 "DB 기준 ≠ 저장 이미지"가 되지 않는다(QA P3-4) — 기록에 진 쪽은 자기 파일을 지운다.
  * <p>
- * 공개 경로는 공개 범위가 PUBLIC 일 때만(아니면 PROFILE_NOT_FOUND — 존재 숨김). 내 카드 미리보기는 공개 범위와 무관하다.
+ * 공개 경로는 공개 범위가 보는 사람에게 열려 있을 때만(PUBLIC, FRIENDS 는 맞팔로우 — 5단계, 아니면 PROFILE_NOT_FOUND — 존재 숨김). 내 카드 미리보기는 공개 범위와 무관하다.
  * VS 카드는 저장하지 않고 메모리 캐시만(QA P3-9).
  */
 @Service
@@ -67,17 +67,20 @@ public class ShareCardService {
         this.writeTx = new TransactionTemplate(transactionManager);
     }
 
-    /** GET /u/{handle}/card/{kind}.png — 공개 프로필 주인의 카드. */
-    public CardImage publicCard(String handle, String kind) {
+    /** GET /u/{handle}/card/{kind}.png — 공개 프로필 주인의 카드(viewer = 보는 사람, 익명이면 null). */
+    public CardImage publicCard(String handle, String kind, ExplorerId viewer) {
         CardKind cardKind = CardKind.parseSolo(kind);
-        ExplorerId owner = publicOwner(handle);
+        ExplorerId owner = publicOwner(handle, viewer);
         return soloCard(owner, profiles.handleOf(owner.value()).orElse(null), cardKind);
     }
 
-    /** GET /u/{handle}/vs/{otherHandle}.png — 두 탐험가가 모두 공개일 때만. 자기 자신과의 비교는 없다(404). */
-    public CardImage publicVersus(String handle, String otherHandle) {
-        ExplorerId owner = publicOwner(handle);
-        ExplorerId other = publicOwner(otherHandle);
+    /**
+     * GET /u/{handle}/vs/{otherHandle}.png — 두 탐험가의 프로필이 모두 보는 사람에게 열려 있을 때만(PUBLIC, 또는 FRIENDS 인데 보는
+     * 사람과 맞팔로우 — 5단계). 비교 계산은 소셜 영토 비교와 같은 공유 커널 함수(TerritoryComparison).
+     */
+    public CardImage publicVersus(String handle, String otherHandle, ExplorerId viewer) {
+        ExplorerId owner = publicOwner(handle, viewer);
+        ExplorerId other = publicOwner(otherHandle, viewer);
         Showcase mine = showcases.read(owner.value(), profiles.handleOf(owner.value()).orElse(null));
         Showcase theirs = showcases.read(other.value(), profiles.handleOf(other.value()).orElse(null));
         String key = mine.pairHash(theirs, CardKind.VS.name() + "@" + Year.now(clock));
@@ -124,10 +127,10 @@ public class ShareCardService {
         return new CardBasis(showcase.summaryHash(kind.name() + "@" + year), showcase.handle());
     }
 
-    private ExplorerId publicOwner(String handle) {
+    private ExplorerId publicOwner(String handle, ExplorerId viewer) {
         ExplorerId owner = profiles.explorerIdByHandle(handle).map(ExplorerId::of)
             .orElseThrow(SharingError.PROFILE_NOT_FOUND::exception);
-        privacy.requireVisibleToPublic(owner);
+        privacy.requireVisibleTo(owner, viewer);
         return owner;
     }
 

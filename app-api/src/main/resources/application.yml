@@ -16,6 +16,8 @@ spring:
           preferred_instant_jdbc_type: TIMESTAMP
         jdbc:
           time_zone: UTC
+          # 5단계: 할당 id 엔티티의 여러 insert 를 JDBC 배치로(상위 % 배치 스냅숏 저장 — QA P3-7). IDENTITY 엔티티는 배치되지 않는다.
+          batch_size: 100
   jackson:
     time-zone: Asia/Seoul
 
@@ -92,6 +94,17 @@ territory:
     # 재계산 예약 배치(병합 뒤 진행·인벤토리 재계산 — 보류 규칙을 만족할 때까지 주기마다 다시 본다)
     enabled: true
     delay-ms: 2000
+  social:
+    # 5단계 소셜. 친구 소식 한 번에 보여 줄 건수
+    feed-size: 30
+    # 일 1회 집계 배치(상위 %·지역별 방문자 비율·시·도 평균) — cron(초 분 시 일 월 요일, territory.time-zone 기준). "-" 면 끔.
+    # 설계의 Redis 대신 DB(rank_percentile·region_stats·province_stats) + 애플리케이션 캐시 — Redis 는 트래픽이 생긴 뒤.
+    rank-batch-cron: "0 30 4 * * *"
+    # 배치 스냅숏 애플리케이션 캐시 시간(인스턴스 메모리). 배치가 끝나면 그 인스턴스는 바로 비운다.
+    stats-cache-ttl: 5m
+    feed-rebuild:
+      # 친구 소식 재구성에서 허용할 처리 실패 건수 — 넘으면 FAILED(이전 세대 유지). 읽을 수 없는 예전 outbox 행은 세지 않는다.
+      max-skipped: 0
   progression:
     # 운영 재계산 배치 진입점: 기동 시 모든 탐험가의 진행·도감·퀘스트를 Territory 로부터 다시 만든다(정의 변경·버그 복구용).
     #   java -jar territory.jar --territory.progression.recalculate-on-startup=true

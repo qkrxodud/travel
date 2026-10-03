@@ -58,7 +58,8 @@ test.describe('4단계 공유 ↔ 서버', () => {
     await expect(page.locator('#t-copy')).toBeEnabled();
     // 기본 공개 범위 PRIVATE(사용자 결정 Q1) — "공개하기" 전에는 /u/{handle} 이 404
     await expect(page.locator('#privacy-select')).toHaveValue('PRIVATE');
-    expect((await page.request.get(`/u/${handle}`)).status()).toBe(404);
+    expect((await request.get(`/u/${handle}`)).status()).toBe(404);       // 방문자(세션 없음)
+    expect((await page.request.get(`/u/${handle}`)).status()).toBe(200);  // 주인 본인은 비공개여도 미리보기(5단계 리더 결정 2)
     for (const kind of ['territory', 'recent', 'recap']) {
       const img = page.locator(`#card-${kind}`);
       await expect(img).toHaveAttribute('data-loaded', 'true', LATE);
@@ -95,9 +96,9 @@ test.describe('4단계 공유 ↔ 서버', () => {
     await expect(page.locator('html')).toHaveAttribute('data-profile-visibility', 'PRIVATE');
     expect((await visitor.page.request.get(`/u/${handle}`)).status()).toBe(404);
     expect((await visitor.page.request.get(`/u/${handle}/card/territory.png`)).status()).toBe(404);
-    // FRIENDS 는 5단계 전까지 PRIVATE 처럼
+    // FRIENDS(5단계) — 서로 팔로우한 친구에게만 열린다. 로그아웃 방문자에겐 PRIVATE 처럼 404
     await page.selectOption('#privacy-select', 'FRIENDS');
-    await expect(page.locator('#privacy-note')).toContainText('비공개처럼');
+    await expect(page.locator('#privacy-note')).toContainText('서로 팔로우한 친구에게만');
     expect((await visitor.page.request.get(`/u/${handle}`)).status()).toBe(404);
     await page.click('#t-publish');
     await expect(page.locator('html')).toHaveAttribute('data-profile-visibility', 'PUBLIC');

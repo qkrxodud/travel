@@ -1,5 +1,10 @@
 dependencies {
     api project(':common')
+    // 5단계: 탐험(공개 이벤트·Query — 체크인·병합, handle·지도 방문)과 진행(공개 이벤트·Query — 레벨·뱃지·테마 완성, explorer_region 집계)을
+    // 구독·조회한다(§1 social: common, exploration:api, progression:api). 다른 패키지(domain·application·infra·api.web) 참조는 ArchUnit 이 막는다.
+    // 공유(sharing)와는 서로 참조하지 않는다 — 공개 범위는 ProfileAudience 포트, 맞팔로우는 공유의 FriendDirectory 포트로 app-api 가 잇는다.
+    implementation project(':exploration')
+    implementation project(':progression')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

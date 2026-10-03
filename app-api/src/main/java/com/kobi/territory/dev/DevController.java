@@ -12,6 +12,10 @@ import com.kobi.territory.exploration.application.ExplorationDevService.SampleVi
 import com.kobi.territory.exploration.application.MapAccess;
 import com.kobi.territory.exploration.domain.explorer.Explorer;
 import com.kobi.territory.outbox.OutboxRedelivery;
+import com.kobi.territory.readmodel.FeedRebuildJob;
+import com.kobi.territory.readmodel.FeedRebuildStatus;
+import com.kobi.territory.social.application.RankBatchJob;
+import com.kobi.territory.social.domain.stats.RankSnapshot;
 import com.kobi.territory.outbox.OutboxRelay;
 import com.kobi.territory.api.security.ExplorerAuthentication;
 import com.kobi.territory.api.security.GoogleLoginConfig;
@@ -21,6 +25,7 @@ import com.kobi.territory.exploration.domain.explorer.AccountIdentity;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -66,6 +71,9 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>{@code POST /dev/recalculate} — 진행·도감·퀘스트 재계산 배치. 로그인 세션 또는 X-Explorer-Token 이 있으면 그 탐험가만, 없으면 전체.
  *       미전달 이벤트가 남은 탐험가는 보류(S3-3). 200 {recalculated, failed, deferred}</li>
  *   <li>{@code POST /dev/login} {email, sub?} — 구글 로그인 대신 같은 계정 연결·병합 경로로 세션을 만든다(4단계, E2E). 200 LoginResponse</li>
+ *   <li>{@code POST /dev/rebuild/feed} — 친구 소식 재구성(운영 /admin/rebuild/feed 와 같은 작업을 끝날 때까지 기다림, 5단계). 200 상태
+ *       {state, generation, replayed, skipped, …}</li>
+ *   <li>{@code POST /dev/batch/rank} — 일 1회 집계 배치(상위 %·지역별 방문자 비율·시·도 평균) 수동 실행(5단계). 200 {population, ranked, regions, provinces, overflowed}</li>
  * </ul>
  * 시드는 샘플을 방문일 순으로 체크인하고 처리 시각을 샘플 날짜로 둔다(D6) — 스트릭·월간 퀘스트가 프로토타입과 비슷하게 나온다.
  * 시드·전부 지우기는 프로토타입 fillSample·clear 처럼 그 탐험가의 진행(XP·뱃지·칭호·도감·퀘스트)을 먼저 비운다 — 취소 비대칭으로
@@ -78,7 +86,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class DevController {
 
     /** FK 역순. 새 테이블이 생기면 여기에 추가한다. item_definition(참조 데이터 — 이관 + 운영 추가)은 비우지 않는다. */
-    private static final List<String> TABLES = List.of("outbox_delivery", "outbox", "owned_item_basis", "owned_item", "inventory_visit",
+    private static final List<String> TABLES = List.of("feed_entry", "friendship", "rank_percentile", "region_stats", "province_stats",
+        "outbox_delivery", "outbox", "owned_item_basis", "owned_item", "inventory_visit",
         "inventory", "scene", "xp_ledger", "badge_earned",
         "title_earned", "explorer_region_mark", "explorer_region", "set_progress", "quest_progress", "explorer_progress", "visit_generation", "visit", "territory",
         "map_member", "expedition_map", "recalculation_request", "handle_reservation", "account", "share_card", "privacy_settings",
@@ -97,13 +106,17 @@ public class DevController {
     private final PlatformTransactionManager transactionManager;
     private final ExplorerAuthentication authentication;
     private final SessionLogin sessionLogin;
+    private final FeedRebuildJob feedRebuild;
+    private final RankBatchJob rankBatch;
 
     public DevController(JdbcTemplate jdbc, ExplorationDevService exploration, MapAccess mapAccess,
                          RecalculateService recalculate, OutboxRedelivery redelivery, ObjectMapper objectMapper,
                          Clock clock, InventoryRecalculateService inventoryRecalculate,
                          ItemDefinitionCache itemDefinitions, ObjectProvider<OutboxRelay> relay,
                          PlatformTransactionManager transactionManager, ExplorerAuthentication authentication,
-                         SessionLogin sessionLogin) {
+                         SessionLogin sessionLogin, FeedRebuildJob feedRebuild, RankBatchJob rankBatch) {
+        this.feedRebuild = feedRebuild;
+        this.rankBatch = rankBatch;
         this.relay = relay;
         this.transactionManager = transactionManager;
         this.authentication = authentication;
@@ -224,6 +237,26 @@ public class DevController {
     }
 
     public record DevLoginRequest(String email, String sub) {}
+
+    /**
+     * 친구 소식 재구성(5단계) — 운영 POST /admin/rebuild/feed 와 같은 작업(FeedRebuildJob: social.feed 구독자만 멈추고 다음 세대에 재생 →
+     * 교체)을 시작하고 끝날 때까지 기다린다(E2E·http 편의). 200 상태.
+     */
+    @PostMapping("/rebuild/feed")
+    public FeedRebuildStatus rebuildFeed() throws Exception {
+        FeedRebuildJob.Started started = feedRebuild.start();
+        if (started.future() != null) started.future().get(5, TimeUnit.MINUTES);
+        return feedRebuild.current();
+    }
+
+    /** 일 1회 집계 배치 수동 실행(5단계, 운영은 territory.social.rank-batch-cron). */
+    @PostMapping("/batch/rank")
+    public Map<String, Integer> rankBatch() {
+        RankSnapshot snapshot = rankBatch.run();
+        return Map.of("population", snapshot.population(), "ranked", snapshot.percentiles().size(),
+            "regions", snapshot.regionStats().size(), "provinces", snapshot.provinceStats().size(),
+            "overflowed", snapshot.overflows().size());
+    }
 
     @PostMapping("/explorers/age")
     @Transactional
