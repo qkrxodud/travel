@@ -892,6 +892,15 @@ async function switchMap(id){
    체크인·취소는 outbox 릴레이로 비동기 반영되므로(로컬 300ms 주기) 변경 직후 몇 번 다시 조회해 화면을 맞춘다. */
 let prog = null, dex = null, qs = null; // GET /progress, /collection, /quests 마지막 응답
 let progRev = 0, pollTimers = [];
+/* 서버 재조회(pollProgress)는 짧은 간격으로 여러 번 응답한다 — 응답마다 render() 하면 화면 전체를 연달아 다시 그리고,
+   캐릭터 이동 애니메이션 도중이면 그 프레임을 빼앗아 끊겨 보인다. 한 프레임에 한 번으로 모으고, 이동 중이면 도착 뒤로 미룬다. */
+let renderQueued = false, charMoving = false, renderAfterMove = false;
+function scheduleRender(){
+  if (charMoving) { renderAfterMove = true; return; }
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; render(); });
+}
 async function refreshProgress(announce){
   const [p, d, q] = await Promise.all([api.progress(), api.collection(), api.quests()]);
   const had = prog ? new Set(prog.badges.filter(b => b.earned).map(b => b.id)) : null;
@@ -902,7 +911,7 @@ async function refreshProgress(announce){
     if (lvBefore !== null && p.level > lvBefore) toast('▲', `레벨 업 · Lv.${p.level}`, p.levelTitle);
   }
   document.documentElement.dataset.progress = String(++progRev);
-  render();
+  scheduleRender();
 }
 function pollProgress(){
   pollTimers.forEach(clearTimeout);
@@ -967,7 +976,7 @@ async function refreshWardrobe(announce){
   if (announce && had) inventoryRes.items.filter(owned => !had.has(owned.itemId) && owned.source === 'SET_REWARD')
     .forEach(owned => toast('✦', `세트 배경 해금 · ${clientItem(owned).n}`, '가방에서 배경으로 쓸 수 있어요'));
   document.documentElement.dataset.wardrobe = String(++wardrobeRev);
-  render();
+  scheduleRender();
 }
 async function editScene(body){
   try { sceneSrv = await api.editScene(body); await refreshWardrobe(false); }
@@ -1407,18 +1416,31 @@ const pingLayer = g.append('g');
 
 const charPos = g.append('g').attr('class', 'charpos').style('pointer-events', 'none');
 const charScale = charPos.append('g');
-let zoomK = 1, charAt = null;
+let zoomK = 1, charAt = null, charTarget = null, charLook = null;
 function placeChar(animate){
   const last = Object.entries(state.visits).map(([code, v]) => ({ code, at:v.at || 0 })).sort((a, b) => b.at - a.at)[0];
   const code = last ? last.code : null;
-  charScale.html(charMarkup(equipped(), false));
-  if (!code) { charPos.attr('display', 'none'); charAt = null; return; }
+  // 캐릭터 그림은 착용이 바뀔 때만 다시 만든다(매 render 마다 innerHTML 을 갈면 이동 중 깜빡이고 무겁다)
+  const look = charMarkup(equipped(), false);
+  if (look !== charLook) { charScale.html(look); charLook = look; }
+  if (!code) { charPos.interrupt().attr('display', 'none'); charAt = charTarget = null; charMoving = false; return; }
   charScale.attr('transform', `scale(${1.1 / Math.sqrt(zoomK)})`);
   charPos.attr('display', null);
+  if (code === charTarget) return; // 이미 그곳에 있거나 그곳으로 가는 중 — 애니메이션을 처음부터 다시 걸지 않는다
   const [x, y] = path.centroid(BY_CODE.get(code));
-  if (animate && charAt && charAt !== code) {
-    charPos.transition().duration(900).ease(d3.easeCubicInOut).attrTween('transform', () => { const [x0, y0] = path.centroid(BY_CODE.get(charAt)); return t => `translate(${x0 + (x - x0) * t},${y0 + (y - y0) * t - Math.sin(t * Math.PI) * 40})`; }).on('end', () => { charAt = code; });
-  } else { charPos.attr('transform', `translate(${x},${y})`); charAt = code; }
+  const from = charAt;
+  charTarget = code;
+  if (animate && from && from !== code) {
+    const [x0, y0] = path.centroid(BY_CODE.get(from));
+    charMoving = true;
+    charPos.interrupt().transition().duration(900).ease(d3.easeCubicInOut)
+      .attrTween('transform', () => t => `translate(${x0 + (x - x0) * t},${y0 + (y - y0) * t - Math.sin(t * Math.PI) * 40})`)
+      .on('end', () => {
+        charAt = code; charMoving = false;
+        if (renderAfterMove) { renderAfterMove = false; scheduleRender(); }
+      })
+      .on('interrupt', () => { charMoving = false; }); // 다른 곳으로 다시 출발할 때 — 새 전환이 이어받는다
+  } else { charPos.interrupt().attr('transform', `translate(${x},${y})`); charAt = code; charMoving = false; }
 }
 const zoom = d3.zoom().scaleExtent([1, 9]).on('zoom', ev => { g.attr('transform', ev.transform); zoomK = ev.transform.k; charScale.attr('transform', `scale(${1.1 / Math.sqrt(zoomK)})`); });
 svg.call(zoom).on('dblclick.zoom', null);
