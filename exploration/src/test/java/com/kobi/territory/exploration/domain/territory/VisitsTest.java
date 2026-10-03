@@ -1,7 +1,5 @@
 package com.kobi.territory.exploration.domain.territory;
 
-import com.kobi.territory.exploration.domain.ExplorationError;
-import com.kobi.territory.exploration.domain.ExplorationException;
 import static com.kobi.territory.exploration.domain.Fixtures.FRIEND;
 import static com.kobi.territory.exploration.domain.Fixtures.GAPYEONG;
 import static com.kobi.territory.exploration.domain.Fixtures.JONGNO;
@@ -10,69 +8,144 @@ import static com.kobi.territory.exploration.domain.Fixtures.KST;
 import static com.kobi.territory.exploration.domain.Fixtures.ME;
 import static com.kobi.territory.exploration.domain.Fixtures.NOON;
 import static com.kobi.territory.exploration.domain.Fixtures.TODAY;
+import static com.kobi.territory.exploration.domain.Fixtures.refusal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.exploration.domain.ExplorationError;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** 일급 컬렉션 Visits — Spring 없음. */
+@DisplayName("지도의 방문 모음")
 class VisitsTest {
 
-    static Visit visit(RegionSnapshot region, ExplorerId who, int daysAgoDate, Instant at) {
-        return new Visit(region, who, VisitDate.of(TODAY.minusDays(daysAgoDate)), Memo.EMPTY, null, Verification.NONE, at);
+    /** region 을 who 가 daysAgo 일 전 날짜로, at 에 칠한 방문. */
+    static Visit visit(RegionSnapshot region, ExplorerId who, int daysAgo, Instant at) {
+        return new Visit(region, who, VisitDate.of(TODAY.minusDays(daysAgo)), Memo.EMPTY, null, Verification.NONE, at);
+    }
+
+    @Nested
+    @DisplayName("방문을 찾을 때")
+    class Find {
+
+        @Test
+        @DisplayName("지역과 멤버로 방문을 찾는다")
+        void findsByRegionAndMember() {
+            Visits visits = Visits.of(List.of(visit(JONGNO, ME, 0, NOON)));
+            assertThat(visits.contains(JONGNO.code(), ME)).isTrue();
+            assertThat(visits.contains(JONGNO.code(), FRIEND)).isFalse();
+        }
+
+        @Test
+        @DisplayName("칠하지 않은 지역을 요구하면 방문이 없다고 거절된다")
+        void missingRefused() {
+            Visits visits = Visits.of(List.of(visit(JONGNO, ME, 0, NOON)));
+            assertThat(refusal(() -> visits.require(JUNG.code(), ME))).isEqualTo(ExplorationError.VISIT_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("방문을 더할 때")
+    class Add {
+
+        @Test
+        @DisplayName("다른 멤버는 같은 지역 방문을 더할 수 있다")
+        void otherMemberSameRegion() {
+            Visits visits = Visits.of(List.of(visit(JONGNO, ME, 0, NOON)));
+            visits.add(visit(JONGNO, FRIEND, 0, NOON));
+            assertThat(visits.size()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("같은 멤버의 같은 지역 방문은 더할 수 없다")
+        void duplicateRefused() {
+            Visits visits = Visits.of(List.of(visit(JONGNO, ME, 0, NOON)));
+            assertThat(refusal(() -> visits.add(visit(JONGNO, ME, 1, NOON)))).isEqualTo(ExplorationError.DUPLICATE_VISIT);
+        }
+
+        @Test
+        @DisplayName("같은 멤버의 같은 지역 방문이 둘인 기록은 불러오지 않는다")
+        void duplicateRestoreRefused() {
+            assertThatThrownBy(() -> Visits.of(List.of(visit(JONGNO, ME, 0, NOON), visit(JONGNO, ME, 2, NOON))))
+                .isInstanceOf(IllegalStateException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("멤버와 지역으로 나눠 볼 때")
+    class Views {
+
+        Visits visits() {
+            return Visits.of(List.of(visit(JONGNO, FRIEND, 0, NOON), visit(JONGNO, ME, 0, NOON.plusSeconds(5)),
+                visit(GAPYEONG, ME, 0, NOON)));
+        }
+
+        @Test
+        @DisplayName("멤버마다 칠한 방문과 밟은 시·도를 안다")
+        void perMember() {
+            Visits visits = visits();
+            assertThat(visits.of(ME).size()).isEqualTo(2);
+            assertThat(visits.of(ME).touches("KR-31")).isTrue();
+            assertThat(visits.of(FRIEND).touches("KR-31")).isFalse();
+        }
+
+        @Test
+        @DisplayName("지역이 지도에 칠해졌는지 안다")
+        void paintedRegion() {
+            Visits visits = visits();
+            assertThat(visits.anyIn(JONGNO.code())).isTrue();
+            assertThat(visits.anyIn(JUNG.code())).isFalse();
+        }
+
+        @Test
+        @DisplayName("지역의 선점은 먼저 칠한 멤버다")
+        void claim() {
+            assertThat(visits().claimOf(JONGNO.code())).get().extracting(Visit::checkedInBy).isEqualTo(FRIEND);
+        }
+
+        @Test
+        @DisplayName("칠해진 지역은 멤버와 상관없이 한 번씩만 센다")
+        void distinctRegions() {
+            assertThat(visits().regions()).containsExactly(JONGNO, GAPYEONG);
+        }
+    }
+
+    @Nested
+    @DisplayName("하루에 칠한 곳을 셀 때")
+    class PerDay {
+
+        Visits visits() {
+            Instant lateUtc = Instant.parse("2026-10-02T15:30:00Z"); // KST 10-03 00:30
+            return Visits.of(List.of(visit(JONGNO, ME, 5, NOON), visit(JUNG, ME, 5, lateUtc)));
+        }
+
+        @Test
+        @DisplayName("한국 시간의 날짜로 나눈다")
+        void byKoreanDay() {
+            assertThat(visits().processedOn(TODAY, KST)).isEqualTo(1);
+            assertThat(visits().processedOn(TODAY.plusDays(1), KST)).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("다른 시간대를 주면 그 시간대의 날짜로 나눈다")
+        void byGivenZone() {
+            assertThat(visits().processedOn(TODAY, ZoneOffset.UTC)).isEqualTo(2);
+        }
     }
 
     @Test
-    void 지역_멤버로_찾고_없으면_VISIT_NOT_FOUND() {
-        Visits vs = Visits.of(List.of(visit(JONGNO, ME, 0, NOON)));
-        assertThat(vs.contains(JONGNO.code(), ME)).isTrue();
-        assertThat(vs.contains(JONGNO.code(), FRIEND)).isFalse();
-        assertThatThrownBy(() -> vs.require(JUNG.code(), ME))
-            .satisfies(exception -> assertThat(((ExplorationException) exception).error()).isEqualTo(ExplorationError.VISIT_NOT_FOUND));
-    }
-
-    @Test
-    void 같은_지역_멤버_추가와_복원은_거부한다() {
-        Visits vs = Visits.of(List.of(visit(JONGNO, ME, 0, NOON)));
-        assertThatThrownBy(() -> vs.add(visit(JONGNO, ME, 1, NOON)))
-            .satisfies(exception -> assertThat(((ExplorationException) exception).error()).isEqualTo(ExplorationError.DUPLICATE_VISIT));
-        assertThatThrownBy(() -> Visits.of(List.of(visit(JONGNO, ME, 0, NOON), visit(JONGNO, ME, 2, NOON))))
-            .isInstanceOf(IllegalStateException.class);
-        vs.add(visit(JONGNO, FRIEND, 0, NOON)); // 다른 멤버는 같은 지역 가능
-        assertThat(vs.size()).isEqualTo(2);
-    }
-
-    @Test
-    void 멤버별_시도_접촉_지역_선점_칠해진_지역() {
-        Visits vs = Visits.of(List.of(visit(JONGNO, FRIEND, 0, NOON), visit(JONGNO, ME, 0, NOON.plusSeconds(5)),
-            visit(GAPYEONG, ME, 0, NOON)));
-        assertThat(vs.of(ME).size()).isEqualTo(2);
-        assertThat(vs.of(ME).touches("KR-31")).isTrue();
-        assertThat(vs.of(FRIEND).touches("KR-31")).isFalse();
-        assertThat(vs.anyIn(JONGNO.code())).isTrue();
-        assertThat(vs.anyIn(JUNG.code())).isFalse();
-        assertThat(vs.claimOf(JONGNO.code())).get().extracting(Visit::checkedInBy).isEqualTo(FRIEND);
-        assertThat(vs.regions()).containsExactly(JONGNO, GAPYEONG);
-    }
-
-    @Test
-    void 처리_날짜별_건수는_시간대_기준() {
-        Instant lateUtc = Instant.parse("2026-10-02T15:30:00Z"); // KST 10-03 00:30
-        Visits vs = Visits.of(List.of(visit(JONGNO, ME, 5, NOON), visit(JUNG, ME, 5, lateUtc)));
-        assertThat(vs.processedOn(TODAY, KST)).isEqualTo(1);
-        assertThat(vs.processedOn(TODAY.plusDays(1), KST)).isEqualTo(1);
-        assertThat(vs.processedOn(TODAY, java.time.ZoneOffset.UTC)).isEqualTo(2);
-    }
-
-    @Test
-    void 최근순은_방문일_내림차순_같으면_처리시각_내림차순() {
+    @DisplayName("탐험 일지는 방문일 최근 순이고 같은 날이면 나중에 칠한 것이 먼저다")
+    void recentFirst() {
         Visit threeDaysAgo = visit(JONGNO, ME, 3, NOON);
         Visit todayNoon = visit(JUNG, ME, 0, NOON);
         Visit todayLater = visit(GAPYEONG, ME, 0, NOON.plus(Duration.ofMinutes(1)));
-        assertThat(Visits.of(List.of(threeDaysAgo, todayNoon, todayLater)).recentFirst()).containsExactly(todayLater, todayNoon, threeDaysAgo);
+        assertThat(Visits.of(List.of(threeDaysAgo, todayNoon, todayLater)).recentFirst())
+            .containsExactly(todayLater, todayNoon, threeDaysAgo);
     }
 }

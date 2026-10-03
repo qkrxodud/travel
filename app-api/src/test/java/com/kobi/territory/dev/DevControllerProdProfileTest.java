@@ -2,6 +2,7 @@ package com.kobi.territory.dev;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,12 +21,14 @@ import org.springframework.test.context.ActiveProfiles;
     "TERRITORY_PUBLIC_BASE_URL=https://territory.example"
 })
 @ActiveProfiles("prod")
+@DisplayName("운영 환경")
 class DevControllerProdProfileTest {
 
     @Autowired ApplicationContext context;
 
     @Test
-    void prod_프로파일에서는_DevController_빈이_없다() {
+    @DisplayName("개발 도구가 없고 켤 설정도 없다")
+    void noDevTools() {
         assertThat(context.getBeansOfType(DevController.class)).isEmpty();
         assertThat(context.containsBean("devController")).isFalse();
         assertThat(context.getEnvironment().getProperty("territory.dev.enabled")).isNull(); // local 파일에만 있다

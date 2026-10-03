@@ -1,7 +1,10 @@
 package com.kobi.territory.sharing.api.web;
 
+import com.kobi.territory.sharing.application.MyRecap;
+import com.kobi.territory.sharing.domain.showcase.YearRecap;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /** 공유 웹 DTO. */
 public final class SharingDtos {
@@ -47,7 +50,22 @@ public final class SharingDtos {
      */
     public record RecapResponse(int year, String mapId, int newRegions, List<Integer> monthCounts,
                                 RecapProvinceResponse topProvince, RecapRegionResponse rarest, int newProvinces,
-                                RecapMonthResponse busiestMonth, int setsCompleted) {}
+                                RecapMonthResponse busiestMonth, int setsCompleted) {
+
+        /** 내 리캡(연간 요약 + 기준 지도 + 완성 테마 수)을 응답으로 옮긴다. 없는 항목(최다 시·도·가장 희귀한 영토·최다 달)은 null. */
+        public static RecapResponse of(MyRecap myRecap) {
+            YearRecap recap = myRecap.recap();
+            return new RecapResponse(recap.year(), myRecap.mapId(), recap.newRegions(), recap.monthCounts(),
+                Optional.ofNullable(recap.topProvince())
+                    .map(top -> new RecapProvinceResponse(top.provinceCode(), top.provinceName(), top.count())).orElse(null),
+                Optional.ofNullable(recap.rarest()).map(region -> new RecapRegionResponse(region.code(), region.name(),
+                    region.provinceCode(), region.provinceName(), region.rarity().name())).orElse(null),
+                recap.newProvinces(),
+                Optional.ofNullable(recap.busiestMonth())
+                    .map(busiest -> new RecapMonthResponse(busiest.month(), busiest.count())).orElse(null),
+                myRecap.setsCompleted());
+        }
+    }
 
     /** @param count 그 해 그 시·도에서 칠한 영토 수 */
     public record RecapProvinceResponse(String provinceCode, String provinceName, int count) {}

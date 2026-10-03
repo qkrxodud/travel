@@ -52,8 +52,8 @@ async function erase(page: Page, code: string) {
   await expect(region(page, code)).not.toHaveClass(/\bon\b/);
 }
 
-test.describe('3단계 꾸미기 ↔ 서버', () => {
-  test('체크인 → 가방에 아이템·자동 착용 → 직접 해제·착용·성별·즐겨찾기 → 취소 시 회수·벗김 → 세트 완성 시 세트 배경', async ({ page, dev }) => {
+test.describe('가방과 캐릭터 꾸미기', () => {
+  test('칠한 지역의 아이템이 가방에 들어와 저절로 입혀지고, 직접 벗기고 입히고 성별·즐겨찾기를 바꿀 수 있으며, 칠한 곳을 지우면 아이템도 돌아가고, 세트를 완성하면 세트 배경을 받는다', async ({ page, dev }) => {
     const errors = watchErrors(page);
     await open(page);
 

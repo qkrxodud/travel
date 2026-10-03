@@ -1,6 +1,26 @@
 package com.kobi.territory.progression.domain.replay;
 
-import com.kobi.territory.progression.domain.Fixtures;
+import static com.kobi.territory.progression.domain.Fixtures.가평군;
+import static com.kobi.territory.progression.domain.Fixtures.기준시각;
+import static com.kobi.territory.progression.domain.Fixtures.나;
+import static com.kobi.territory.progression.domain.Fixtures.늦게온멤버;
+import static com.kobi.territory.progression.domain.Fixtures.방문;
+import static com.kobi.territory.progression.domain.Fixtures.새_진행;
+import static com.kobi.territory.progression.domain.Fixtures.종로구;
+import static com.kobi.territory.progression.domain.Fixtures.중구;
+import static com.kobi.territory.progression.domain.Fixtures.지도;
+import static com.kobi.territory.progression.domain.Fixtures.진행규칙;
+import static com.kobi.territory.progression.domain.Fixtures.초;
+import static com.kobi.territory.progression.domain.Fixtures.취소한다;
+import static com.kobi.territory.progression.domain.Fixtures.친구;
+import static com.kobi.territory.progression.domain.Fixtures.칠한다;
+import static com.kobi.territory.progression.domain.Fixtures.퀘스트;
+import static com.kobi.territory.progression.domain.Fixtures.퀘스트사실;
+import static com.kobi.territory.progression.domain.Fixtures.테마;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.common.model.RegionCode;
 import com.kobi.territory.progression.domain.collectionbook.CollectionBook;
 import com.kobi.territory.progression.domain.progress.ExplorerProgress;
 import com.kobi.territory.progression.domain.progress.ProgressVisit;
@@ -9,159 +29,242 @@ import com.kobi.territory.progression.domain.progress.XpLedgerEntry;
 import com.kobi.territory.progression.domain.quest.QuestBoard;
 import com.kobi.territory.progression.domain.quest.QuestFact;
 import com.kobi.territory.progression.domain.quest.QuestPeriod;
-import static com.kobi.territory.progression.domain.Fixtures.FRIEND;
-import static com.kobi.territory.progression.domain.Fixtures.GAPYEONG;
-import static com.kobi.territory.progression.domain.Fixtures.JONGNO;
-import static com.kobi.territory.progression.domain.Fixtures.JUNG;
-import static com.kobi.territory.progression.domain.Fixtures.MAP;
-import static com.kobi.territory.progression.domain.Fixtures.ME;
-import static com.kobi.territory.progression.domain.Fixtures.POLICY;
-import static com.kobi.territory.progression.domain.Fixtures.QUEST_RULES;
-import static com.kobi.territory.progression.domain.Fixtures.THEMES;
-import static com.kobi.territory.progression.domain.Fixtures.T0;
-import static com.kobi.territory.progression.domain.Fixtures.visit;
-import static org.assertj.core.api.Assertions.assertThat;
-
-import com.kobi.territory.common.model.ExplorerId;
-import com.kobi.territory.common.model.Rarity;
-import com.kobi.territory.common.model.RegionCode;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** 재계산 = 이벤트 누적. 같은 애그리거트 메서드를 같은 순서로 부르기 때문. + 복구 규칙(QA P1-2). */
+/**
+ * 진행 재계산: 영토의 방문 이력을 처음부터 다시 반영해 진행·도감·퀘스트를 되살린다.
+ * 회귀 출처: QA P1-2(복구 규칙), 3단계 R2-1(완성 시점 멤버만 복구 지급).
+ */
+@DisplayName("진행 재계산")
 class ProgressionReplayTest {
 
-    static final YearMonth OCT = YearMonth.of(2026, 10);
-    static final Instant LATER = T0.plusSeconds(3600);
+    private static final YearMonth 시월 = YearMonth.of(2026, 10);
+    private static final Instant 재계산시각 = 기준시각.plusSeconds(3600);
 
-    static ProgressionReplay.Result replay(ExplorerProgress current, List<ReplayVisit> history, CollectionBook book,
-                                           List<QuestBoard> boards) {
-        return ProgressionReplay.replay(ME, current, Map.of(MAP, history), book == null ? Map.of() : Map.of(MAP, book),
-            boards, POLICY, THEMES, QUEST_RULES, OCT, LATER);
+    private static ProgressionReplay.Result 재계산(ExplorerId who, ExplorerProgress current, List<ReplayVisit> history,
+                                               CollectionBook book, List<QuestBoard> boards) {
+        return ProgressionReplay.replay(who, current, Map.of(지도, history), book == null ? Map.of() : Map.of(지도, book),
+            boards, 진행규칙, 테마, 퀘스트, 시월, 재계산시각);
     }
 
-    @Test
-    void 재생_결과는_이벤트를_하나씩_반영한_결과와_같다() {
-        List<RegionCode> codes = List.of(JONGNO, GAPYEONG, JUNG);
-        // 이벤트 누적(핸들러 흐름) — 퀘스트 사실은 핸들러처럼 진행의 지역 기록으로 만든다
-        ExplorerProgress accumulated = ExplorerProgress.start(ME, POLICY, T0);
-        CollectionBook book = CollectionBook.empty(MAP);
-        QuestBoard month = QuestBoard.empty(ME, QuestPeriod.of(OCT));
-        QuestBoard always = QuestBoard.empty(ME, QuestPeriod.ALL);
-        for (int i = 0; i < codes.size(); i++) {
-            ProgressVisit visit = visit(codes.get(i), T0.plusSeconds(i));
-            QuestFact fact = QuestFact.of(visit.region(), visit.provinceCode(), visit.rarity(), THEMES.includeAny(visit.region()),
-                accumulated.regions().visitedProvinceBefore(visit.provinceCode(), visit.visitedAt()));
-            accumulated.applyVisit(visit, POLICY);
-            book.applyVisit(visit.region(), ME, visit.visitedAt(), THEMES)
-                .forEach(completion -> accumulated.applyThemeCompleted(completion.themeId(), completion.completedAt(), POLICY));
-            month.applyVisit(fact, QUEST_RULES, OCT);
-            always.applyVisit(fact, QUEST_RULES, OCT);
+    private static ProgressionReplay.Result 재계산(ExplorerProgress current, List<ReplayVisit> history, CollectionBook book,
+                                               List<QuestBoard> boards) {
+        return 재계산(나, current, history, book, boards);
+    }
+
+    private static ReplayVisit 내방문(RegionCode code, Instant at) {
+        return new ReplayVisit(나, 방문(code).처리시각(at).사실());
+    }
+
+    @Nested
+    @DisplayName("방문 이력을 다시 반영하면 소식을 하나씩 받은 결과와 같다")
+    class SameAsEvents {
+
+        private final List<RegionCode> 칠한순서 = List.of(종로구, 가평군, 중구);
+
+        /** 소식을 하나씩 받은 쪽(핸들러 흐름) — 퀘스트 사실은 핸들러처럼 진행의 지역 기록으로 만든다. */
+        private final ExplorerProgress 누적진행 = 새_진행();
+        private final CollectionBook 누적도감 = CollectionBook.empty(지도);
+        private final QuestBoard 누적월간 = QuestBoard.empty(나, QuestPeriod.of(시월));
+        private final QuestBoard 누적상시 = QuestBoard.empty(나, QuestPeriod.ALL);
+        private final ProgressionReplay.Result 결과;
+
+        SameAsEvents() {
+            for (int i = 0; i < 칠한순서.size(); i++) {
+                ProgressVisit visit = 방문(칠한순서.get(i)).처리시각(초(i)).사실();
+                QuestFact fact = QuestFact.of(visit.region(), visit.provinceCode(), visit.rarity(), 테마.includeAny(visit.region()),
+                    누적진행.regions().visitedProvinceBefore(visit.provinceCode(), visit.visitedAt()));
+                누적진행.applyVisit(visit, 진행규칙);
+                누적도감.applyVisit(visit.region(), 나, visit.visitedAt(), 테마)
+                    .forEach(completion -> 누적진행.applyThemeCompleted(completion.themeId(), completion.completedAt(), 진행규칙));
+                누적월간.applyVisit(fact, 퀘스트, 시월);
+                누적상시.applyVisit(fact, 퀘스트, 시월);
+            }
+            List<ReplayVisit> history = 칠한순서.stream().map(code -> 내방문(code, 초(칠한순서.indexOf(code)))).toList();
+            결과 = 재계산(새_진행(), history, null, List.of());
         }
 
-        List<ReplayVisit> history = codes.stream()
-            .map(code -> new ReplayVisit(ME, visit(code, T0.plusSeconds(codes.indexOf(code))))).toList();
-        ProgressionReplay.Result result = replay(ExplorerProgress.start(ME, POLICY, T0), history, null, List.of());
+        @Test
+        @DisplayName("XP·레벨·장부가 같다")
+        void xpLevelLedger() {
+            assertThat(결과.progress().xp()).isEqualTo(누적진행.xp());
+            assertThat(결과.progress().level()).isEqualTo(누적진행.level());
+            assertThat(결과.progress().ledger().entries()).extracting(XpLedgerEntry::refId)
+                .containsExactlyInAnyOrderElementsOf(누적진행.ledger().entries().stream().map(XpLedgerEntry::refId).toList());
+        }
 
-        assertThat(result.progress().xp()).isEqualTo(accumulated.xp());
-        assertThat(result.progress().level()).isEqualTo(accumulated.level());
-        assertThat(result.progress().badges().keySet()).isEqualTo(accumulated.badges().keySet());
-        assertThat(result.progress().titles().keySet()).isEqualTo(accumulated.titles().keySet());
-        assertThat(result.progress().streak()).isEqualTo(accumulated.streak());
-        assertThat(result.progress().ledger().entries()).extracting(XpLedgerEntry::refId)
-            .containsExactlyInAnyOrderElementsOf(accumulated.ledger().entries().stream().map(XpLedgerEntry::refId).toList());
-        assertThat(result.collectionBooks().get(0).themeProgresses()).containsExactlyInAnyOrderElementsOf(book.themeProgresses());
-        assertThat(result.monthly().rows()).containsExactlyInAnyOrderElementsOf(month.rows());
-        assertThat(result.always().rows()).containsExactlyInAnyOrderElementsOf(always.rows());
-        assertThat(month.of("mprov").current(QUEST_RULES.require("mprov"))).isEqualTo(1);
+        @Test
+        @DisplayName("뱃지·칭호·연속 탐험 달이 같다")
+        void badgesTitlesStreak() {
+            assertThat(결과.progress().badges().keySet()).isEqualTo(누적진행.badges().keySet());
+            assertThat(결과.progress().titles().keySet()).isEqualTo(누적진행.titles().keySet());
+            assertThat(결과.progress().streak()).isEqualTo(누적진행.streak());
+        }
+
+        @Test
+        @DisplayName("도감과 퀘스트 보드가 같다")
+        void collectionAndQuests() {
+            assertThat(결과.collectionBooks().get(0).themeProgresses()).containsExactlyInAnyOrderElementsOf(누적도감.themeProgresses());
+            assertThat(결과.monthly().rows()).containsExactlyInAnyOrderElementsOf(누적월간.rows());
+            assertThat(결과.always().rows()).containsExactlyInAnyOrderElementsOf(누적상시.rows());
+            assertThat(누적월간.of("mprov").current(퀘스트.require("mprov"))).isEqualTo(1);
+        }
     }
 
     @Test
-    void 취소_비대칭으로_남은_보상과_완성_기록은_재계산이_지우지_않는다() {
-        ExplorerProgress accumulated = ExplorerProgress.start(ME, POLICY, T0);
-        CollectionBook book = CollectionBook.empty(MAP);
-        accumulated.applyVisit(visit(JONGNO, T0), POLICY);
-        accumulated.applyVisit(visit(JUNG, T0.plusSeconds(1)), POLICY);
-        book.applyVisit(JONGNO, ME, T0, THEMES);
-        book.applyVisit(JUNG, ME, T0.plusSeconds(1), THEMES)
-            .forEach(completion -> accumulated.applyThemeCompleted(completion.themeId(), completion.completedAt(), POLICY));
-        accumulated.revokeVisit(MAP, JUNG, T0.plusSeconds(2), POLICY);
-        book.revokeVisit(JUNG, false, THEMES);
+    @DisplayName("지난달 처리된 체크인은 이번 달 퀘스트에 세지 않는다")
+    void lastMonthVisitsNotInThisMonth() {
+        ProgressionReplay.Result result = 재계산(새_진행(), List.of(내방문(가평군, 기준시각.minus(Duration.ofDays(31)))), null,
+            List.of());
 
-        ProgressionReplay.Result result = replay(accumulated, List.of(new ReplayVisit(ME, visit(JONGNO, T0))), book, List.of());
+        assertThat(result.monthly().of("m3").current(퀘스트.require("m3"))).isZero();
+        assertThat(result.progress().regions().find(가평군).orElseThrow().active()).isTrue();
+    }
 
-        assertThat(result.progress().xp()).isEqualTo(accumulated.xp()).isEqualTo(145); // 35 + 선점 10 + 세트 100
-        assertThat(result.progress().badges().keySet()).isEqualTo(accumulated.badges().keySet());
-        assertThat(result.progress().regions().find(JUNG).orElseThrow().active()).isFalse();
-        assertThat(result.collectionBooks().get(0).progressOf("han").completedAt()).isEqualTo(T0.plusSeconds(1));
-        assertThat(result.collectionBooks().get(0).progressOf("han").have()).isEqualTo(1);
+    @Nested
+    @DisplayName("취소해도 남는 것은 재계산도 지우지 않는다")
+    class CancelAsymmetry {
+
+        /** 종로구·중구를 칠해 테마를 완성한 뒤 중구를 취소한 진행과 도감. */
+        private final ExplorerProgress 진행 = 새_진행();
+        private final CollectionBook 도감 = CollectionBook.empty(지도);
+        private final ProgressionReplay.Result 결과;
+
+        CancelAsymmetry() {
+            칠한다(진행, 방문(종로구));
+            칠한다(진행, 방문(중구).처리시각(초(1)));
+            도감.applyVisit(종로구, 나, 기준시각, 테마);
+            도감.applyVisit(중구, 나, 초(1), 테마)
+                .forEach(completion -> 진행.applyThemeCompleted(completion.themeId(), completion.completedAt(), 진행규칙));
+            취소한다(진행, 방문(중구).처리시각(초(2)));
+            도감.revokeVisit(중구, false, 테마);
+            결과 = 재계산(진행, List.of(내방문(종로구, 기준시각)), 도감, List.of());
+        }
+
+        @Test
+        @DisplayName("테마 보너스와 선점 보너스가 남는다")
+        void rewardsStay() {
+            assertThat(결과.progress().xp()).isEqualTo(진행.xp()).isEqualTo(145); // 35 + 중구 선점 10 + 테마 100
+            assertThat(결과.progress().badges().keySet()).isEqualTo(진행.badges().keySet());
+        }
+
+        @Test
+        @DisplayName("취소한 지역은 꺼진 채로, 도감의 완성 기록은 그대로 남는다")
+        void cancelledRegionAndCompletion() {
+            assertThat(결과.progress().regions().find(중구).orElseThrow().active()).isFalse();
+            assertThat(결과.collectionBooks().get(0).progressOf("han").completedAt()).isEqualTo(초(1));
+            assertThat(결과.collectionBooks().get(0).progressOf("han").have()).isEqualTo(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("보상 소식이 끝내 전달되지 못했을 때")
+    class Recovery {
+
+        /** 도감엔 완성 기록이 있지만 진행엔 테마 보너스가 없는 상태에서 재계산. */
+        private ProgressionReplay.Result 테마보너스유실() {
+            ExplorerProgress lost = 새_진행();
+            칠한다(lost, 방문(종로구));
+            칠한다(lost, 방문(중구).처리시각(초(1)));
+            CollectionBook book = CollectionBook.empty(지도);
+            book.applyVisit(종로구, 나, 기준시각, 테마);
+            book.applyVisit(중구, 나, 초(1), 테마);
+            assertThat(lost.titles()).doesNotContainKey("set-han");
+            return 재계산(lost, List.of(내방문(종로구, 기준시각), 내방문(중구, 초(1))), book, List.of());
+        }
+
+        /** 9월 보드에서 보상을 받았지만 진행 장부엔 그 XP가 없는 상태. */
+        private List<QuestBoard> 구월보상만받은보드() {
+            QuestBoard september = QuestBoard.empty(나, QuestPeriod.of(YearMonth.of(2026, 9)));
+            september.applyVisit(퀘스트사실(가평군, true), 퀘스트, YearMonth.of(2026, 9));
+            september.claim("mgun", 퀘스트, 기준시각, YearMonth.of(2026, 9));
+            return List.of(september, QuestBoard.empty(나, QuestPeriod.ALL));
+        }
+
+        @Test
+        @DisplayName("완성 기록이 있는데 테마 보너스가 없으면 지급한다")
+        void grantsMissingThemeBonus() {
+            ProgressionReplay.Result result = 테마보너스유실();
+
+            assertThat(result.progress().ledger().has(RefIds.theme(나, "han"))).isTrue();
+            assertThat(result.progress().xp()).isEqualTo(35 + 20 + 100);
+        }
+
+        @Test
+        @DisplayName("빠졌던 테마 칭호와 뱃지도 함께 채운다")
+        void fixesTitleAndBadge() {
+            ProgressionReplay.Result result = 테마보너스유실();
+
+            assertThat(result.progress().titles()).containsKey("set-han");
+            assertThat(result.progress().badges()).containsKey("set1");
+        }
+
+        @Test
+        @DisplayName("받은 퀘스트인데 XP가 없으면 지난 달 보드라도 지급한다")
+        void grantsMissingQuestXp() {
+            List<QuestBoard> boards = 구월보상만받은보드();
+
+            ProgressionReplay.Result result = 재계산(새_진행(), List.of(), null, boards);
+
+            assertThat(result.progress().ledger().has(RefIds.quest(나, boards.get(0).period(), "mgun"))).isTrue();
+            assertThat(result.progress().xp()).isEqualTo(40);
+        }
+
+        @Test
+        @DisplayName("여러 번 돌려도 한 번만 지급한다")
+        void idempotent() {
+            List<QuestBoard> boards = 구월보상만받은보드();
+            ProgressionReplay.Result first = 재계산(새_진행(), List.of(), null, boards);
+
+            ProgressionReplay.Result again = 재계산(first.progress(), List.of(), null, boards);
+
+            assertThat(again.progress().xp()).isEqualTo(40);
+        }
+
+        @Test
+        @DisplayName("완성 시점 멤버였다면 직접 칠하지 않았어도 지급한다")
+        void memberAtCompletion() {
+            ProgressionReplay.Result mine = 재계산(새_진행(), List.of(), 친구가함께완성(), List.of());
+
+            assertThat(mine.progress().ledger().has(RefIds.theme(나, "han"))).isTrue();
+        }
+
+        @Test
+        @DisplayName("완성 뒤에 들어온 멤버에게는 지급하지 않는다")
+        void lateMemberNotRecovered() {
+            ProgressionReplay.Result late = 재계산(늦게온멤버, ExplorerProgress.start(늦게온멤버, 진행규칙, 기준시각), List.of(),
+                친구가함께완성(), List.of());
+
+            assertThat(late.progress().ledger().has(RefIds.theme(늦게온멤버, "han"))).isFalse();
+            assertThat(late.progress().titles()).doesNotContainKey("set-han");
+        }
+
+        /** 나와 친구가 멤버일 때 친구가 혼자 종로구·중구를 칠해 완성한 도감. */
+        private CollectionBook 친구가함께완성() {
+            CollectionBook book = CollectionBook.empty(지도);
+            book.applyVisit(종로구, 친구, 기준시각, 테마, List.of(나, 친구));
+            book.applyVisit(중구, 친구, 초(1), 테마, List.of(나, 친구));
+            return book;
+        }
     }
 
     @Test
-    void 복구_규칙_완성_기록은_있는데_세트_보너스가_없으면_지급하고_칭호도_보정한다() {
-        // SetCompleted 전달이 영구 실패해 진행엔 보너스가 없고, 도감엔 완성 기록이 있는 상태
-        ExplorerProgress lost = ExplorerProgress.start(ME, POLICY, T0);
-        lost.applyVisit(visit(JONGNO, T0), POLICY);
-        lost.applyVisit(visit(JUNG, T0.plusSeconds(1)), POLICY);
-        CollectionBook book = CollectionBook.empty(MAP);
-        book.applyVisit(JONGNO, ME, T0, THEMES);
-        book.applyVisit(JUNG, ME, T0.plusSeconds(1), THEMES);
-        assertThat(lost.titles()).doesNotContainKey("set-han");
-
-        ProgressionReplay.Result result = replay(lost, List.of(new ReplayVisit(ME, visit(JONGNO, T0)),
-            new ReplayVisit(ME, visit(JUNG, T0.plusSeconds(1)))), book, List.of());
-
-        assertThat(result.progress().ledger().has(RefIds.theme(ME, "han"))).isTrue();
-        assertThat(result.progress().titles()).containsKey("set-han");
-        assertThat(result.progress().badges()).containsKey("set1");
-        assertThat(result.progress().xp()).isEqualTo(35 + 20 + 100);
-    }
-
-    @Test
-    void 복구_규칙_받은_퀘스트인데_장부에_XP_가_없으면_지급한다_지난_달_보드도() {
-        QuestBoard september = QuestBoard.empty(ME, QuestPeriod.of(YearMonth.of(2026, 9)));
-        september.applyVisit(Fixtures.fact(GAPYEONG, true), QUEST_RULES, YearMonth.of(2026, 9));
-        september.claim("mgun", QUEST_RULES, T0, YearMonth.of(2026, 9));
-        QuestBoard always = QuestBoard.empty(ME, QuestPeriod.ALL);
-
-        ProgressionReplay.Result result = replay(ExplorerProgress.start(ME, POLICY, T0), List.of(), null,
-            List.of(september, always));
-
-        assertThat(result.progress().ledger().has(RefIds.quest(ME, september.period(), "mgun"))).isTrue();
-        assertThat(result.progress().xp()).isEqualTo(40);
-        // 다시 돌려도 한 번만(멱등)
-        ProgressionReplay.Result again = replay(result.progress(), List.of(), null, List.of(september, always));
-        assertThat(again.progress().xp()).isEqualTo(40);
-    }
-
-    @Test
-    void 복구_규칙은_완성_시점_멤버였던_테마만_지급한다_R2_1() {
-        // 공유 지도에서 FRIEND 와 ME 가 있을 때 FRIEND 가 완성 → 수령자 둘. 나중 합류한 LATE 는 수령자가 아니다
-        ExplorerId late = ExplorerId.of("55555555-5555-5555-5555-555555555555");
-        CollectionBook book = CollectionBook.empty(MAP);
-        book.applyVisit(JONGNO, FRIEND, T0, THEMES, List.of(ME, FRIEND));
-        book.applyVisit(JUNG, FRIEND, T0.plusSeconds(1), THEMES, List.of(ME, FRIEND));
-
-        ProgressionReplay.Result lateResult = ProgressionReplay.replay(late, ExplorerProgress.start(late, POLICY, T0),
-            Map.of(MAP, List.of()), Map.of(MAP, book), List.of(), POLICY, THEMES, QUEST_RULES, OCT, LATER);
-        assertThat(lateResult.progress().ledger().has(RefIds.theme(late, "han"))).isFalse();
-        assertThat(lateResult.progress().titles()).doesNotContainKey("set-han");
-
-        ProgressionReplay.Result myResult = replay(ExplorerProgress.start(ME, POLICY, T0), List.of(), book, List.of());
-        assertThat(myResult.progress().ledger().has(RefIds.theme(ME, "han"))).isTrue(); // 완성 시점 멤버(직접 칠하지 않았어도)
-    }
-
-    @Test
-    void 공유_지도_재생에서_새로_생기는_완성은_멤버_전원이_받는다() {
+    @DisplayName("공유 지도 이력에서 새로 생기는 완성은 직접 칠하지 않은 멤버도 받는다")
+    void sharedMapCompletionDuringReplay() {
         List<ReplayVisit> history = List.of(
-            new ReplayVisit(FRIEND, new ProgressVisit(MAP, JONGNO, "KR-11", Rarity.COMMON, T0, true), List.of(ME, FRIEND)),
-            new ReplayVisit(FRIEND, new ProgressVisit(MAP, JUNG, "KR-11", Rarity.COMMON, T0.plusSeconds(1), true),
-                List.of(ME, FRIEND)));
-        ProgressionReplay.Result result = replay(ExplorerProgress.start(ME, POLICY, T0), history, null, List.of());
-        assertThat(result.progress().ledger().has(RefIds.theme(ME, "han"))).isTrue();
+            new ReplayVisit(친구, 방문(종로구).사실(), List.of(나, 친구)),
+            new ReplayVisit(친구, 방문(중구).처리시각(초(1)).사실(), List.of(나, 친구)));
+
+        ProgressionReplay.Result result = 재계산(새_진행(), history, null, List.of());
+
+        assertThat(result.progress().ledger().has(RefIds.theme(나, "han"))).isTrue();
         assertThat(result.progress().xp()).isEqualTo(100); // 내 방문은 없다 — 테마 보너스만
     }
 }

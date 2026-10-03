@@ -2,6 +2,7 @@ package com.kobi.territory.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 
@@ -10,10 +11,12 @@ import org.testcontainers.DockerClientFactory;
  * 대부분의 CI 가 설정) 또는 -Dterritory.require-docker=true 이면 Docker 가 반드시 있어야 하고, 없으면 이 테스트가 실패한다.
  * 로컬(둘 다 없음)에서는 아무것도 확인하지 않는다.
  */
+@DisplayName("검증 환경")
 class DockerAvailabilityTest {
 
     @Test
-    void CI_에서는_Docker_가_있어야_MySQL_회귀_테스트가_skip_되지_않는다() {
+    @DisplayName("지속 통합 환경에서는 실제 데이터베이스 동시성 검증이 조용히 건너뛰어지지 않는다")
+    void concurrencyChecksAreNotSkippedOnCi() {
         boolean required = "true".equalsIgnoreCase(System.getenv("CI"))
             || Boolean.parseBoolean(System.getProperty("territory.require-docker", "false"));
         if (!required) return;

@@ -24,6 +24,7 @@ import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,7 +44,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *   <li>병합 중 체크인(개인 지도·공유 지도): 201 을 받은 체크인은 하나도 잃지 않는다 — 개인 지도 방문은 계정 영토로 옮겨지고,
  *       공유 지도 방문은 탈퇴 처리로 숨겨진다. 병합 뒤 체크인은 401/404 로 거절된다. 5xx·교착 없음.</li>
  * </ul>
- * Docker 가 없으면 skip(CI 는 DockerAvailabilityTest 가 막는다).
+ * Docker 가 없으면 skip(CI 는 DockerAvailabilityTest 가 막는다). 회귀 출처: 4단계 병합 경합·사용자 결정 Q2(공유 지도 재귀속).
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -53,7 +54,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 })
 @Import(IntegrationTestConfig.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@DisplayName("기록 합치기와 겹친 요청")
 class AccountMergeMySqlTest {
+
+    static final String REPEAT = "{displayName} — {currentRepetition}/{totalRepetitions}회째";
 
     @Container
     @ServiceConnection
@@ -131,8 +135,9 @@ class AccountMergeMySqlTest {
         return "mysql" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
     }
 
-    @RepeatedTest(5)
-    void 같은_계정으로_두_기기가_동시에_처음_로그인해도_계정은_하나_영토는_합쳐진다() throws Exception {
+    @RepeatedTest(value = 5, name = REPEAT)
+    @DisplayName("같은 계정으로 두 기기가 동시에 처음 로그인해도 계정은 하나이고 두 기기의 영토와 경험치가 합쳐진다")
+    void simultaneousFirstLogins() throws Exception {
         Device first = device();
         Device second = device();
         assertThat(checkIn(first, null, "KR-11010").status()).isEqualTo(201);
@@ -157,8 +162,9 @@ class AccountMergeMySqlTest {
             Integer.class, accountId)).isEqualTo(2);
     }
 
-    @RepeatedTest(8)
-    void 병합_중_체크인은_잃지_않는다_개인_지도는_옮겨지고_공유_지도는_재귀속된다() throws Exception {
+    @RepeatedTest(value = 8, name = REPEAT)
+    @DisplayName("합치는 동안 칠한 곳은 하나도 잃지 않는다 — 받아들여진 개인 지도 체크인은 계정 영토로, 공유 지도 체크인은 계정 것으로 간다")
+    void checkInsDuringMergeAreKept() throws Exception {
         String email = email();
         Device account = device();
         assertThat(login(email, account).status()).isEqualTo(200); // 계정 탐험가(연결)
@@ -214,8 +220,9 @@ class AccountMergeMySqlTest {
         assertThat(statuses.keySet()).isSubsetOf(201, 401, 404);
     }
 
-    @RepeatedTest(5)
-    void 병합_중_그_지도의_다른_멤버가_체크인해도_선점은_계정으로_가고_남에게_넘어가지_않는다() throws Exception {
+    @RepeatedTest(value = 5, name = REPEAT)
+    @DisplayName("합치는 동안 같은 지도의 다른 멤버가 같은 곳을 칠해도 익명 쪽 선점은 계정으로 가고 남에게 넘어가지 않는다")
+    void claimsStayWithAccount() throws Exception {
         String email = email();
         Device account = device();
         assertThat(login(email, account).status()).isEqualTo(200);

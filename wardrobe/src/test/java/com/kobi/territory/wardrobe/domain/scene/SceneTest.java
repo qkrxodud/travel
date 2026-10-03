@@ -1,11 +1,11 @@
 package com.kobi.territory.wardrobe.domain.scene;
 
-import static com.kobi.territory.wardrobe.domain.Fixtures.EXPLORER;
+import static com.kobi.territory.wardrobe.domain.Fixtures.ME;
 import static com.kobi.territory.wardrobe.domain.Fixtures.STYLE;
 import static com.kobi.territory.wardrobe.domain.Fixtures.T0;
 import static com.kobi.territory.wardrobe.domain.Fixtures.at;
 import static com.kobi.territory.wardrobe.domain.Fixtures.regionItem;
-import static com.kobi.territory.wardrobe.domain.Fixtures.setBackground;
+import static com.kobi.territory.wardrobe.domain.Fixtures.themeBackground;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -18,9 +18,13 @@ import com.kobi.territory.wardrobe.domain.item.ItemSpecs;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** D1: Scene — 슬롯 일치, 장식 ≤3, 보유 아이템만, autoEquip 희귀도, 회수 시 벗김, 꾸미기 점수. */
+/** 회귀 출처: 3단계 D1(장면 — 슬롯 일치·장식 3칸·가방에 있는 것만·자동 착용·회수 시 벗김·꾸미기 점수). */
+@DisplayName("장면")
 class SceneTest {
 
     static final ItemSpec LANTERN = regionItem("KR-11010", ItemSlot.HAND, Rarity.COMMON);
@@ -32,109 +36,268 @@ class SceneTest {
     static final ItemSpec STATUE = regionItem("KR-50110", ItemSlot.PROP, Rarity.RARE);
     static final ItemSpec VASE = regionItem("KR-38390", ItemSlot.PROP, Rarity.COMMON);
     static final ItemSpec TREE = regionItem("KR-36350", ItemSlot.PROP, Rarity.COMMON);
-    static final ItemSpecs ALL = ItemSpecs.of(List.of(LANTERN, CAMERA, MAP, CAP, ULLEUNG, PARASOL, STATUE, VASE, TREE,
-        setBackground("han")));
+    static final ItemSpecs CATALOG = ItemSpecs.of(List.of(LANTERN, CAMERA, MAP, CAP, ULLEUNG, PARASOL, STATUE, VASE, TREE,
+        themeBackground("han")));
     static final Holdings OWNS_ALL = Holdings.of(List.of(LANTERN.itemId(), CAMERA.itemId(), MAP.itemId(), CAP.itemId(),
         ULLEUNG.itemId(), PARASOL.itemId(), STATUE.itemId(), VASE.itemId(), TREE.itemId()));
+
+    static Scene blank() {
+        return Scene.blank(ME, T0);
+    }
+
+    /** 이 아이템들을 차례로 얻어 자동으로 입은 장면. */
+    static Scene wearing(ItemSpec... items) {
+        Scene scene = blank();
+        for (ItemSpec item : items) scene.autoEquip(item, CATALOG, at(1));
+        return scene;
+    }
 
     static SceneEdit equip(EquipSlot slot, ItemSpec item) {
         return new SceneEdit(null, Map.of(slot, item.itemId()), null, null);
     }
 
-    @Test
-    void 자동_착용은_빈_슬롯이거나_더_희귀할_때만() {
-        Scene scene = Scene.blank(EXPLORER, T0);
-        assertThat(scene.autoEquip(LANTERN, ALL, at(1))).isPresent();
-        assertThat(scene.autoEquip(MAP, ALL, at(2))).isEmpty(); // 같은 희귀도는 바꾸지 않는다
-        assertThat(scene.autoEquip(CAMERA, ALL, at(3))).isPresent();
-        assertThat(scene.autoEquip(LANTERN, ALL, at(4))).isEmpty();
-        assertThat(scene.equippedSlots().itemAt(EquipSlot.HAND)).contains(CAMERA.itemId());
+    static SceneEdit props(ItemSpec... items) {
+        return new SceneEdit(null, null, null, List.of(items).stream().map(ItemSpec::itemId).toList());
     }
 
-    @Test
-    void 자동_착용_장식은_빈_칸이_있을_때만_3개까지() {
-        Scene scene = Scene.blank(EXPLORER, T0);
-        assertThat(scene.autoEquip(PARASOL, ALL, at(1))).isPresent();
-        assertThat(scene.autoEquip(PARASOL, ALL, at(1))).isEmpty();
-        scene.autoEquip(STATUE, ALL, at(2));
-        scene.autoEquip(VASE, ALL, at(3));
-        assertThat(scene.autoEquip(TREE, ALL, at(4))).isEmpty();
-        assertThat(scene.propSlots().itemIds()).containsExactly(PARASOL.itemId(), STATUE.itemId(), VASE.itemId());
+    static void assertRejected(ThrowingCallable edit, String code) {
+        assertThatThrownBy(edit).isInstanceOf(TerritoryException.class).hasFieldOrPropertyWithValue("code", code);
     }
 
-    @Test
-    void 입히려면_가방에_있어야_하고_슬롯이_맞아야_한다() {
-        Scene scene = Scene.blank(EXPLORER, T0);
-        assertThatThrownBy(() -> scene.edit(equip(EquipSlot.HAND, LANTERN), ALL, Holdings.of(List.of()), at(1)))
-            .isInstanceOf(TerritoryException.class).hasFieldOrPropertyWithValue("code", "ITEM_NOT_OWNED");
-        assertThatThrownBy(() -> scene.edit(equip(EquipSlot.HAT, LANTERN), ALL, OWNS_ALL, at(1)))
-            .isInstanceOf(TerritoryException.class).hasFieldOrPropertyWithValue("code", "SLOT_MISMATCH");
-        assertThatThrownBy(() -> scene.edit(new SceneEdit(null, null, null, List.of(LANTERN.itemId())), ALL, OWNS_ALL, at(1)))
-            .isInstanceOf(TerritoryException.class).hasFieldOrPropertyWithValue("code", "SLOT_MISMATCH");
-        assertThatThrownBy(() -> scene.edit(equip(EquipSlot.HAND, regionItem("KR-99999", ItemSlot.HAND, Rarity.COMMON)),
-            ALL, OWNS_ALL, at(1)))
-            .isInstanceOf(TerritoryException.class).hasFieldOrPropertyWithValue("code", "ITEM_NOT_FOUND");
-        assertThat(scene.wornItemIds()).isEmpty();
+    @Nested
+    @DisplayName("새 아이템을 얻으면 자동으로 입는다")
+    class AutoEquip {
+
+        @Test
+        @DisplayName("슬롯이 비어 있으면 입는다")
+        void emptySlot() {
+            assertThat(blank().autoEquip(LANTERN, CATALOG, at(1))).isPresent();
+        }
+
+        @Test
+        @DisplayName("지금 입은 것과 희귀도가 같으면 그대로 둔다")
+        void sameRarityKeepsCurrent() {
+            Scene scene = wearing(LANTERN);
+
+            assertThat(scene.autoEquip(MAP, CATALOG, at(2))).isEmpty();
+            assertThat(scene.equippedSlots().itemAt(EquipSlot.HAND)).contains(LANTERN.itemId());
+        }
+
+        @Test
+        @DisplayName("더 희귀하면 바꿔 입는다")
+        void rarerReplaces() {
+            Scene scene = wearing(LANTERN);
+
+            assertThat(scene.autoEquip(CAMERA, CATALOG, at(3))).isPresent();
+            assertThat(scene.equippedSlots().itemAt(EquipSlot.HAND)).contains(CAMERA.itemId());
+        }
+
+        @Test
+        @DisplayName("덜 희귀하면 바꾸지 않는다")
+        void lessRareKeepsCurrent() {
+            Scene scene = wearing(CAMERA);
+
+            assertThat(scene.autoEquip(LANTERN, CATALOG, at(4))).isEmpty();
+            assertThat(scene.equippedSlots().itemAt(EquipSlot.HAND)).contains(CAMERA.itemId());
+        }
+
+        @Test
+        @DisplayName("장식은 빈 칸에 놓는다")
+        void propGoesToFreeSlot() {
+            assertThat(blank().autoEquip(PARASOL, CATALOG, at(1))).isPresent();
+        }
+
+        @Test
+        @DisplayName("이미 놓인 장식은 다시 놓지 않는다")
+        void samePropOnce() {
+            assertThat(wearing(PARASOL).autoEquip(PARASOL, CATALOG, at(1))).isEmpty();
+        }
+
+        @Test
+        @DisplayName("장식 세 칸이 다 차면 더 놓지 않고 놓인 순서를 지킨다")
+        void fullPropSlots() {
+            Scene scene = wearing(PARASOL, STATUE, VASE);
+
+            assertThat(scene.autoEquip(TREE, CATALOG, at(4))).isEmpty();
+            assertThat(scene.propSlots().itemIds()).containsExactly(PARASOL.itemId(), STATUE.itemId(), VASE.itemId());
+        }
     }
 
-    @Test
-    void 장식은_3개까지_중복_없이() {
-        Scene scene = Scene.blank(EXPLORER, T0);
-        assertThatThrownBy(() -> scene.edit(new SceneEdit(null, null, null,
-            List.of(PARASOL.itemId(), STATUE.itemId(), VASE.itemId(), TREE.itemId())), ALL, OWNS_ALL, at(1)))
-            .isInstanceOf(TerritoryException.class).hasFieldOrPropertyWithValue("code", "TOO_MANY_PROPS");
-        assertThatThrownBy(() -> scene.edit(new SceneEdit(null, null, null, List.of(PARASOL.itemId(), PARASOL.itemId())),
-            ALL, OWNS_ALL, at(1)))
-            .isInstanceOf(TerritoryException.class).hasFieldOrPropertyWithValue("code", "DUPLICATE_PROP");
-    }
+    @Nested
+    @DisplayName("직접 꾸미면")
+    class Edit {
 
-    @Test
-    void 편집은_성별_벗기_입기_장식을_한_번에_적용하고_바뀐_것이_없으면_결과가_없다() {
-        Scene scene = Scene.blank(EXPLORER, T0);
-        scene.autoEquip(LANTERN, ALL, at(1));
-        SceneEdit edit = new SceneEdit(Gender.F, Map.of(EquipSlot.HAT, CAP.itemId(), EquipSlot.BG, ULLEUNG.itemId()),
+        static final SceneEdit OUTFIT = new SceneEdit(Gender.F, Map.of(EquipSlot.HAT, CAP.itemId(), EquipSlot.BG, ULLEUNG.itemId()),
             Set.of(EquipSlot.HAND), List.of(STATUE.itemId()));
 
-        assertThat(scene.edit(edit, ALL, OWNS_ALL, at(2))).isPresent();
-        assertThat(scene.gender()).isEqualTo(Gender.F);
-        assertThat(scene.equippedSlots().itemAt(EquipSlot.HAND)).isEmpty();
-        assertThat(scene.wornItemIds()).containsExactly(CAP.itemId(), ULLEUNG.itemId(), STATUE.itemId());
-        assertThat(scene.edit(edit, ALL, OWNS_ALL, at(3))).isEmpty();
-        assertThat(scene.updatedAt()).isEqualTo(at(2));
+        @Test
+        @DisplayName("성별·입기·장식을 한 번에 적용한다")
+        void appliesAllAtOnce() {
+            Scene scene = wearing(LANTERN);
+
+            assertThat(scene.edit(OUTFIT, CATALOG, OWNS_ALL, at(2))).isPresent();
+            assertThat(scene.gender()).isEqualTo(Gender.F);
+            assertThat(scene.wornItemIds()).containsExactly(CAP.itemId(), ULLEUNG.itemId(), STATUE.itemId());
+        }
+
+        @Test
+        @DisplayName("벗긴 슬롯은 비어 있다")
+        void unequipClearsSlot() {
+            Scene scene = wearing(LANTERN);
+            scene.edit(OUTFIT, CATALOG, OWNS_ALL, at(2));
+
+            assertThat(scene.equippedSlots().itemAt(EquipSlot.HAND)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("같은 슬롯에 다른 아이템을 입히면 이전 것은 벗겨진다 — 한 슬롯에 하나")
+        void oneItemPerSlot() {
+            Scene scene = wearing(LANTERN);
+
+            scene.edit(equip(EquipSlot.HAND, MAP), CATALOG, OWNS_ALL, at(2));
+
+            assertThat(scene.wornItemIds()).containsExactly(MAP.itemId());
+        }
+
+        @Test
+        @DisplayName("바뀐 것이 없으면 장면이 바뀌지 않는다")
+        void noChangeNoUpdate() {
+            Scene scene = wearing(LANTERN);
+            scene.edit(OUTFIT, CATALOG, OWNS_ALL, at(2));
+
+            assertThat(scene.edit(OUTFIT, CATALOG, OWNS_ALL, at(3))).isEmpty();
+            assertThat(scene.updatedAt()).isEqualTo(at(2));
+        }
     }
 
-    @Test
-    void 회수된_아이템은_슬롯과_장식에서_벗긴다() {
-        Scene scene = Scene.blank(EXPLORER, T0);
-        scene.autoEquip(LANTERN, ALL, at(1));
-        scene.autoEquip(PARASOL, ALL, at(1));
+    @Nested
+    @DisplayName("입힐 수 없는 아이템")
+    class Rejections {
 
-        assertThat(scene.takeOff(LANTERN.itemId(), at(2))).isPresent();
-        assertThat(scene.takeOff(PARASOL.itemId(), at(2))).isPresent();
-        assertThat(scene.takeOff(CAP.itemId(), at(2))).isEmpty();
-        assertThat(scene.wornItemIds()).isEmpty();
+        @Test
+        @DisplayName("가방에 없는 아이템은 입힐 수 없고 장면도 그대로다")
+        void notOwned() {
+            Scene scene = blank();
+
+            assertRejected(() -> scene.edit(equip(EquipSlot.HAND, LANTERN), CATALOG, Holdings.of(List.of()), at(1)), "ITEM_NOT_OWNED");
+            assertThat(scene.wornItemIds()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("가방에 없는 장식은 놓을 수 없다")
+        void propNotOwned() {
+            assertRejected(() -> blank().edit(props(PARASOL), CATALOG, Holdings.of(List.of()), at(1)), "ITEM_NOT_OWNED");
+        }
+
+        @Test
+        @DisplayName("아이템 슬롯과 다른 슬롯에는 입힐 수 없다")
+        void slotMismatch() {
+            assertRejected(() -> blank().edit(equip(EquipSlot.HAT, LANTERN), CATALOG, OWNS_ALL, at(1)), "SLOT_MISMATCH");
+        }
+
+        @Test
+        @DisplayName("장식이 아닌 아이템은 장식 칸에 놓을 수 없다")
+        void notAProp() {
+            assertRejected(() -> blank().edit(props(LANTERN), CATALOG, OWNS_ALL, at(1)), "SLOT_MISMATCH");
+        }
+
+        @Test
+        @DisplayName("카탈로그에 없는 아이템은 입힐 수 없다")
+        void unknownItem() {
+            ItemSpec unknown = regionItem("KR-99999", ItemSlot.HAND, Rarity.COMMON);
+
+            assertRejected(() -> blank().edit(equip(EquipSlot.HAND, unknown), CATALOG, OWNS_ALL, at(1)), "ITEM_NOT_FOUND");
+        }
+
+        @Test
+        @DisplayName("장식은 세 개까지만 놓을 수 있다")
+        void tooManyProps() {
+            assertRejected(() -> blank().edit(props(PARASOL, STATUE, VASE, TREE), CATALOG, OWNS_ALL, at(1)), "TOO_MANY_PROPS");
+        }
+
+        @Test
+        @DisplayName("같은 장식을 두 칸에 놓을 수 없다")
+        void duplicateProp() {
+            assertRejected(() -> blank().edit(props(PARASOL, PARASOL), CATALOG, OWNS_ALL, at(1)), "DUPLICATE_PROP");
+        }
     }
 
-    @Test
-    void 꾸미기_점수는_착용_아이템_희귀도_점수_합() {
-        Scene scene = Scene.blank(EXPLORER, T0);
-        scene.autoEquip(CAMERA, ALL, at(1));    // 희귀 3
-        scene.autoEquip(CAP, ALL, at(1));       // 일반 1
-        scene.autoEquip(setBackground("han"), ALL, at(1)); // 전설 8
-        scene.autoEquip(PARASOL, ALL, at(1));   // 일반 1
-        assertThat(scene.stylePoints(ALL, STYLE)).isEqualTo(13);
-        assertThat(Scene.blank(EXPLORER, T0).stylePoints(ALL, STYLE)).isZero();
+    @Nested
+    @DisplayName("아이템을 잃으면")
+    class TakeOff {
+
+        @Test
+        @DisplayName("그 아이템을 슬롯에서 벗긴다")
+        void fromSlot() {
+            Scene scene = wearing(LANTERN);
+
+            assertThat(scene.takeOff(LANTERN.itemId(), at(2))).isPresent();
+            assertThat(scene.wornItemIds()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("그 장식을 장식 칸에서 치운다")
+        void fromPropSlots() {
+            Scene scene = wearing(PARASOL);
+
+            assertThat(scene.takeOff(PARASOL.itemId(), at(2))).isPresent();
+            assertThat(scene.wornItemIds()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("입지 않은 아이템을 잃으면 장면은 그대로다")
+        void notWorn() {
+            assertThat(wearing(LANTERN).takeOff(CAP.itemId(), at(2))).isEmpty();
+        }
     }
 
-    @Test
-    void 재계산_정리는_가방에_없는_아이템만_벗긴다() {
-        Scene scene = Scene.blank(EXPLORER, T0);
-        scene.autoEquip(LANTERN, ALL, at(1));
-        scene.autoEquip(CAP, ALL, at(1));
-        scene.autoEquip(PARASOL, ALL, at(1));
+    @Nested
+    @DisplayName("다시 계산한 가방에 맞추면")
+    class KeepOnly {
 
-        assertThat(scene.keepOnly(Holdings.of(List.of(CAP.itemId())), at(2))).isPresent();
-        assertThat(scene.wornItemIds()).containsExactly(CAP.itemId());
-        assertThat(scene.keepOnly(Holdings.of(List.of(CAP.itemId())), at(3))).isEmpty();
+        @Test
+        @DisplayName("가방에 없게 된 아이템만 벗긴다")
+        void removesOnlyMissing() {
+            Scene scene = wearing(LANTERN, CAP, PARASOL);
+
+            assertThat(scene.keepOnly(Holdings.of(List.of(CAP.itemId())), at(2))).isPresent();
+            assertThat(scene.wornItemIds()).containsExactly(CAP.itemId());
+        }
+
+        @Test
+        @DisplayName("이미 가방과 맞으면 장면이 바뀌지 않는다")
+        void alreadyConsistent() {
+            Scene scene = wearing(CAP);
+
+            assertThat(scene.keepOnly(Holdings.of(List.of(CAP.itemId())), at(3))).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("꾸미기 점수")
+    class StylePoints {
+
+        @Test
+        @DisplayName("입은 아이템과 장식의 희귀도 점수를 더한다")
+        void sumOfRarityPoints() {
+            Scene scene = wearing(CAMERA, CAP, themeBackground("han"), PARASOL); // 희귀 3 + 일반 1 + 전설 8 + 일반 1
+
+            assertThat(scene.stylePoints(CATALOG, STYLE)).isEqualTo(13);
+        }
+
+        @Test
+        @DisplayName("아무것도 입지 않으면 0점이다")
+        void blankIsZero() {
+            assertThat(blank().stylePoints(CATALOG, STYLE)).isZero();
+        }
+
+        @Test
+        @DisplayName("카탈로그에서 사라진 아이템은 0점으로 친다")
+        void unknownWornItemScoresZero() {
+            Scene scene = Scene.restore(ME, Gender.M, EquippedSlots.of(Map.of(EquipSlot.HAT, "region:KR-00000",
+                EquipSlot.HAND, CAMERA.itemId())), PropSlots.empty(), T0);
+
+            assertThat(scene.stylePoints(CATALOG, STYLE)).isEqualTo(3);
+        }
     }
 }

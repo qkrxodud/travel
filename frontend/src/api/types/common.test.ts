@@ -37,8 +37,8 @@ function serverCodes(): Set<string> {
 
 const hasBackend = existsSync(join(ROOT, 'app-api/src/main/java'));
 
-describe.skipIf(!hasBackend)('서버 에러 코드 목록', () => {
-  it('SERVER_ERROR_CODES 가 백엔드가 내는 코드와 같다', () => {
+describe.skipIf(!hasBackend)('서버 오류 종류 목록', () => {
+  it('화면이 아는 오류 종류는 서버가 실제로 내는 것과 빠짐도 남음도 없다', () => {
     const server = [...serverCodes()].sort();
     expect(server.length).toBeGreaterThan(40);
     expect([...SERVER_ERROR_CODES].sort()).toEqual(server);

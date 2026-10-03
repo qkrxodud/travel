@@ -42,8 +42,8 @@ async function stranger(browser: Browser) {
   return { context, page: await context.newPage() };
 }
 
-test.describe('4단계 공유 ↔ 서버', () => {
-  test('카드 미리보기 → 공개 프로필(월 단위·메모 없음·OG PNG) → 비공개 404 → 프로필 링크 합류 초대 보상', async ({ page, browser, request, dev }) => {
+test.describe('자랑 카드와 공개 프로필', () => {
+  test('자랑 카드를 미리 보고, 공개 프로필에는 방문 달만 보이고 메모는 숨겨지며, 비공개로 바꾸면 프로필이 사라지고, 프로필 링크로 친구가 합류하면 초대 보상을 받는다', async ({ page, browser, request, dev }) => {
     // ---- 칠하기(메모 포함) → 로그인(익명 탐험가를 계정에 연결) ----
     await open(page);
     await paintWithMemo(page, JONGNO);

@@ -5,35 +5,62 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.EvaluationResult;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
  * QA P2-1 회귀: D7 경계 규칙이 허용 목록이라 api 루트 패키지(exploration.api.Leak) 참조도 잡는지, 테스트 전용 픽스처
- * (com.kobi.territory.archfixture — 실제 컨텍스트 구조를 흉내 낸 패키지)에 같은 규칙을 적용해 확인한다.
+ * (com.kobi.territory.archfixture — 실제 컨텍스트 구조를 흉내 낸 패키지: 탐험 api 루트의 Leak·api.event 의 Fine·domain 의 Secret,
+ * 진행 application 의 Consumer)에 같은 규칙을 적용해 확인한다.
  */
+@DisplayName("모듈 경계 규칙은 실제 위반을 잡는다")
 class ArchitectureRuleRegressionTest {
 
     private static final String FIXTURE_ROOT = "com.kobi.territory.archfixture.";
     private static final JavaClasses FIXTURES = new ClassFileImporter().importPackages("com.kobi.territory.archfixture");
 
-    @Test
-    void 다른_컨텍스트가_api_루트_클래스를_참조하면_실패하고_api_event_는_허용된다() {
-        EvaluationResult result = ArchitectureTest.onlyPublicContractVisible(FIXTURE_ROOT, "exploration",
+    private static EvaluationResult otherContextLooksIntoExploration() {
+        return ArchitectureTest.onlyPublicContractVisible(FIXTURE_ROOT, "exploration",
             new String[] {"exploration", "progression"}).evaluate(FIXTURES);
-        assertThat(result.hasViolation()).isTrue();
-        assertThat(result.getFailureReport().getDetails()).anyMatch(detail -> detail.contains("Leak"))
-            .noneMatch(detail -> detail.contains("Fine"));
     }
 
-    @Test
-    void api_아래에_event_query_web_이외_패키지를_두면_실패한다() {
-        assertThat(ArchitectureTest.apiHasOnlyEventQueryWeb(FIXTURE_ROOT, "exploration").evaluate(FIXTURES).hasViolation())
-            .isTrue();
+    @Nested
+    @DisplayName("다른 컨텍스트가 탐험을 들여다볼 때")
+    class LookingAcrossContexts {
+
+        @Test
+        @DisplayName("공개 이벤트·조회 계약이 아닌 공개 창구 바로 아래의 것을 보면 경계 위반으로 잡힌다")
+        void apiRootReferenceIsViolation() {
+            EvaluationResult result = otherContextLooksIntoExploration();
+            assertThat(result.hasViolation()).isTrue();
+            assertThat(result.getFailureReport().getDetails()).anyMatch(detail -> detail.contains("Leak"));
+        }
+
+        @Test
+        @DisplayName("공개 이벤트를 보는 것은 위반이 아니다")
+        void publicEventReferenceIsAllowed() {
+            assertThat(otherContextLooksIntoExploration().getFailureReport().getDetails())
+                .noneMatch(detail -> detail.contains("Fine"));
+        }
     }
 
-    @Test
-    void 공개_계약이_아닌_api_클래스가_도메인을_참조하는_것도_공개_범위_규칙이_잡는다() {
-        assertThat(ArchitectureTest.publicContractStandalone(FIXTURE_ROOT, "exploration").evaluate(FIXTURES).hasViolation())
-            .as("event 패키지의 Fine 은 도메인을 참조하지 않으므로 standalone 위반은 없다").isFalse();
+    @Nested
+    @DisplayName("공개 창구의 모양")
+    class ApiShape {
+
+        @Test
+        @DisplayName("이벤트·조회·화면 세 갈래 밖에 무엇을 두면 위반으로 잡힌다")
+        void extraPackageIsViolation() {
+            assertThat(ArchitectureTest.apiHasOnlyEventQueryWeb(FIXTURE_ROOT, "exploration").evaluate(FIXTURES).hasViolation())
+                .isTrue();
+        }
+
+        @Test
+        @DisplayName("도메인을 모르는 공개 이벤트는 공개 계약 독립 규칙에 걸리지 않는다")
+        void standaloneEventPasses() {
+            assertThat(ArchitectureTest.publicContractStandalone(FIXTURE_ROOT, "exploration").evaluate(FIXTURES).hasViolation())
+                .isFalse();
+        }
     }
 }

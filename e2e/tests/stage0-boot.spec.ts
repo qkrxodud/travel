@@ -15,15 +15,15 @@ function isExternal(url: string | undefined, baseURL: string): boolean {
   }
 }
 
-test.describe('0단계 뼈대 부팅', () => {
-  test('첫 화면이 로드되고 타이틀이 나의 영토다', async ({ page }) => {
+test.describe('앱 첫 화면', () => {
+  test('앱을 열면 나의 영토 첫 화면이 뜬다', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle('나의 영토');
     await expect(page.locator('#tabs')).toBeVisible();
     await expect(page.locator('#tab-map')).toBeVisible();
   });
 
-  test('탭 6개를 클릭하면 해당 탭으로 전환된다', async ({ page }) => {
+  test('여섯 탭을 누르면 그 탭 화면으로 바뀐다', async ({ page }) => {
     await page.goto('/');
     const buttons = page.locator('#tabs [data-tab]');
     await expect(buttons).toHaveCount(TABS.length);
@@ -39,7 +39,7 @@ test.describe('0단계 뼈대 부팅', () => {
     }
   });
 
-  test('페이지 콘솔 에러가 없다', async ({ page, baseURL }) => {
+  test('화면을 여는 동안 브라우저 오류가 나지 않는다', async ({ page, baseURL }) => {
     const errors: string[] = [];
     const ignored: string[] = [];
     page.on('console', (msg) => {
@@ -60,7 +60,7 @@ test.describe('0단계 뼈대 부팅', () => {
     expect(errors, errors.join('\n')).toEqual([]);
   });
 
-  test('/health 응답에 dailyCap 5가 있다', async ({ request }) => {
+  test('서버가 살아 있다고 답하며 하루 칠하기 상한 다섯 곳을 알려 준다', async ({ request }) => {
     const res = await request.get('/health');
     expect(res.ok()).toBeTruthy();
     const body = await res.json();

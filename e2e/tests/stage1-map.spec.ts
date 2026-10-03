@@ -26,8 +26,8 @@ async function clickRegion(page: Page, code: string) {
   await region(page, code).dispatchEvent('click');
 }
 
-test.describe('1단계 지도 탭 ↔ 서버', () => {
-  test('칠하기 → 예상 XP → 저장 → 색칠·정복률·일지 → 새로고침 유지 → 기록 수정 → 제거', async ({ page, dev, request }) => {
+test.describe('지도에 영토 칠하기', () => {
+  test('지역을 칠하면 예상 XP를 보고 저장해 정복률과 일지에 남고, 새로고침해도 그대로이며, 기록을 고치고 지울 수 있다', async ({ page, dev, request }) => {
     await open(page);
     await expect(page.locator('#s-cnt')).toHaveText('0 / 250');
     await expect(page.locator('#log')).toContainText('아직 기록이 없어요');
@@ -96,7 +96,7 @@ test.describe('1단계 지도 탭 ↔ 서버', () => {
     await expect(region(page, GAPYEONG)).not.toHaveClass(/\bon\b/);
   });
 
-  test('칠하기 모드에서 이미 칠한 지역을 누르면 제거되고, 모달 취소는 저장하지 않는다', async ({ page }) => {
+  test('이미 칠한 지역을 다시 누르면 지워지고, 체크인을 그만두면 칠하지 않는다', async ({ page }) => {
     await open(page);
     await clickRegion(page, JONGNO);
     await expect(page.locator('#ci-xp-total')).toHaveText('+35'); // 일반 10 + 서울 첫 방문 15 + 선점 10
@@ -113,7 +113,7 @@ test.describe('1단계 지도 탭 ↔ 서버', () => {
     await expect(page.locator('#s-cnt')).toHaveText('0 / 250');
   });
 
-  test('미래 날짜 체크인은 서버 오류를 toast로 보여주고 칠하지 않는다', async ({ page }) => {
+  test('오늘 이후 날짜로는 칠할 수 없다고 알려 주고 칠하지 않는다', async ({ page }) => {
     await open(page);
     await clickRegion(page, JONGNO);
     await expect(page.locator('#checkin')).toBeVisible();
@@ -128,7 +128,7 @@ test.describe('1단계 지도 탭 ↔ 서버', () => {
     await expect(page.locator('#s-cnt')).toHaveText('0 / 250');
   });
 
-  test('온보딩(72h)이 끝난 탐험가의 6번째 체크인은 하루 상한 toast', async ({ page, dev }) => {
+  test('가입하고 사흘이 지난 탐험가는 하루 다섯 곳까지만 칠할 수 있다', async ({ page, dev }) => {
     await open(page);
     const explorerId = await dev.explorerOf(page);
     await dev.age(explorerId, 73);
@@ -149,7 +149,7 @@ test.describe('1단계 지도 탭 ↔ 서버', () => {
     await expect(page.locator('#s-cnt')).toHaveText('5 / 250');
   });
 
-  test('가입 직후(온보딩 중)에는 하루 5곳을 넘겨 칠할 수 있다', async ({ page, dev }) => {
+  test('갓 가입한 탐험가는 처음 사흘 동안 하루 다섯 곳을 넘겨 칠할 수 있다', async ({ page, dev }) => {
     await open(page);
     const explorerId = await dev.explorerOf(page);
     const today = localISO(new Date());
@@ -164,7 +164,7 @@ test.describe('1단계 지도 탭 ↔ 서버', () => {
     await expect(page.locator('#s-cnt')).toHaveText('6 / 250');
   });
 
-  test('예시 다시 채우기(POST /dev/seed)와 전부 지우기(DELETE /dev/visits)', async ({ page }) => {
+  test('예시 영토 45곳을 채웠다가 전부 지울 수 있고, 예시는 새로고침해도 남는다', async ({ page }) => {
     await open(page);
     await page.click('#t-sample');
     await expect(page.locator('#s-cnt')).toHaveText('45 / 250');
@@ -187,7 +187,7 @@ test.describe('1단계 지도 탭 ↔ 서버', () => {
     await expect(page.locator('#log')).toContainText('아직 기록이 없어요');
   });
 
-  test('서버 초기화로 저장된 탐험가가 사라지면 새로 발급받는다', async ({ page, dev }) => {
+  test('서버에서 내 탐험가 기록이 사라져도 새 탐험가로 빈 지도에서 다시 시작한다', async ({ page, dev }) => {
     await open(page);
     const first = await dev.explorerOf(page);
     await dev.reset();

@@ -60,8 +60,8 @@ async function readyWithJongno(page: Page, dev: { explorerOf: (page: Page) => Pr
   return { startX, startY };
 }
 
-test.describe('6단계 캐릭터 이동 프레임', () => {
-  test('체크인 후 이동 중 역행 0회 — 재조회·재렌더가 애니메이션을 다시 걸지 않는다', async ({ page, dev }) => {
+test.describe('지도 위 캐릭터 이동', () => {
+  test('체크인하면 캐릭터가 새 지역으로 끊김 없이 한 번에 걸어가고, 가는 동안 화면이 새로 고쳐져도 되돌아가지 않는다', async ({ page, dev }) => {
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-territory', 'ready');
     const token = await dev.explorerOf(page);
@@ -112,7 +112,7 @@ test.describe('6단계 캐릭터 이동 프레임', () => {
     expect(progress[progress.length - 1]).toBeCloseTo(1, 5);
   });
 
-  test('이동 도중 두 번째 체크인 — 지금 위치에서 이어서 출발한다(한 프레임 순간이동 없음)', async ({ page, dev }) => {
+  test('가는 도중 다른 곳을 또 칠하면 지금 있는 곳에서 이어 가고 순간이동하지 않는다', async ({ page, dev }) => {
     const { startX, startY } = await readyWithJongno(page, dev);
 
     await region(page, HAEUNDAE).dispatchEvent('click');

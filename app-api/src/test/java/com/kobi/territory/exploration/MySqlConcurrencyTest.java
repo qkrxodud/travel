@@ -25,6 +25,8 @@ import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,8 +41,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * QA P1-1 회귀: MySQL(기본 REPEATABLE READ)에서 동시 체크인이 지도 단위로 직렬화되는지 실제 HTTP로 검증한다.
- * Docker가 없으면 skip된다. 기본 빌드(./gradlew build)에 포함된다.
+ * 회귀 출처 QA P1-1(동시 체크인 직렬화)·P1-2(칭호 선택 경합)·S-1(재계산·릴레이 겹침)·3단계 P1-1(지도 커맨드 경합)·3단계 r2 P1-2
+ * (탈퇴와 동시 체크인): MySQL(기본 REPEATABLE READ) + 실제 HTTP. Docker가 없으면 skip된다. 기본 빌드(./gradlew build)에 포함된다.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -51,7 +53,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Import(IntegrationTestConfig.class)
 // 컨테이너가 멈추기 전에 컨텍스트(outbox 릴레이 스케줄러)를 닫는다 — 안 그러면 JVM 끝까지 죽은 DB에 접속을 시도한다.
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@DisplayName("동시에 몰린 요청")
 class MySqlConcurrencyTest {
+
+    static final String REPEAT = "{displayName} — {currentRepetition}/{totalRepetitions}회째";
 
     @Container
     @ServiceConnection
@@ -124,166 +129,186 @@ class MySqlConcurrencyTest {
     }
 
     @Test
-    void 실제로_MySQL_REPEATABLE_READ_위에서_돈다() {
+    @DisplayName("운영과 같은 데이터베이스·격리 수준 위에서 검증한다")
+    void runsOnProductionLikeDatabase() {
         assertThat(jdbc.queryForObject("SELECT VERSION()", String.class)).startsWith("8.4");
         assertThat(jdbc.queryForObject("SELECT @@GLOBAL.transaction_isolation", String.class)).isEqualTo("REPEATABLE-READ");
     }
 
-    @RepeatedTest(3)
-    void 온보딩이_끝난_탐험가의_동시_12건은_정확히_5건만_성공한다() throws Exception {
-        String me = newExplorer().get("explorerId").asText();
-        assertThat(send("POST", "/dev/explorers/age", me, "{\"hours\":73}").statusCode()).isEqualTo(200);
+    @Nested
+    @DisplayName("한 탐험가가 동시에 여러 곳을 칠할 때")
+    class ConcurrentCheckIns {
 
-        var tally = tally(concurrentCheckIns(me, seoul(12)));
+        @RepeatedTest(value = 3, name = REPEAT)
+        @DisplayName("온보딩이 끝난 탐험가가 열두 곳을 한꺼번에 칠해도 하루 다섯 곳까지만 칠해진다")
+        void dailyCapHolds() throws Exception {
+            String me = newExplorer().get("explorerId").asText();
+            assertThat(send("POST", "/dev/explorers/age", me, "{\"hours\":73}").statusCode()).isEqualTo(200);
 
-        assertThat(tally).containsEntry("201", 5L).containsEntry("422 DAILY_CAP_EXCEEDED", 7L).hasSize(2);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE checked_in_by = ?", Integer.class, me))
-            .isEqualTo(5);
-    }
+            var tally = tally(concurrentCheckIns(me, seoul(12)));
 
-    @RepeatedTest(3)
-    void 같은_시도_4곳_동시_체크인의_nth는_1부터_4까지_유일하고_시도_첫방문은_1건() throws Exception {
-        JsonNode ex = newExplorer();
-        String me = ex.get("explorerId").asText();
-        String mapId = ex.get("personalMapId").asText();
-
-        var tally = tally(concurrentCheckIns(me, seoul(4)));
-        assertThat(tally).containsEntry("201", 4L).hasSize(1);
-
-        List<JsonNode> visited = new ArrayList<>();
-        for (String payload : jdbc.queryForList(
-            "SELECT payload FROM outbox WHERE aggregate_id = ? AND event_type LIKE '%.RegionVisited' ORDER BY id",
-            String.class, mapId)) {
-            visited.add(om.readTree(payload));
+            assertThat(tally).containsEntry("201", 5L).containsEntry("422 DAILY_CAP_EXCEEDED", 7L).hasSize(2);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE checked_in_by = ?", Integer.class, me))
+                .isEqualTo(5);
         }
-        assertThat(visited).hasSize(4);
-        assertThat(visited).extracting(payload -> payload.get("nth").asInt()).containsExactlyInAnyOrder(1, 2, 3, 4);
-        assertThat(visited.stream().filter(payload -> payload.get("isFirstInProvince").asBoolean())).hasSize(1);
-        assertThat(visited).allSatisfy(payload -> assertThat(payload.get("isFirstClaim").asBoolean()).isTrue());
-        // 커밋 순서(outbox id 순)대로 nth 가 1,2,3,4 이고 첫 건만 시·도 첫 방문
-        assertThat(visited).extracting(payload -> payload.get("nth").asInt()).containsExactly(1, 2, 3, 4);
-        assertThat(visited.get(0).get("isFirstInProvince").asBoolean()).isTrue();
+
+        @RepeatedTest(value = 3, name = REPEAT)
+        @DisplayName("같은 시·도 네 곳을 한꺼번에 칠해도 회차는 칠한 순서대로 1부터 4이고 시·도 첫 발은 처음 한 곳뿐이다")
+        void nthIsUniqueInCommitOrder() throws Exception {
+            JsonNode ex = newExplorer();
+            String me = ex.get("explorerId").asText();
+            String mapId = ex.get("personalMapId").asText();
+
+            var tally = tally(concurrentCheckIns(me, seoul(4)));
+            assertThat(tally).containsEntry("201", 4L).hasSize(1);
+
+            List<JsonNode> visited = new ArrayList<>();
+            for (String payload : jdbc.queryForList(
+                "SELECT payload FROM outbox WHERE aggregate_id = ? AND event_type LIKE '%.RegionVisited' ORDER BY id",
+                String.class, mapId)) {
+                visited.add(om.readTree(payload));
+            }
+            assertThat(visited).hasSize(4);
+            assertThat(visited).extracting(payload -> payload.get("nth").asInt()).containsExactlyInAnyOrder(1, 2, 3, 4);
+            assertThat(visited.stream().filter(payload -> payload.get("isFirstInProvince").asBoolean())).hasSize(1);
+            assertThat(visited).allSatisfy(payload -> assertThat(payload.get("isFirstClaim").asBoolean()).isTrue());
+            // 커밋 순서(outbox id 순)대로 nth 가 1,2,3,4 이고 첫 건만 시·도 첫 방문
+            assertThat(visited).extracting(payload -> payload.get("nth").asInt()).containsExactly(1, 2, 3, 4);
+            assertThat(visited.get(0).get("isFirstInProvince").asBoolean()).isTrue();
+        }
+
+        @Test
+        @DisplayName("같은 곳을 여섯 번 한꺼번에 칠해도 한 번만 칠해지고 나머지는 이미 칠한 곳이라며 거절된다")
+        void sameRegionOnce() throws Exception {
+            String me = newExplorer().get("explorerId").asText();
+            var tally = tally(concurrentCheckIns(me, java.util.Collections.nCopies(6, "KR-11010")));
+            assertThat(tally).containsEntry("201", 1L).containsEntry("409 DUPLICATE_VISIT", 5L).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("칠하고 고치고 취소하는 흐름이 그대로 동작한다")
+        void checkInEditCancel() throws Exception {
+            String me = newExplorer().get("explorerId").asText();
+            String today = LocalDate.now(clock).toString();
+            assertThat(send("POST", "/visits", me, "{\"regionCode\":\"KR-37430\",\"visitDate\":\"" + today + "\"}")
+                .statusCode()).isEqualTo(201);
+            assertThat(send("PATCH", "/visits/KR-37430", me, "{\"memo\":\"독도\"}").statusCode()).isEqualTo(200);
+            assertThat(send("DELETE", "/visits/KR-37430", me, null).statusCode()).isEqualTo(204);
+            JsonNode territory = om.readTree(send("GET", "/territory", me, null).body());
+            assertThat(territory.get("conquest").get("visited").asInt()).isZero();
+        }
+
     }
 
-    @Test
-    void 같은_지역_동시_6건은_1건만_성공하고_나머지는_DUPLICATE_VISIT() throws Exception {
-        String me = newExplorer().get("explorerId").asText();
-        var tally = tally(concurrentCheckIns(me, java.util.Collections.nCopies(6, "KR-11010")));
-        assertThat(tally).containsEntry("201", 1L).containsEntry("409 DUPLICATE_VISIT", 5L).hasSize(2);
-    }
+    @Nested
+    @DisplayName("진행 반영이 다른 요청과 겹칠 때")
+    class ProgressUnderContention {
 
-    @Test
-    void 개인_지도_체크인_수정_취소가_MySQL에서_동작한다() throws Exception {
-        String me = newExplorer().get("explorerId").asText();
-        String today = LocalDate.now(clock).toString();
-        assertThat(send("POST", "/visits", me, "{\"regionCode\":\"KR-37430\",\"visitDate\":\"" + today + "\"}")
-            .statusCode()).isEqualTo(201);
-        assertThat(send("PATCH", "/visits/KR-37430", me, "{\"memo\":\"독도\"}").statusCode()).isEqualTo(200);
-        assertThat(send("DELETE", "/visits/KR-37430", me, null).statusCode()).isEqualTo(204);
-        JsonNode territory = om.readTree(send("GET", "/territory", me, null).body());
-        assertThat(territory.get("conquest").get("visited").asInt()).isZero();
-    }
-
-    @Test
-    void 진행_V2와_구독자별_릴레이가_MySQL에서_동작한다() throws Exception {
-        String me = newExplorer().get("explorerId").asText();
-        var tally = tally(concurrentCheckIns(me, seoul(4)));
-        assertThat(tally).containsEntry("201", 4L).hasSize(1);
-        // 일반 4곳: 기본 10×4 + 서울 첫 발 15 + 선점 10×4 = 95 (릴레이로 비동기 반영)
-        Awaitility.await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
-            JsonNode progress = om.readTree(send("GET", "/progress", me, null).body());
-            assertThat(progress.get("xp").asInt()).isEqualTo(95);
-        });
-        assertThat(send("DELETE", "/visits/" + seoul(1).get(0), me, null).statusCode()).isEqualTo(204);
-        Awaitility.await().atMost(Duration.ofSeconds(20)).untilAsserted(() ->
-            assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(85));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM explorer_region WHERE explorer_id = ? AND active_map_count > 0",
-            Integer.class, me)).isEqualTo(3);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_delivery WHERE status <> 'DELIVERED'", Integer.class))
-            .isZero();
-    }
+        @Test
+        @DisplayName("동시에 칠한 곳의 경험치가 모두 반영되고 취소하면 그 기본 경험치만 빠진다")
+        void relayAppliesAndRevokes() throws Exception {
+            String me = newExplorer().get("explorerId").asText();
+            var tally = tally(concurrentCheckIns(me, seoul(4)));
+            assertThat(tally).containsEntry("201", 4L).hasSize(1);
+            // 일반 4곳: 기본 10×4 + 서울 첫 발 15 + 선점 10×4 = 95 (릴레이로 비동기 반영)
+            Awaitility.await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
+                JsonNode progress = om.readTree(send("GET", "/progress", me, null).body());
+                assertThat(progress.get("xp").asInt()).isEqualTo(95);
+            });
+            assertThat(send("DELETE", "/visits/" + seoul(1).get(0), me, null).statusCode()).isEqualTo(204);
+            Awaitility.await().atMost(Duration.ofSeconds(20)).untilAsserted(() ->
+                assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(85));
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM explorer_region WHERE explorer_id = ? AND active_map_count > 0",
+                Integer.class, me)).isEqualTo(3);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_delivery WHERE status <> 'DELIVERED'", Integer.class))
+                .isZero();
+        }
 
 
-    @Test
-    void 칭호_선택_PUT_경합_중에도_체크인_진행이_손실되지_않는다_QA_P1_2() throws Exception {
-        String me = newExplorer().get("explorerId").asText();
-        String mapId = jdbc.queryForObject("SELECT id FROM expedition_map WHERE owner_id = ?", String.class, me);
-        AtomicBoolean running = new AtomicBoolean(true);
-        List<Future<Integer>> writers = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            writers.add(POOL.submit(() -> {
-                int sent = 0;
-                while (running.get()) {
-                    // 선택·해제를 번갈아 보내 매번 explorer_progress 행(version)이 실제로 바뀌게 한다
-                    send("PUT", "/progress/title", me, sent % 2 == 0 ? "{\"titleId\":\"lv1\"}" : "{\"titleId\":null}");
-                    sent++;
+        @Test
+        @DisplayName("칭호를 계속 바꾸는 중에 칠해도 경험치가 하나도 사라지지 않는다")
+        void titleChangesDoNotLoseProgress() throws Exception {
+            String me = newExplorer().get("explorerId").asText();
+            String mapId = jdbc.queryForObject("SELECT id FROM expedition_map WHERE owner_id = ?", String.class, me);
+            AtomicBoolean running = new AtomicBoolean(true);
+            List<Future<Integer>> writers = new ArrayList<>();
+            for (int i = 0; i < 4; i++) {
+                writers.add(POOL.submit(() -> {
+                    int sent = 0;
+                    while (running.get()) {
+                        // 선택·해제를 번갈아 보내 매번 explorer_progress 행(version)이 실제로 바뀌게 한다
+                        send("PUT", "/progress/title", me, sent % 2 == 0 ? "{\"titleId\":\"lv1\"}" : "{\"titleId\":null}");
+                        sent++;
+                    }
+                    return sent;
+                }));
+            }
+            String today = LocalDate.now(clock).toString();
+            try {
+                for (String code : List.of("KR-35050", "KR-36330", "KR-38360", "KR-38370", "KR-38380")) {
+                    assertThat(send("POST", "/visits", me, "{\"regionCode\":\"" + code + "\",\"visitDate\":\"" + today + "\"}")
+                        .statusCode()).isEqualTo(201);
                 }
-                return sent;
-            }));
-        }
-        String today = LocalDate.now(clock).toString();
-        try {
-            for (String code : List.of("KR-35050", "KR-36330", "KR-38360", "KR-38370", "KR-38380")) {
-                assertThat(send("POST", "/visits", me, "{\"regionCode\":\"" + code + "\",\"visitDate\":\"" + today + "\"}")
-                    .statusCode()).isEqualTo(201);
+                Thread.sleep(3000); // 경합을 몇 초 더 유지
+            } finally {
+                running.set(false);
             }
-            Thread.sleep(3000); // 경합을 몇 초 더 유지
-        } finally {
-            running.set(false);
+            int puts = 0;
+            for (Future<Integer> writer : writers) puts += writer.get();
+            assertThat(puts).as("경합을 만든 PUT 수").isGreaterThan(10);
+
+            Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
+                assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(285));
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_delivery d JOIN outbox o ON o.id = d.event_id "
+                + "WHERE o.aggregate_id IN (?, ?) AND d.status = 'FAILED'", Integer.class, mapId, me)).isZero();
+            Integer conflicts = jdbc.queryForObject("SELECT COALESCE(SUM(d.conflicts), 0) FROM outbox_delivery d JOIN outbox o "
+                + "ON o.id = d.event_id WHERE o.aggregate_id IN (?, ?)", Integer.class, mapId, me);
+            System.out.println("[QA P1-2] PUT " + puts + "건 경합 중 릴레이 낙관적 락 충돌 " + conflicts + "회 — 전부 재시도로 흡수");
         }
-        int puts = 0;
-        for (Future<Integer> writer : writers) puts += writer.get();
-        assertThat(puts).as("경합을 만든 PUT 수").isGreaterThan(10);
 
-        Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
-            assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(285));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_delivery d JOIN outbox o ON o.id = d.event_id "
-            + "WHERE o.aggregate_id IN (?, ?) AND d.status = 'FAILED'", Integer.class, mapId, me)).isZero();
-        Integer conflicts = jdbc.queryForObject("SELECT COALESCE(SUM(d.conflicts), 0) FROM outbox_delivery d JOIN outbox o "
-            + "ON o.id = d.event_id WHERE o.aggregate_id IN (?, ?)", Integer.class, mapId, me);
-        System.out.println("[QA P1-2] PUT " + puts + "건 경합 중 릴레이 낙관적 락 충돌 " + conflicts + "회 — 전부 재시도로 흡수");
-    }
-
-    @Test
-    void 재계산과_릴레이가_동시에_돌아도_릴레이_반영분이_사라지지_않는다_QA_S_1() throws Exception {
-        String me = newExplorer().get("explorerId").asText();
-        String mapId = jdbc.queryForObject("SELECT id FROM expedition_map WHERE owner_id = ?", String.class, me);
-        AtomicBoolean running = new AtomicBoolean(true);
-        Future<List<Integer>> recalculations = POOL.submit(() -> {
-            List<Integer> statuses = new ArrayList<>();
-            while (running.get()) statuses.add(send("POST", "/dev/recalculate", me, null).statusCode());
-            return statuses;
-        });
-        String today = LocalDate.now(clock).toString();
-        try {
-            for (String code : List.of("KR-35050", "KR-36330", "KR-38360", "KR-38370", "KR-38380")) {
-                assertThat(send("POST", "/visits", me, "{\"regionCode\":\"" + code + "\",\"visitDate\":\"" + today + "\"}")
-                    .statusCode()).isEqualTo(201);
+        @Test
+        @DisplayName("다시 계산이 계속 겹쳐 돌아도 칠한 곳의 반영이 사라지지 않고, 조용해진 뒤 다시 계산해도 같다")
+        void recalculationDoesNotLoseProgress() throws Exception {
+            String me = newExplorer().get("explorerId").asText();
+            String mapId = jdbc.queryForObject("SELECT id FROM expedition_map WHERE owner_id = ?", String.class, me);
+            AtomicBoolean running = new AtomicBoolean(true);
+            Future<List<Integer>> recalculations = POOL.submit(() -> {
+                List<Integer> statuses = new ArrayList<>();
+                while (running.get()) statuses.add(send("POST", "/dev/recalculate", me, null).statusCode());
+                return statuses;
+            });
+            String today = LocalDate.now(clock).toString();
+            try {
+                for (String code : List.of("KR-35050", "KR-36330", "KR-38360", "KR-38370", "KR-38380")) {
+                    assertThat(send("POST", "/visits", me, "{\"regionCode\":\"" + code + "\",\"visitDate\":\"" + today + "\"}")
+                        .statusCode()).isEqualTo(201);
+                }
+                Thread.sleep(3000); // 릴레이가 이벤트를 처리하는 동안 재계산을 몇 초 더 겹쳐 돌린다
+            } finally {
+                running.set(false);
             }
-            Thread.sleep(3000); // 릴레이가 이벤트를 처리하는 동안 재계산을 몇 초 더 겹쳐 돌린다
-        } finally {
-            running.set(false);
-        }
-        List<Integer> statuses = recalculations.get();
-        Awaitility.await().atMost(Duration.ofSeconds(60)).until(() -> jdbc.queryForObject(
-            "SELECT COUNT(*) FROM outbox WHERE published_at IS NULL AND aggregate_id IN (?, ?)", Integer.class, mapId, me) == 0);
-        System.out.println("[QA S-1] 실패 전달: " + jdbc.queryForList("SELECT d.subscriber, d.status, d.attempts, d.conflicts, "
-            + "d.last_error FROM outbox_delivery d JOIN outbox o ON o.id = d.event_id WHERE o.aggregate_id IN (?, ?) "
-            + "AND (d.attempts > 1 OR d.conflicts > 0)", mapId, me));
-        assertThat(statuses).as("겹쳐 돈 재계산 수").hasSizeGreaterThan(3).containsOnly(200);
+            List<Integer> statuses = recalculations.get();
+            Awaitility.await().atMost(Duration.ofSeconds(60)).until(() -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM outbox WHERE published_at IS NULL AND aggregate_id IN (?, ?)", Integer.class, mapId, me) == 0);
+            System.out.println("[QA S-1] 실패 전달: " + jdbc.queryForList("SELECT d.subscriber, d.status, d.attempts, d.conflicts, "
+                + "d.last_error FROM outbox_delivery d JOIN outbox o ON o.id = d.event_id WHERE o.aggregate_id IN (?, ?) "
+                + "AND (d.attempts > 1 OR d.conflicts > 0)", mapId, me));
+            assertThat(statuses).as("겹쳐 돈 재계산 수").hasSizeGreaterThan(3).containsOnly(200);
 
-        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-            assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(285));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM xp_ledger WHERE explorer_id = ? AND ref_id LIKE 'set:%'",
-            Integer.class, me)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM explorer_region WHERE explorer_id = ? AND active_map_count = 1",
-            Integer.class, me)).isEqualTo(5);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_delivery d JOIN outbox o ON o.id = d.event_id "
-            + "WHERE o.aggregate_id IN (?, ?) AND d.status = 'FAILED'", Integer.class, mapId, me)).isZero();
-        // 조용해진 뒤 한 번 더 재계산해도 같은 결과(재계산 결과 = 모든 이벤트 반영 상태)
-        assertThat(send("POST", "/dev/recalculate", me, null).statusCode()).isEqualTo(200);
-        assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(285);
-        System.out.println("[QA S-1] 재계산 " + statuses.size() + "회를 릴레이와 겹쳐 실행 — xp 285, FAILED 0");
+            Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(285));
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM xp_ledger WHERE explorer_id = ? AND ref_id LIKE 'set:%'",
+                Integer.class, me)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM explorer_region WHERE explorer_id = ? AND active_map_count = 1",
+                Integer.class, me)).isEqualTo(5);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_delivery d JOIN outbox o ON o.id = d.event_id "
+                + "WHERE o.aggregate_id IN (?, ?) AND d.status = 'FAILED'", Integer.class, mapId, me)).isZero();
+            // 조용해진 뒤 한 번 더 재계산해도 같은 결과(재계산 결과 = 모든 이벤트 반영 상태)
+            assertThat(send("POST", "/dev/recalculate", me, null).statusCode()).isEqualTo(200);
+            assertThat(om.readTree(send("GET", "/progress", me, null).body()).get("xp").asInt()).isEqualTo(285);
+            System.out.println("[QA S-1] 재계산 " + statuses.size() + "회를 릴레이와 겹쳐 실행 — xp 285, FAILED 0");
+        }
+
     }
 
     // ---- 3단계 QA P1-1: 공유 지도 커맨드 경합(지도 행 잠금) ----------------------------------------------------------
@@ -318,123 +343,132 @@ class MySqlConcurrencyTest {
         return jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND left_at IS NULL", Integer.class, mapId);
     }
 
-    @RepeatedTest(3)
-    void 자리가_2개_남은_지도에_4명이_동시에_합류하면_정확히_2명만_들어간다() throws Exception {
-        String owner = newExplorer().get("explorerId").asText();
-        String mapId = createMap(owner);
-        String first = newExplorer().get("explorerId").asText();
-        assertThat(send("POST", "/maps/join", first, "{\"inviteCode\":\"" + inviteOf(owner, mapId) + "\"}").statusCode())
-            .isEqualTo(200);
-        String code = inviteOf(owner, mapId);
-        List<String> joiners = new ArrayList<>();
-        for (int i = 0; i < 4; i++) joiners.add(newExplorer().get("explorerId").asText());
+    @Nested
+    @DisplayName("공유 지도에 요청이 몰릴 때")
+    class MapCommandsUnderContention {
 
-        var tally = tally(concurrently(joiners.stream().<java.util.concurrent.Callable<HttpResponse<String>>>map(joiner ->
-            () -> send("POST", "/maps/join", joiner, "{\"inviteCode\":\"" + code + "\"}")).toList()));
+        @RepeatedTest(value = 3, name = REPEAT)
+        @DisplayName("자리가 둘 남은 지도에 네 명이 한꺼번에 합류하면 두 명만 들어가고 나머지는 지도가 찼다고 거절된다")
+        void onlyTwoJoin() throws Exception {
+            String owner = newExplorer().get("explorerId").asText();
+            String mapId = createMap(owner);
+            String first = newExplorer().get("explorerId").asText();
+            assertThat(send("POST", "/maps/join", first, "{\"inviteCode\":\"" + inviteOf(owner, mapId) + "\"}").statusCode())
+                .isEqualTo(200);
+            String code = inviteOf(owner, mapId);
+            List<String> joiners = new ArrayList<>();
+            for (int i = 0; i < 4; i++) joiners.add(newExplorer().get("explorerId").asText());
 
-        assertThat(tally).containsEntry("200", 2L).containsEntry("409 MAP_FULL", 2L).hasSize(2);
-        assertThat(activeMembers(mapId)).isEqualTo(4);
-        assertThat(send("GET", "/maps/" + mapId, owner, null).statusCode()).isEqualTo(200);
-        assertThat(send("GET", "/maps", first, null).statusCode()).isEqualTo(200);
-    }
+            var tally = tally(concurrently(joiners.stream().<java.util.concurrent.Callable<HttpResponse<String>>>map(joiner ->
+                () -> send("POST", "/maps/join", joiner, "{\"inviteCode\":\"" + code + "\"}")).toList()));
 
-    @RepeatedTest(3)
-    void 지도장_넘기기와_그_대상의_탈퇴가_동시에_와도_OWNER는_정확히_1명이고_MemberLeft와_상태가_맞다() throws Exception {
-        String owner = newExplorer().get("explorerId").asText();
-        String member = newExplorer().get("explorerId").asText();
-        String mapId = createMap(owner);
-        assertThat(send("POST", "/maps/join", member, "{\"inviteCode\":\"" + inviteOf(owner, mapId) + "\"}").statusCode())
-            .isEqualTo(200);
-
-        List<Res> results = concurrently(List.of(
-            () -> send("POST", "/maps/" + mapId + "/transfer-owner", owner, "{\"explorerId\":\"" + member + "\"}"),
-            () -> send("POST", "/maps/" + mapId + "/leave", member, null)));
-
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND left_at IS NULL AND role = 'OWNER'",
-            Integer.class, mapId)).isEqualTo(1);
-        int memberLeft = jdbc.queryForObject("SELECT COUNT(*) FROM outbox WHERE aggregate_id = ? AND event_type LIKE '%MemberLeft'",
-            Integer.class, mapId);
-        boolean left = jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND explorer_id = ? AND left_at IS NOT NULL",
-            Integer.class, mapId, member) == 1;
-        assertThat(memberLeft).isEqualTo(left ? 1 : 0);
-        // 둘 중 하나만 성공한다: 양도가 먼저면 탈퇴가 422(지도장), 탈퇴가 먼저면 양도가 403(멤버 아님)
-        assertThat(results.stream().filter(result -> result.status() == 200).count()).isEqualTo(1);
-        assertThat(left).isEqualTo(results.get(1).status() == 200);
-        assertThat(send("GET", "/maps/" + mapId, left ? owner : member, null).statusCode()).isEqualTo(200);
-    }
-
-    @RepeatedTest(3)
-    void 유예_종료_배치와_재가입이_동시에_와도_응답과_멤버_행이_맞다() throws Exception {
-        String owner = newExplorer().get("explorerId").asText();
-        String member = newExplorer().get("explorerId").asText();
-        String mapId = createMap(owner);
-        String code = inviteOf(owner, mapId);
-        assertThat(send("POST", "/maps/join", member, "{\"inviteCode\":\"" + code + "\"}").statusCode()).isEqualTo(200);
-        assertThat(send("POST", "/maps/" + mapId + "/leave", member, null).statusCode()).isEqualTo(200);
-        clock.advance(Duration.ofDays(8));
-
-        List<Res> results = concurrently(List.of(
-            () -> send("POST", "/maps/join", member, "{\"inviteCode\":\"" + code + "\"}"),
-            () -> {
-                purgeJob.run();
-                return send("GET", "/health", null, null);
-            }));
-
-        assertThat(results.get(0).status()).isEqualTo(200);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND explorer_id = ? AND left_at IS NULL",
-            Integer.class, mapId, member)).isEqualTo(1);
-        assertThat(activeMembers(mapId)).isEqualTo(2);
-    }
-
-    // ---- 3단계 QA r2 P1-2: 탈퇴와 동시에 들어온 본인 체크인이 지도에 영구히 남지 않는다 ------------------------------
-
-    private void awaitRelayed(String mapId) {
-        Awaitility.await().atMost(Duration.ofSeconds(30)).until(() -> jdbc.queryForObject(
-            "SELECT COUNT(*) FROM outbox WHERE published_at IS NULL AND aggregate_id = ?", Integer.class, mapId) == 0);
-    }
-
-    @RepeatedTest(15)
-    void 다른_멤버가_영토를_잠근_사이_탈퇴와_본인_체크인이_동시에_와도_탈퇴자의_방문은_남지_않는다() throws Exception {
-        String owner = newExplorer().get("explorerId").asText();
-        String leaver = newExplorer().get("explorerId").asText();
-        String other = newExplorer().get("explorerId").asText();
-        String mapId = createMap(owner);
-        String code = inviteOf(owner, mapId);
-        for (String joiner : List.of(leaver, other)) {
-            assertThat(send("POST", "/maps/join", joiner, "{\"inviteCode\":\"" + code + "\"}").statusCode()).isEqualTo(200);
+            assertThat(tally).containsEntry("200", 2L).containsEntry("409 MAP_FULL", 2L).hasSize(2);
+            assertThat(activeMembers(mapId)).isEqualTo(4);
+            assertThat(send("GET", "/maps/" + mapId, owner, null).statusCode()).isEqualTo(200);
+            assertThat(send("GET", "/maps", first, null).statusCode()).isEqualTo(200);
         }
-        String today = LocalDate.now(clock).toString();
-        List<String> regions = seoul(3);
-        AtomicBoolean ticking = new AtomicBoolean(true);
-        Future<?> ticker = POOL.submit(() -> { // 처리 시각이 1ms씩 흐르게(QA 재현 조건)
-            while (ticking.get()) {
-                clock.advance(Duration.ofMillis(1));
-                Thread.sleep(1);
+
+        @RepeatedTest(value = 3, name = REPEAT)
+        @DisplayName("지도장 넘기기와 그 대상의 탈퇴가 겹쳐도 지도장은 한 명이고 하나만 이루어진다")
+        void transferOrLeaveNotBoth() throws Exception {
+            String owner = newExplorer().get("explorerId").asText();
+            String member = newExplorer().get("explorerId").asText();
+            String mapId = createMap(owner);
+            assertThat(send("POST", "/maps/join", member, "{\"inviteCode\":\"" + inviteOf(owner, mapId) + "\"}").statusCode())
+                .isEqualTo(200);
+
+            List<Res> results = concurrently(List.of(
+                () -> send("POST", "/maps/" + mapId + "/transfer-owner", owner, "{\"explorerId\":\"" + member + "\"}"),
+                () -> send("POST", "/maps/" + mapId + "/leave", member, null)));
+
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND left_at IS NULL AND role = 'OWNER'",
+                Integer.class, mapId)).isEqualTo(1);
+            int memberLeft = jdbc.queryForObject("SELECT COUNT(*) FROM outbox WHERE aggregate_id = ? AND event_type LIKE '%MemberLeft'",
+                Integer.class, mapId);
+            boolean left = jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND explorer_id = ? AND left_at IS NOT NULL",
+                Integer.class, mapId, member) == 1;
+            assertThat(memberLeft).isEqualTo(left ? 1 : 0);
+            // 둘 중 하나만 성공한다: 양도가 먼저면 탈퇴가 422(지도장), 탈퇴가 먼저면 양도가 403(멤버 아님)
+            assertThat(results.stream().filter(result -> result.status() == 200).count()).isEqualTo(1);
+            assertThat(left).isEqualTo(results.get(1).status() == 200);
+            assertThat(send("GET", "/maps/" + mapId, left ? owner : member, null).statusCode()).isEqualTo(200);
+        }
+
+        @RepeatedTest(value = 3, name = REPEAT)
+        @DisplayName("유예가 끝나 지우는 작업과 다시 합류가 겹쳐도 합류한 멤버로 남는다")
+        void purgeAndRejoin() throws Exception {
+            String owner = newExplorer().get("explorerId").asText();
+            String member = newExplorer().get("explorerId").asText();
+            String mapId = createMap(owner);
+            String code = inviteOf(owner, mapId);
+            assertThat(send("POST", "/maps/join", member, "{\"inviteCode\":\"" + code + "\"}").statusCode()).isEqualTo(200);
+            assertThat(send("POST", "/maps/" + mapId + "/leave", member, null).statusCode()).isEqualTo(200);
+            clock.advance(Duration.ofDays(8));
+
+            List<Res> results = concurrently(List.of(
+                () -> send("POST", "/maps/join", member, "{\"inviteCode\":\"" + code + "\"}"),
+                () -> {
+                    purgeJob.run();
+                    return send("GET", "/health", null, null);
+                }));
+
+            assertThat(results.get(0).status()).isEqualTo(200);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM map_member WHERE map_id = ? AND explorer_id = ? AND left_at IS NULL",
+                Integer.class, mapId, member)).isEqualTo(1);
+            assertThat(activeMembers(mapId)).isEqualTo(2);
+        }
+
+        // ---- 3단계 QA r2 P1-2: 탈퇴와 동시에 들어온 본인 체크인이 지도에 영구히 남지 않는다 ------------------------------
+
+        private void awaitRelayed(String mapId) {
+            Awaitility.await().atMost(Duration.ofSeconds(30)).until(() -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM outbox WHERE published_at IS NULL AND aggregate_id = ?", Integer.class, mapId) == 0);
+        }
+
+        @RepeatedTest(value = 15, name = REPEAT)
+        @DisplayName("다른 멤버가 칠하는 사이 떠나는 멤버가 동시에 칠해도 떠난 사람의 방문은 지도에 남지 않는다")
+        void leaverVisitDoesNotRemain() throws Exception {
+            String owner = newExplorer().get("explorerId").asText();
+            String leaver = newExplorer().get("explorerId").asText();
+            String other = newExplorer().get("explorerId").asText();
+            String mapId = createMap(owner);
+            String code = inviteOf(owner, mapId);
+            for (String joiner : List.of(leaver, other)) {
+                assertThat(send("POST", "/maps/join", joiner, "{\"inviteCode\":\"" + code + "\"}").statusCode()).isEqualTo(200);
             }
-            return null;
-        });
-        try {
-            concurrently(List.of(
-                () -> send("POST", "/visits", other, "{\"regionCode\":\"" + regions.get(0) + "\",\"visitDate\":\"" + today
-                    + "\",\"mapId\":\"" + mapId + "\"}"),
-                () -> send("POST", "/visits", other, "{\"regionCode\":\"" + regions.get(1) + "\",\"visitDate\":\"" + today
-                    + "\",\"mapId\":\"" + mapId + "\"}"),
-                () -> send("POST", "/maps/" + mapId + "/leave", leaver, null),
-                () -> send("POST", "/visits", leaver, "{\"regionCode\":\"" + regions.get(2) + "\",\"visitDate\":\"" + today
-                    + "\",\"mapId\":\"" + mapId + "\"}")));
-        } finally {
-            ticking.set(false);
-            ticker.get();
-        }
-        awaitRelayed(mapId);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE map_id = ? AND checked_in_by = ? AND hidden_at IS NULL",
-            Integer.class, mapId, leaver)).as("탈퇴자의 보이는 방문").isZero();
+            String today = LocalDate.now(clock).toString();
+            List<String> regions = seoul(3);
+            AtomicBoolean ticking = new AtomicBoolean(true);
+            Future<?> ticker = POOL.submit(() -> { // 처리 시각이 1ms씩 흐르게(QA 재현 조건)
+                while (ticking.get()) {
+                    clock.advance(Duration.ofMillis(1));
+                    Thread.sleep(1);
+                }
+                return null;
+            });
+            try {
+                concurrently(List.of(
+                    () -> send("POST", "/visits", other, "{\"regionCode\":\"" + regions.get(0) + "\",\"visitDate\":\"" + today
+                        + "\",\"mapId\":\"" + mapId + "\"}"),
+                    () -> send("POST", "/visits", other, "{\"regionCode\":\"" + regions.get(1) + "\",\"visitDate\":\"" + today
+                        + "\",\"mapId\":\"" + mapId + "\"}"),
+                    () -> send("POST", "/maps/" + mapId + "/leave", leaver, null),
+                    () -> send("POST", "/visits", leaver, "{\"regionCode\":\"" + regions.get(2) + "\",\"visitDate\":\"" + today
+                        + "\",\"mapId\":\"" + mapId + "\"}")));
+            } finally {
+                ticking.set(false);
+                ticker.get();
+            }
+            awaitRelayed(mapId);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE map_id = ? AND checked_in_by = ? AND hidden_at IS NULL",
+                Integer.class, mapId, leaver)).as("탈퇴자의 보이는 방문").isZero();
 
-        clock.advance(Duration.ofDays(8));
-        purgeJob.run();
-        awaitRelayed(mapId);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit v WHERE v.map_id = ? AND NOT EXISTS (SELECT 1 FROM map_member m "
-            + "WHERE m.map_id = v.map_id AND m.explorer_id = v.checked_in_by AND m.left_at IS NULL)", Integer.class, mapId))
-            .as("유예 종료 뒤 비멤버 방문").isZero();
+            clock.advance(Duration.ofDays(8));
+            purgeJob.run();
+            awaitRelayed(mapId);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit v WHERE v.map_id = ? AND NOT EXISTS (SELECT 1 FROM map_member m "
+                + "WHERE m.map_id = v.map_id AND m.explorer_id = v.checked_in_by AND m.left_at IS NULL)", Integer.class, mapId))
+                .as("유예 종료 뒤 비멤버 방문").isZero();
+        }
     }
 }

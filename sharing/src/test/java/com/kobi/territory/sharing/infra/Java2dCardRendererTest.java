@@ -27,13 +27,19 @@ import java.time.LocalDate;
 import java.time.Year;
 import java.util.List;
 import javax.imageio.ImageIO;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
+ * 회귀 출처: 4단계 OG 카드 렌더러(OFL 글꼴 번들).
  * 렌더 결과 스냅샷(픽셀 단위 비교 대신 구조 확인): 1200×630 PNG, 번들 한글 글꼴 사용, 지도 영역에 "내 영토" 색 픽셀, 오른쪽 글자
  * 영역에 흰 글자 픽셀, 아래 공개 경로 막대. 실패 분석용으로 build/card-snapshots 에 PNG 를 남긴다.
  */
+@DisplayName("카드 그림")
 class Java2dCardRendererTest {
 
     static Java2dCardRenderer renderer;
@@ -57,17 +63,8 @@ class Java2dCardRendererTest {
             new ShowcaseScene(7, List.of("청사초롱 등불", "제주 감귤 모자"), 3));
     }
 
-    @Test
-    void 번들_한글_글꼴로_그린다() {
-        assertThat(renderer.fonts().source()).startsWith("bundled");
-        assertThat(renderer.fonts().displaysKorean()).isTrue();
-        // 제목 글꼴(Do Hyeon)에 없는 '·' 는 본문 글꼴로 내려가 두부(□)가 생기지 않는다
-        String line = "Lv.4 · 스트릭 2개월";
-        assertThat(renderer.fonts().covering(renderer.fonts().display(34), line).canDisplayUpTo(line)).isEqualTo(-1);
-    }
-
-    @Test
-    void 카드_4종이_1200x630_PNG_이고_지도와_글자_영역이_그려진다() throws IOException {
+    /** 카드 4종을 그려 build/card-snapshots 에 남긴다(실패 분석용). */
+    static Map<String, BufferedImage> renderAll() throws IOException {
         Showcase other = new Showcase("lee", showcase.atlas(), PublicVisits.of(List.of(
             new VisitFact("KR-11010", LocalDate.parse("2026-01-01"), Instant.EPOCH)), showcase.atlas()),
             ShowcaseProgress.start(9), ShowcaseScene.empty());
@@ -78,21 +75,81 @@ class Java2dCardRendererTest {
             CardComposer.versus(showcase, other));
         Path out = Path.of("build", "card-snapshots");
         Files.createDirectories(out);
+        Map<String, BufferedImage> images = new LinkedHashMap<>();
         for (CardContent content : contents) {
             byte[] png = renderer.render(content);
             assertThat(png).startsWith(0x89, 'P', 'N', 'G');
             String name = content.getClass().getSimpleName().toLowerCase();
             Files.write(out.resolve(name + ".png"), png);
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
-            assertThat(image.getWidth()).isEqualTo(1200);
-            assertThat(image.getHeight()).isEqualTo(630);
-            assertThat(countPixels(image, 40, 40, 560, 590, Java2dCardRenderer.EMPTY_REGION))
-                .as(name + " 지도 실루엣(빈 지역)").isGreaterThan(20_000);
-            assertThat(countNear(image, 620, 50, 1180, 540, Color.WHITE)).as(name + " 오른쪽 흰 글자").isGreaterThan(300);
-            assertThat(countPixels(image, 640, 548, 644, 582, Java2dCardRenderer.MINE)).as(name + " 아래 막대").isGreaterThan(100);
+            images.put(name, ImageIO.read(new ByteArrayInputStream(png)));
         }
-        BufferedImage territory = ImageIO.read(new ByteArrayInputStream(renderer.render(contents.get(0))));
-        assertThat(countPixels(territory, 40, 40, 560, 590, Java2dCardRenderer.MINE)).as("칠한 지역").isGreaterThan(30);
+        return images;
+    }
+
+    @Nested
+    @DisplayName("글꼴")
+    class Fonts {
+
+        @Test
+        @DisplayName("함께 넣은 글꼴로 그린다")
+        void bundled() {
+            assertThat(renderer.fonts().source()).startsWith("bundled");
+        }
+
+        @Test
+        @DisplayName("한글을 그릴 수 있다")
+        void displaysKorean() {
+            assertThat(renderer.fonts().displaysKorean()).isTrue();
+        }
+
+        @Test
+        @DisplayName("제목 글꼴에 없는 가운뎃점도 빈 네모 없이 그린다")
+        void fallsBackForMissingGlyphs() {
+            String line = "Lv.4 · 스트릭 2개월";
+
+            assertThat(renderer.fonts().covering(renderer.fonts().display(34), line).canDisplayUpTo(line)).isEqualTo(-1);
+        }
+    }
+
+    @Nested
+    @DisplayName("카드 네 종류 모두")
+    class AllKinds {
+
+        @Test
+        @DisplayName("링크 미리보기 크기(1200×630) 그림이다")
+        void ogSize() throws IOException {
+            renderAll().forEach((name, image) -> {
+                assertThat(image.getWidth()).as(name).isEqualTo(1200);
+                assertThat(image.getHeight()).as(name).isEqualTo(630);
+            });
+        }
+
+        @Test
+        @DisplayName("왼쪽에 우리나라 지도 실루엣을 그린다")
+        void mapSilhouette() throws IOException {
+            renderAll().forEach((name, image) ->
+                assertThat(countPixels(image, 40, 40, 560, 590, Java2dCardRenderer.EMPTY_REGION)).as(name).isGreaterThan(20_000));
+        }
+
+        @Test
+        @DisplayName("오른쪽에 흰 글자를 쓴다")
+        void whiteText() throws IOException {
+            renderAll().forEach((name, image) ->
+                assertThat(countNear(image, 620, 50, 1180, 540, Color.WHITE)).as(name).isGreaterThan(300));
+        }
+
+        @Test
+        @DisplayName("아래에 공개 주소 막대를 그린다")
+        void footerBar() throws IOException {
+            renderAll().forEach((name, image) ->
+                assertThat(countPixels(image, 640, 548, 644, 582, Java2dCardRenderer.MINE)).as(name).isGreaterThan(100));
+        }
+    }
+
+    @Test
+    @DisplayName("영토 카드에는 칠한 지역이 내 색으로 보인다")
+    void paintedRegions() throws IOException {
+        assertThat(countPixels(renderAll().get("territory"), 40, 40, 560, 590, Java2dCardRenderer.MINE)).isGreaterThan(30);
     }
 
     private static int countPixels(BufferedImage image, int left, int top, int right, int bottom, Color color) {

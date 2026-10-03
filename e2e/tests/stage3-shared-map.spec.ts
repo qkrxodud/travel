@@ -35,8 +35,8 @@ async function reloadMap(page: Page) {
   await expect(page.locator('html')).toHaveAttribute('data-territory', 'ready');
 }
 
-test.describe('3단계 공유 지도 ↔ 서버', () => {
-  test('만들기 → 초대코드 합류 → 각자 체크인·선점 색 → 지도장 이의 → 탈퇴 경고 → 재가입 복구', async ({ page, browser, dev }) => {
+test.describe('친구들과 함께 칠하는 공유 지도', () => {
+  test('공유 지도를 만들어 초대코드로 친구를 들이면 먼저 칠한 사람 색으로 칠해지고, 지도장은 이의를 걸 수 있으며, 나갔다가 다시 들어오면 내 기록이 돌아온다', async ({ page, browser, dev }) => {
     // ---- A: 지도 만들기(3줄 규칙 안내) ----
     await open(page);
     const aId = await dev.idOf(page);
@@ -130,7 +130,7 @@ test.describe('3단계 공유 지도 ↔ 서버', () => {
     await friendContext.close();
   });
 
-  test('지도장 설정(사진 필수)과 초대코드 재발급', async ({ page }) => {
+  test('지도장은 사진을 필수로 바꾸고 초대코드를 새로 만들 수 있다', async ({ page }) => {
     await open(page);
     await page.click('#t-map-new');
     await page.fill('#mm-name', '사진 원정대');

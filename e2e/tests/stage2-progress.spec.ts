@@ -42,8 +42,8 @@ async function paint(page: Page, code: string, xpTotal?: string) {
   await expect(region(page, code)).toHaveClass(/\bon\b/);
 }
 
-test.describe('2단계 진행 ↔ 서버', () => {
-  test('체크인 → 헤더 XP·Lv → 세트 완성·칭호 → 퀘스트 받기 1회 → 취소는 XP만 감소·도감 완성 유지 → 칭호 선택', async ({ page, dev, request }) => {
+test.describe('XP와 레벨, 도감, 퀘스트', () => {
+  test('칠할수록 XP와 레벨이 오르고 세트를 완성하면 칭호를 받으며, 퀘스트 보상은 한 번만 받고, 칠한 곳을 지우면 XP만 줄고 완성한 세트는 남으며, 받은 칭호 가운데 하나를 골라 단다', async ({ page, dev, request }) => {
     const errors = watchErrors(page);
     await open(page);
     await expect(page.locator('#lv')).toHaveText('Lv.1');
@@ -132,7 +132,7 @@ test.describe('2단계 진행 ↔ 서버', () => {
     expect(errors, errors.join('\n')).toEqual([]);
   });
 
-  test('예시 다시 채우기는 처리 시각을 샘플 날짜로 넣어 스트릭·월간 퀘스트가 프로토타입처럼 보인다(D6)', async ({ page }) => {
+  test('예시 영토는 예시 날짜에 칠한 것으로 쳐서 스트릭·월간 퀘스트·뱃지가 채워지고, 전부 지우면 진행도 비워진다', async ({ page }) => {
     const errors = watchErrors(page);
     await open(page);
     await page.click('#t-sample');

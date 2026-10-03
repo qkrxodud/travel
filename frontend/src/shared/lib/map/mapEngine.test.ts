@@ -1,3 +1,7 @@
+/**
+ * 지도 엔진 — 지도 그림은 엔진이 소유하고 화면은 바뀐 값만 넘긴다. 캐릭터 이동은 목적지가 바뀔 때만 시작한다.
+ * 이야기 순서: 캐릭터 이동 → 지도 칠하기 → 지도 만지기.
+ */
 import { afterEach, describe, expect, it } from 'vitest';
 import { CATALOG } from '../../../test/fixtures';
 import { MapEngine, type RegionPaint } from './mapEngine';
@@ -17,7 +21,7 @@ function mount() {
   const engine = new MapEngine(svg, tip, card, CATALOG.features, { onRegionClick: code => clicks.push(code), describe: code => code });
   const charpos = () => svg.querySelector('g.charpos') as TransitionNode;
   const transitions = () => Object.keys(charpos().__transition ?? {});
-  return { engine, svg, charpos, transitions, clicks };
+  return { engine, svg, tip, charpos, transitions, clicks };
 }
 
 const paint = (mine: string[], selected: string | null = null): RegionPaint =>
@@ -27,8 +31,8 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('지도 엔진 — 캐릭터 이동', () => {
-  it('처음에는 바로 서고, 목적지가 바뀌면 이동을 한 번 시작한다', () => {
+describe('지도 위 캐릭터 이동', () => {
+  it('처음에는 제자리에 바로 서고, 목적지가 바뀌면 한 번 깡충 이동한다', () => {
     const { engine, charpos, transitions } = mount();
     engine.placeCharacter('11010', LOOK_A, true);
     expect(charpos().getAttribute('transform')).toMatch(/^translate\(/);
@@ -37,7 +41,7 @@ describe('지도 엔진 — 캐릭터 이동', () => {
     expect(transitions()).toHaveLength(1);
   });
 
-  it('같은 목적지로 이동 중이면 재렌더가 와도 다시 걸지 않는다(재시작 금지)', () => {
+  it('같은 곳으로 가는 중에 화면이 다시 그려져도 이동을 처음부터 다시 하지 않는다', () => {
     const { engine, transitions } = mount();
     engine.placeCharacter('11010', LOOK_A, true);
     engine.placeCharacter('37430', LOOK_A, true);
@@ -46,7 +50,7 @@ describe('지도 엔진 — 캐릭터 이동', () => {
     expect(transitions()).toEqual([moving]);
   });
 
-  it('이동 중 캐릭터 그림이 바뀌어도 이동을 끊지 않고 도착 뒤로 미룬다', () => {
+  it('가는 도중 옷차림이 바뀌면 이동을 끊지 않고 도착한 뒤에 갈아입는다', () => {
     const { engine, svg, transitions } = mount();
     engine.placeCharacter('11010', LOOK_A, true);
     engine.placeCharacter('37430', LOOK_A, true);
@@ -56,7 +60,7 @@ describe('지도 엔진 — 캐릭터 이동', () => {
     expect(svg.querySelector('g.charpos g')?.innerHTML).toBe(LOOK_A);
   });
 
-  it('다른 곳으로 다시 출발하면 새 이동이 이어받는다', () => {
+  it('다른 곳으로 다시 출발하면 새 이동 하나가 이어받는다', () => {
     const { engine, transitions } = mount();
     engine.placeCharacter('11010', LOOK_A, true);
     engine.placeCharacter('37430', LOOK_A, true);
@@ -67,7 +71,7 @@ describe('지도 엔진 — 캐릭터 이동', () => {
     expect(after).toHaveLength(1);
   });
 
-  it('이동 도중 새 목적지로 다시 출발하면 출발 지역이 아니라 지금 위치에서 이어 간다(순간이동 없음)', async () => {
+  it('가는 도중 새 목적지가 생기면 출발 지역이 아니라 지금 있는 곳에서 이어 간다', async () => {
     const { engine, charpos } = mount();
     const at = () => {
       const match = /translate\(([-\d.e]+),\s*([-\d.e]+)\)/.exec(charpos().getAttribute('transform') ?? '');
@@ -89,7 +93,7 @@ describe('지도 엔진 — 캐릭터 이동', () => {
     expect(distance(midway, resumed)).toBeLessThan(distance(origin, resumed));
   });
 
-  it('두 번째 이동 중에도 캐릭터 그림 교체는 도착 뒤로 미룬다', async () => {
+  it('두 번째로 가는 도중에도 갈아입기는 도착 뒤로 미룬다', async () => {
     const { engine, svg } = mount();
     engine.placeCharacter('11010', LOOK_A, true);
     engine.placeCharacter('37430', LOOK_A, true);
@@ -99,27 +103,78 @@ describe('지도 엔진 — 캐릭터 이동', () => {
     expect(svg.querySelector('g.charpos g')?.innerHTML).toBe(LOOK_A);
   });
 
-  it('영토가 없으면 숨긴다', () => {
+  it('칠한 곳이 없으면 캐릭터를 숨긴다', () => {
     const { engine, charpos } = mount();
     engine.placeCharacter(null, LOOK_A, true);
     expect(charpos().getAttribute('display')).toBe('none');
   });
 });
 
-describe('지도 엔진 — 지역 칠하기', () => {
-  it('내 영토·선택·전설·data-code 를 단다(바뀐 게 없으면 DOM 을 건드리지 않는다)', () => {
-    const { engine, svg, clicks } = mount();
-    const region = (code: string) => svg.querySelector(`path.region[data-code="${code}"]`) as SVGPathElement;
-    expect(region('37430').classList.contains('legend')).toBe(true);
+describe('지도 칠하기', () => {
+  const regionIn = (svg: SVGSVGElement) => (code: string) => svg.querySelector(`path.region[data-code="${code}"]`) as SVGPathElement;
+
+  it('전설 지역은 처음부터 전설로 표시한다', () => {
+    const { svg } = mount();
+    expect(regionIn(svg)('37430').classList.contains('legend')).toBe(true);
+    expect(regionIn(svg)('11010').classList.contains('legend')).toBe(false);
+  });
+
+  it('내 영토와 지금 고른 지역을 칠한다', () => {
+    const { engine, svg } = mount();
     engine.setPaint(paint(['11010'], '31370'));
-    expect(region('11010').classList.contains('on')).toBe(true);
-    expect(region('31370').classList.contains('focus')).toBe(true);
-    region('11010').style.fill = 'red'; // 칠하기를 다시 돌리면 인라인 fill 이 지워진다
+    expect(regionIn(svg)('11010').classList.contains('on')).toBe(true);
+    expect(regionIn(svg)('31370').classList.contains('focus')).toBe(true);
+    expect(regionIn(svg)('37430').classList.contains('on')).toBe(false);
+  });
+
+  it('바뀐 것이 없으면 다시 칠하지 않고, 바뀌면 다시 칠한다', () => {
+    const { engine, svg } = mount();
+    const region = regionIn(svg);
+    engine.setPaint(paint(['11010'], '31370'));
+    region('11010').style.fill = 'red'; // 다시 칠하면 덧칠한 색이 지워진다
     engine.setPaint(paint(['11010'], '31370'));
     expect(region('11010').style.fill).toBe('red');
     engine.setPaint(paint(['11010', '11020'], '31370'));
     expect(region('11010').style.fill).toBe('');
-    region('31370').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+
+  it('다른 탭에서 보여 달라고 한 지역을 강조한다', () => {
+    const { engine, svg } = mount();
+    engine.setPaint({ ...paint([]), highlight: '37430' });
+    expect(regionIn(svg)('37430').classList.contains('hl')).toBe(true);
+  });
+
+  it('공유 지도에서는 먼저 칠한 멤버의 색으로 칠하고 누가 칠했는지 표시한다', () => {
+    const { engine, svg } = mount();
+    engine.setPaint({ ...paint([]), claimColor: new Map([['11010', '#e8743b']]), claimer: new Map([['11010', 'friend']]) });
+    const jongno = regionIn(svg)('11010');
+    expect(jongno.classList.contains('claimed')).toBe(true);
+    expect(jongno.style.fill).toBe('rgb(232, 116, 59)');
+    expect(jongno.getAttribute('data-claim')).toBe('friend');
+  });
+});
+
+describe('지도 만지기', () => {
+  it('지역을 누르면 어느 지역인지 알린다', () => {
+    const { svg, clicks } = mount();
+    svg.querySelector('path.region[data-code="31370"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(clicks).toEqual(['31370']);
+  });
+
+  it('지역 위에 마우스를 올리면 그 지역 설명을 띄우고, 벗어나면 감춘다', () => {
+    const { svg, tip } = mount();
+    const region = svg.querySelector('path.region[data-code="37430"]') as SVGPathElement;
+    region.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 10, clientY: 20 }));
+    expect(tip.textContent).toBe('37430');
+    expect(tip.classList.contains('show')).toBe(true);
+    region.dispatchEvent(new MouseEvent('mouseleave'));
+    expect(tip.classList.contains('show')).toBe(false);
+  });
+
+  it('체크인한 곳에 퍼지는 원을 그리고, 모르는 지역이면 그리지 않는다', () => {
+    const { engine, svg } = mount();
+    engine.ping('11010');
+    engine.ping('99999');
+    expect(svg.querySelectorAll('circle.ping')).toHaveLength(1);
   });
 });

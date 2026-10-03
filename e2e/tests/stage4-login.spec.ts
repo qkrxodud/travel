@@ -31,8 +31,8 @@ async function paint(page: Page, code: string) {
   await expect(region(page, code)).toHaveClass(/\bon\b/);
 }
 
-test.describe('4단계 로그인 ↔ 서버', () => {
-  test('익명 칠하기 → 로그인(영토 유지) → 다른 기기 익명 기록을 같은 계정으로 병합 → 로그아웃', async ({ page, browser, dev }) => {
+test.describe('구글 로그인과 계정', () => {
+  test('익명으로 칠한 영토는 로그인해도 그대로 남고, 다른 기기에서 익명으로 칠한 기록도 같은 계정으로 합쳐지며, 로그아웃하면 새 익명 탐험가가 된다', async ({ page, browser, dev }) => {
     // ---- 첫 기기: 익명으로 칠하기, 구글 로그인은 비활성 안내(클라이언트 ID 없음) ----
     await open(page);
     await tab(page, 'profile');
@@ -123,7 +123,7 @@ test.describe('4단계 로그인 ↔ 서버', () => {
     await secondContext.close();
   });
 
-  test('handle 변경 — 형식·금칙어·중복·옛 handle 예약', async ({ page, browser, dev }) => {
+  test('handle 을 바꿀 때 형식이 틀리거나 쓸 수 없는 말이거나 남이 쓰는 이름이면 거절되고, 내 옛 handle 은 남이 가져가지 못한다', async ({ page, browser, dev }) => {
     await open(page);
     const mine = await dev.login(page, { email: 'lee@example.com', token: await dev.explorerOf(page) });
     const other = await browser.newContext();

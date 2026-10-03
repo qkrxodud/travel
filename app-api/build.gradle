@@ -76,6 +76,9 @@ def frontendCheck = tasks.register('frontendCheck', NpmTask) {
     dependsOn tasks.named('npmInstall')
     npmCommand = ['run', 'check']
     frontendSources(it)
+    // 화면의 에러 코드 목록을 백엔드 소스와 대조하는 단위 테스트(api/types/common.test.ts)가 읽는 파일 — 백엔드에만 코드를 더해도 다시 돈다
+    inputs.files(fileTree(rootDir) { include '*/src/main/java/**/*.java' })
+        .withPropertyName('backendErrorCodeSources').withPathSensitivity(PathSensitivity.RELATIVE)
     def marker = layout.buildDirectory.file('frontend-check/passed')
     outputs.file(marker)
     doLast { marker.get().asFile.text = new Date().toString() }

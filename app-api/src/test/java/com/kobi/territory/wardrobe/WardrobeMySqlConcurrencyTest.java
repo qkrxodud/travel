@@ -21,6 +21,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,6 +38,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * QA P2-1 회귀(MySQL 8.4): 인벤토리 재계산(POST /dev/recalculate — 진행 다음 꾸미기)을 체크인·취소·장면 편집과 겹쳐 돌려도
  * 전달 실패가 남지 않고, 조용해진 뒤 재계산 결과가 이벤트 누적 상태와 같다(루트 선잠금 + version 강제 증가). Docker 가 없으면 skip.
  */
+@DisplayName("가방 다시 계산과 겹친 요청")
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
     "spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver",
@@ -84,7 +86,8 @@ class WardrobeMySqlConcurrencyTest {
     }
 
     @Test
-    void 재계산과_구독_장면_편집이_동시에_돌아도_실패가_남지_않고_재계산_결과는_누적과_같다() throws Exception {
+    @DisplayName("다시 계산이 체크인·취소·장면 편집과 겹쳐 돌아도 전달 실패가 남지 않고, 입은 것은 가방 안에 있으며, 조용해진 뒤 다시 계산해도 같다")
+    void recalculationUnderContention() throws Exception {
         JsonNode explorer = om.readTree(send("POST", "/explorers", null, null).body());
         String me = explorer.get("explorerId").asText();
         String token = explorer.get("accessToken").asText();

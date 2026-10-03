@@ -46,8 +46,8 @@ async function user(browser: Browser, dev: any, email: string) {
   return { context, page, handle: login.handle as string, explorerId: login.explorerId as string };
 }
 
-test.describe('5단계 소셜 ↔ 서버', () => {
-  test('팔로우·맞팔 → 친구 랭킹·소식·영토 비교 → FRIENDS 프로필 → 언팔 404 → 지도 안 랭킹 → 상위 %', async ({ browser, dev }) => {
+test.describe('친구와 랭킹', () => {
+  test('서로 팔로우하면 친구 랭킹·소식·영토 비교가 열리고 친구 공개 프로필을 볼 수 있으며, 팔로우를 끊으면 다시 볼 수 없고, 공유 지도 안 랭킹과 전국 상위 % 가 보인다', async ({ browser, dev }) => {
     const kim = await user(browser, dev, 'kim.social+e2e@example.com');
     const lee = await user(browser, dev, 'lee.social+e2e@example.com');
     await checkIn(kim.page, JONGNO);
