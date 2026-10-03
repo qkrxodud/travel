@@ -16,6 +16,7 @@ curl localhost:8080/health     # 설정 바인딩 확인 (dailyCap 5, leaveGrace
 curl localhost:8080/actuator/health
 ```
 
+- **운영 이미지 빌드(매 단계 필수)**: `docker build -t territory-app:qa .`(다른 태그, 확인 후 삭제)가 통과해야 한다. 빌드 스크립트·모듈·`buildSrc`가 늘면 Dockerfile의 COPY 목록이 빠지기 쉽다(8단계 배포 때 `buildSrc` 누락으로 실패한 사례). 운영 compose 자체는 건드리지 않는다.
 - 빌드 산출물 확인: `app-api/build/libs/territory.jar`만 bootJar여야 한다. 도메인 모듈에 bootJar가 생겼으면 루트 `apply false` 누락.
 - API가 추가된 단계면 해당 엔드포인트를 curl로 실제 호출한다(체크인 → 영토 조회 → 취소 왕복).
 

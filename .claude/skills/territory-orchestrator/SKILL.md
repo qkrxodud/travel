@@ -33,7 +33,7 @@ description: 나의 영토(territory) 백엔드·웹 프론트엔드 구현 작�
 1. **작업 분해**: domain-model.md §6에서 해당 단계의 산출물을 TaskCreate로 등록한다. 한 태스크 = 한 모듈 범위(예: 1단계 = "catalog 구현", "exploration 구현", "app-api 통합+Flyway V1"). 의존 관계를 태스크에 명시한다.
 2. **팀 구성**: context-builder(들) + architecture-qa로 TeamCreate. 독립 모듈이 2개면 context-builder 2명 병렬(예: 1단계의 catalog와 exploration 초기 작업).
 3. **진행**: 팀원들이 자체 조율한다 — context-builder는 모듈 완성 직후 architecture-qa에게 SendMessage로 검증 요청, QA는 결함을 builder에게 직접 리포트. 리더는 태스크 상태를 모니터링하고 설계 해석 분쟁만 중재한다.
-4. **수렴 기준**: QA P1·P2 결함 0 + `./gradlew clean build` 통과 + 해당 단계 API curl 왕복 확인.
+4. **수렴 기준**: QA P1·P2 결함 0 + `./gradlew clean build` 통과 + `docker build` 통과 + 해당 단계 API curl 왕복 확인. 커밋 후 운영 compose 반영 순서: `scripts/backup.sh` → `docker tag territory-app:latest territory-app:prev` → `docker compose up -d --build app` → healthy·Flyway 로그 확인.
 5. **종합**: `_workspace/{단계}_summary.md`에 산출물·검증 결과·미해결 사항을 기록하고 팀을 정리한 뒤 사용자에게 보고한다.
 
 ## 프론트엔드 작업 (frontend/)

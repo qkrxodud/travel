@@ -11,6 +11,8 @@ WORKDIR /workspace
 # 의존성 캐시 레이어: 빌드 스크립트만 먼저 복사해 의존성을 받아 둔다(소스만 바뀌면 이 레이어는 재사용).
 COPY gradlew settings.gradle build.gradle gradle.properties ./
 COPY gradle ./gradle
+# 빌드 스크립트가 쓰는 사용자 태스크(testDocs 등) — 루트 build.gradle 평가에 필요하다
+COPY buildSrc ./buildSrc
 COPY common/build.gradle common/
 COPY catalog/build.gradle catalog/
 COPY exploration/build.gradle exploration/
