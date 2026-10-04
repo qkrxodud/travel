@@ -29,9 +29,12 @@ export interface MysteryCardView {
 
 const RARITY_LABEL = { RARE: '희귀', LEGEND: '전설' } as const;
 
-/** revealedByUser = 카드·마커를 눌러 지도에서 찾았는지. 서버가 공개해도 된다고 하면(이번 주 보너스를 받음) 누르지 않아도 이름을 보여 준다 */
-export function mysteryCard(week: MysteryWeekResponse, revealedByUser: boolean): MysteryCardView {
-  const revealed = revealedByUser || week.revealed;
+/**
+ * revealedWeek = 카드·마커를 눌러 지도에서 찾은 주(weekStart). 그 주가 이번 주일 때만 이름을 보여 준다 — 탭을 연 채 주가 넘어가면 새 지역은 다시 숨는다.
+ * 서버가 공개해도 된다고 하면(이번 주 보너스를 받음) 누르지 않아도 이름을 보여 준다.
+ */
+export function mysteryCard(week: MysteryWeekResponse, revealedWeek: string | null): MysteryCardView {
+  const revealed = revealedWeek === week.weekStart || week.revealed;
   const rarity = RARITY_LABEL[week.region.rarity];
   return {
     title: revealed ? `${week.region.provinceName} ${week.region.name}` : `어딘가의 ${rarity} 지역`,

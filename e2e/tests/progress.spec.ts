@@ -114,7 +114,7 @@ test.describe('XP와 레벨, 도감, 퀘스트', () => {
 
     await test.step('프로필에는 얻은 뱃지가 보이고, 얻은 칭호 가운데 하나를 골라 달면 새로고침해도 남는다', async () => {
       await tab(page, 'profile');
-      await expect(page.locator('#b-cnt')).toHaveText('2 / 15');
+      await expect(page.locator('#b-cnt')).toHaveText('2 / 19'); // 뱃지 정의 19종(9단계 단골 여행자·오랜 단골·꿈을 이룬 여행자·꿈의 수집가 포함)
       await expect(page.locator('.badge[data-badge="first"]')).toHaveClass(/\bgot\b/);
       await expect(page.locator('.badge[data-badge="set1"]')).toHaveClass(/\bgot\b/);
       await expect(page.locator('.badge[data-badge="ten"]')).not.toHaveClass(/\bgot\b/);
@@ -160,7 +160,7 @@ test.describe('XP와 레벨, 도감, 퀘스트', () => {
       await tab(page, 'sets');
       await expect(page.locator('.set[data-set="sea"]')).toHaveClass(/\bdone\b/, LATE);
       await tab(page, 'profile');
-      await expect(page.locator('#b-cnt')).toHaveText('6 / 15', LATE);
+      await expect(page.locator('#b-cnt')).toHaveText('6 / 19', LATE);
       await expect(page.locator('.badge[data-badge="streak3"]')).toHaveClass(/\bgot\b/);
     });
 

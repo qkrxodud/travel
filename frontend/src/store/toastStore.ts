@@ -42,6 +42,8 @@ const ERROR_TITLE: Readonly<Partial<Record<ServerErrorCode, string>>> = {
   PROFILE_MAP_NOT_FOUND: '합류할 수 없는 지도', PROFILE_NOT_FOUND: '프로필 없음',
   ALREADY_FOLLOWING: '이미 팔로우 중', CANNOT_FOLLOW_SELF: '나는 팔로우할 수 없어요', CANNOT_COMPARE_SELF: '나와는 비교할 수 없어요',
   INVALID_VISIBILITY: '공개 범위 확인', CARD_KIND_NOT_FOUND: '모르는 카드',
+  REVISIT_NOT_PAINTED: '아직 칠하지 않은 곳', REVISIT_SAME_YEAR: '내년부터 받을 수 있어요', REVISIT_ALREADY_STAMPED: '올해 도장은 받았어요',
+  WISH_ALREADY_VISITED: '이미 다녀온 곳', WISHLIST_FULL: '가고 싶은 곳이 가득해요',
   HANDLE_INVALID: 'handle 형식 확인', HANDLE_RESERVED: '쓸 수 없는 handle', HANDLE_TAKEN: '이미 쓰는 handle', LOGIN_REQUIRED: '로그인이 필요해요', CSRF_INVALID: '새로고침이 필요해요',
 };
 

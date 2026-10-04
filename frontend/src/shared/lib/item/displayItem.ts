@@ -14,6 +14,8 @@ export interface DisplayItem extends PixelItem {
   favorite: boolean;
   equipped: boolean;
   source: ItemSource | null;
+  /** 1 = 기본, 2 = 재방문 2회차 색 변형(그림은 서버 variantLook) */
+  variant: number;
 }
 
 export const SLOT_TO_CLIENT: Readonly<Record<ServerSlot, ClientSlot>> = { HAT: 'hat', HAND: 'hand', BADGE: 'badge', BAG: 'back', PET: 'pet', BG: 'bg', PROP: 'prop' };
@@ -25,6 +27,9 @@ export type SetNameLookup = (setId: string) => string | undefined;
 
 const CONQUEST_PREFIX = 'conquest:';
 const STREAK_PREFIX = 'streak:';
+const SEASON_PREFIX = 'season:';
+/** 재방문 2회차 색 변형 */
+export const REVISIT_VARIANT = 2;
 
 /** 아이템이 어디서 왔는지(툴팁) */
 export function itemOrigin(itemId: string, catalog: Catalog | null, setName: SetNameLookup): string {
@@ -38,22 +43,33 @@ export function itemOrigin(itemId: string, catalog: Catalog | null, setName: Set
     return `${catalog?.provinceByCode.get(provinceCode) ?? provinceCode} 정복 보상`;
   }
   if (itemId.startsWith(STREAK_PREFIX)) return `${itemId.slice(STREAK_PREFIX.length)}개월 연속 탐험 보상`;
+  if (itemId.startsWith(SEASON_PREFIX)) return `${seasonYear(itemId)} 계절 한정 테마 완성 보상`.trim();
   return '이벤트 보상';
 }
 
-export type AchievementKind = 'conquest' | 'streak';
+/** season:autumn-2026 → "2026"(id 에 연도가 없으면 빈 문자열) */
+function seasonYear(itemId: string): string {
+  return /-(\d{4})$/.exec(itemId)?.[1] ?? '';
+}
 
-/** 업적 보상 아이템(시·도 정복 대표 장식 · 연속 탐험 마일스톤)인지 — 가방 타일 표시 */
+export type AchievementKind = 'conquest' | 'streak' | 'season';
+
+/** 업적 보상 아이템(시·도 정복 대표 장식 · 연속 탐험 마일스톤 · 계절 한정 배경)인지 — 가방 타일 표시 */
 export function achievementOf(itemId: string): AchievementKind | null {
   if (itemId.startsWith(CONQUEST_PREFIX)) return 'conquest';
   if (itemId.startsWith(STREAK_PREFIX)) return 'streak';
+  if (itemId.startsWith(SEASON_PREFIX)) return 'season';
   return null;
 }
 
-type ServedItem = Pick<ItemResponse, 'itemId' | 'name' | 'emoji' | 'slot' | 'tier' | 'theme' | 'look'>;
+type ServedItem = Pick<ItemResponse, 'itemId' | 'name' | 'emoji' | 'slot' | 'tier' | 'theme' | 'look'> & Partial<Pick<ItemResponse, 'variant' | 'variantLook'>>;
 
-/** 서버 아이템 → 화면 아이템. 정의가 사라진 아이템은 🎁·id 로 보인다(프로토타입과 같게). */
+/**
+ * 서버 아이템 → 화면 아이템. 정의가 사라진 아이템은 🎁·id 로 보인다(프로토타입과 같게).
+ * 재방문 2회차(variant 2)면 서버가 준 변형 룩(variantLook)으로 그린다 — 같은 아이템 id 라 입히기·즐겨찾기는 그대로.
+ */
 export function toDisplayItem(served: ServedItem, origin: string, owned?: Pick<OwnedItemResponse, 'favorite' | 'equipped' | 'source'>): DisplayItem {
+  const variant = served.variant === REVISIT_VARIANT && served.variantLook ? REVISIT_VARIANT : 1;
   return {
     code: served.itemId,
     emoji: served.emoji || '🎁',
@@ -61,15 +77,16 @@ export function toDisplayItem(served: ServedItem, origin: string, owned?: Pick<O
     slot: served.slot ? SLOT_TO_CLIENT[served.slot] : 'hand',
     tier: toTier(served.tier),
     theme: served.theme,
-    look: served.look,
+    look: variant === REVISIT_VARIANT ? served.variantLook ?? served.look : served.look,
     from: origin,
     favorite: owned?.favorite ?? false,
     equipped: owned?.equipped ?? false,
     source: owned?.source ?? null,
+    variant,
   };
 }
 
 /** 카탈로그 정의(아직 갖지 않은 아이템 — 체크인 보상·갖고 싶은 것) → 화면 아이템 */
 export function catalogItem(view: ItemView, origin: string): DisplayItem {
-  return toDisplayItem(view, origin);
+  return toDisplayItem({ ...view, variant: 1, variantLook: null }, origin);
 }

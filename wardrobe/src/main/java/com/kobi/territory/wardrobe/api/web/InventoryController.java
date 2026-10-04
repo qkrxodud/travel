@@ -3,6 +3,7 @@ package com.kobi.territory.wardrobe.api.web;
 import com.kobi.territory.catalog.api.query.ItemView;
 import com.kobi.territory.common.identity.CurrentExplorer;
 import com.kobi.territory.common.model.ExplorerId;
+import com.kobi.territory.common.model.RegionCode;
 import com.kobi.territory.wardrobe.api.web.WardrobeDtos.FavoriteRequest;
 import com.kobi.territory.wardrobe.api.web.WardrobeDtos.InventoryResponse;
 import com.kobi.territory.wardrobe.api.web.WardrobeDtos.OwnedItemResponse;
@@ -47,7 +48,8 @@ public class InventoryController {
         List<OwnedItem> owned = inventory.ownedItems().newestFirst();
         Map<String, ItemView> views = viewsOf(owned.stream().map(OwnedItem::itemId).toList());
         return new InventoryResponse(owned.size(),
-            owned.stream().map(item -> OwnedItemResponse.of(item, views.get(item.itemId()), scene.wears(item.itemId()))).toList());
+            owned.stream().map(item -> OwnedItemResponse.of(item, views.get(item.itemId()), scene.wears(item.itemId()),
+                variantOf(inventory, views.get(item.itemId())))).toList());
     }
 
     @PutMapping("/{itemId}/favorite")
@@ -55,7 +57,13 @@ public class InventoryController {
                                       @Valid @RequestBody FavoriteRequest request) {
         OwnedItem item = inventories.markFavorite(explorerId, itemId, request.favorite());
         Scene scene = scenes.view(explorerId).scene();
-        return OwnedItemResponse.of(item, viewsOf(List.of(itemId)).get(itemId), scene.wears(itemId));
+        ItemView view = viewsOf(List.of(itemId)).get(itemId);
+        return OwnedItemResponse.of(item, view, scene.wears(itemId), variantOf(inventories.view(explorerId), view));
+    }
+
+    /** 재방문 색 변형 번호(9단계) — 지역 특산물이면 그 지역의 도장 여부(가방이 판정). */
+    private static int variantOf(Inventory inventory, ItemView view) {
+        return inventory.variantOf(view == null || view.regionCode() == null ? null : RegionCode.of(view.regionCode()));
     }
 
     private Map<String, ItemView> viewsOf(List<String> itemIds) {

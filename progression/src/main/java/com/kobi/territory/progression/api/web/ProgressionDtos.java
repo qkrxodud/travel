@@ -84,7 +84,40 @@ public final class ProgressionDtos {
                                    int badgeCount, List<BadgeResponse> badges, List<TitleResponse> titles,
                                    List<XpEntryResponse> recentXp, StreakFreezeResponse streakFreeze,
                                    MilestoneResponse nextMilestone, List<MilestoneResponse> milestones,
-                                   List<ProvinceProgressResponse> provinces, int mysteryFoundCount) {}
+                                   List<ProvinceProgressResponse> provinces, int mysteryFoundCount, int revisitStampCount,
+                                   int wishFulfilledCount) {}
+
+    /** 계절 회차의 지역 하나 — collected = 이 회차 기간 안에 이 지도에서 칠해 센 지역. */
+    public record SeasonRegionResponse(String code, String name, String provinceCode, boolean collected) {}
+
+    /**
+     * 계절 한정 테마 회차 하나(9단계).
+     *
+     * @param roundId          {계절}-{연도}(예 autumn-2026)
+     * @param name             표시 이름(예 "2026 단풍 명소")
+     * @param endsAt           닫히는 순간(마지막 날 다음 날 00:00, 서비스 시간대) — 이 순간부터 닫힘
+     * @param remainingSeconds 지금 열린 회차면 닫힐 때까지 남은 초, 닫힌 회차는 0
+     * @param open             지금 열려 있는지
+     * @param rewarded         내가 완성 보상(XP·칭호·배경)을 받은 수령자인지(완성 시점 멤버)
+     * @param backgroundItemId 회차 배경 아이템 id(season:{roundId})
+     */
+    public record SeasonRoundResponse(String roundId, String seasonId, String name, String emoji, int year, Instant startsAt,
+                                      Instant endsAt, long remainingSeconds, boolean open, int have, int total,
+                                      boolean completed, Instant completedAt, boolean rewarded, int xp, String titleId,
+                                      String titleName, String backgroundItemId, List<SeasonRegionResponse> regions) {}
+
+    /** 다음에 열리는 회차(지금 열린 회차가 없을 때 안내용). */
+    public record NextSeasonResponse(String roundId, String seasonId, String name, String emoji, Instant startsAt, Instant endsAt) {}
+
+    /**
+     * GET /seasons/current(9단계) — mapId 생략 시 개인 지도.
+     *
+     * @param current 지금 열린 회차(없으면 빈 목록 — 봄·가을 기간이 겹치지 않아 보통 0~1개)
+     * @param next    다음에 열리는 회차(없으면 null)
+     * @param history 이 지도에 기록이 있는 닫힌 회차(최근 순, 미완성 기록 포함)
+     */
+    public record SeasonsResponse(String mapId, Instant now, List<SeasonRoundResponse> current, NextSeasonResponse next,
+                                  List<SeasonRoundResponse> history) {}
 
     /** 이번 주 미스터리 지역(8단계). */
     public record MysteryRegionResponse(String code, String name, String provinceCode, String provinceName, Rarity rarity) {}

@@ -1,6 +1,6 @@
 /**
  * 화면 아이템 — 서버 아이템(카탈로그 정의·보유·장면)을 가방 타일·캐릭터가 쓰는 모양으로 옮긴다. 값은 서버 그대로다.
- * 이야기 순서: 아이템 출처 → 아이템 표시 → 지금 입은 옷차림 → 가방.
+ * 이야기 순서: 아이템 출처 → 아이템 표시 → 재방문 2회차 색 → 지금 입은 옷차림 → 가방.
  */
 import { describe, expect, it } from 'vitest';
 import type { InventoryResponse, ItemResponse, SceneResponse } from '../../../api/types/wardrobe';
@@ -38,6 +38,11 @@ describe('아이템 출처', () => {
     expect(achievementOf('set:jiri')).toBeNull();
   });
 
+  it('계절 한정 배경은 그 회차 연도의 계절 한정 테마 완성 보상이고 업적 보상으로 표시한다', () => {
+    expect(itemOrigin('season:autumn-2026', CATALOG, setName)).toBe('2026 계절 한정 테마 완성 보상');
+    expect(achievementOf('season:spring-2027')).toBe('season');
+  });
+
   it('그 밖의 아이템은 이벤트 보상이다', () => {
     expect(itemOrigin('event:chuseok', CATALOG, setName)).toBe('이벤트 보상');
   });
@@ -57,6 +62,30 @@ describe('아이템 표시', () => {
   it('아직 갖지 않은 카탈로그 아이템은 즐겨찾기·착용 없이 보인다', () => {
     const view = CATALOG.itemById.get('region:KR-31370');
     expect(view && catalogItem(view, '경기 가평군')).toMatchObject({ name: '가평 잣 다람쥐', slot: 'pet', tier: 'rare', favorite: false, equipped: false, source: null });
+  });
+});
+
+describe('재방문 2회차 색', () => {
+  const swapped = { type: 'lantern', primary: '#f4c542', secondary: '#e63946' };
+  const lanternLook = { type: 'lantern', primary: '#e63946', secondary: '#f4c542' };
+
+  it('다시 다녀와 받은 2회차 특산물은 서버가 준 변형 색으로 그리고, 같은 아이템이라 입히기는 그대로다', () => {
+    const shown = toDisplayItem(served('region:KR-11010', { look: lanternLook, variant: 2, variantLook: swapped }), '서울 종로구');
+    expect(shown).toMatchObject({ code: 'region:KR-11010', variant: 2, look: swapped });
+  });
+
+  it('기본 특산물은 원래 색 그대로다', () => {
+    expect(toDisplayItem(served('region:KR-11010', { look: lanternLook, variant: 1, variantLook: null }), '')).toMatchObject({ variant: 1, look: lanternLook });
+  });
+
+  it('입은 2회차 특산물도 변형 색으로 그린다', () => {
+    const scene = { gender: 'M', slots: { HAND: served('region:KR-11010', { look: lanternLook, variant: 2, variantLook: swapped }) }, props: [], stylePoints: 0, wornCount: 1, updatedAt: null } as unknown as SceneResponse;
+    expect(sceneEquipment(scene, CATALOG, setName).hand).toMatchObject({ variant: 2, look: swapped });
+  });
+
+  it('아직 갖지 않은 카탈로그 아이템은 변형 색이 있어도 기본 색으로 보인다', () => {
+    const view = CATALOG.itemById.get('region:KR-11010');
+    expect(view && catalogItem(view, '')).toMatchObject({ variant: 1, look: view?.look });
   });
 });
 

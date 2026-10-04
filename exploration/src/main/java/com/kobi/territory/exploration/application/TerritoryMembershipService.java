@@ -71,7 +71,8 @@ public class TerritoryMembershipService {
         List<String> memberIds = maps.findById(mapId).map(map -> map.memberIds().stream().map(ExplorerId::value).toList())
             .orElse(List.of());
         outbox.append(AGGREGATE, mapId.value(), new VisitsRestored(mapId.value(), event.explorerId(),
-            codes(result.restored()), codes(result.regionsBack()), memberIds, event.joinedAt()));
+            codes(result.restored()), codes(result.regionsBack()), memberIds, event.joinedAt(),
+            result.restored().stream().map(code -> new VisitsRestored.RestoredVisit(code.value(), result.visitedAt().get(code))).toList()));
     }
 
     /** 유예 끝 → 숨긴 방문 하드 삭제. 탐험가 단위 기록(explorer_region)은 그대로(§5) — 하류에 알릴 것이 없다. */

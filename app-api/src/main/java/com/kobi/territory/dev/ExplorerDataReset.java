@@ -18,8 +18,11 @@ class ExplorerDataReset {
     static final List<String> PROGRESSION_TABLES = List.of("xp_ledger", "badge_earned", "title_earned",
         "explorer_region_mark", "explorer_region", "quest_progress", "streak_freeze");
 
+    /** 9단계 탐험가 단위 기록(재방문 도장·가고 싶은 곳 핀) — 시드·전부 지우기 때 함께 비운다(도장 보상이 다시 생기지 않게). */
+    static final List<String> EXPLORER_RECORD_TABLES = List.of("revisit_stamp", "wish_pin");
+
     /** 꾸미기 자식 행 — 시드·전부 지우기 때 가방도 비운다(세트 배경처럼 회수 없는 보상이 남지 않게). */
-    static final List<String> WARDROBE_CHILD_TABLES = List.of("owned_item_basis", "owned_item", "inventory_visit");
+    static final List<String> WARDROBE_CHILD_TABLES = List.of("owned_item_basis", "owned_item", "inventory_visit", "inventory_revisit");
 
     private final JdbcTemplate jdbc;
 
@@ -36,6 +39,9 @@ class ExplorerDataReset {
         // 개인 지도 도감만 — 공유 지도 도감은 다른 멤버 것이기도 하다(QA P3-13)
         jdbc.update("DELETE FROM set_progress WHERE map_id IN (SELECT id FROM expedition_map WHERE owner_id = ? AND kind = 'PERSONAL')",
             explorerId);
+        jdbc.update("DELETE FROM season_progress WHERE map_id IN (SELECT id FROM expedition_map WHERE owner_id = ? AND kind = 'PERSONAL')",
+            explorerId);
+        EXPLORER_RECORD_TABLES.forEach(table -> jdbc.update("DELETE FROM " + table + " WHERE explorer_id = ?", explorerId));
         WARDROBE_CHILD_TABLES.forEach(table -> jdbc.update("DELETE FROM " + table + " WHERE explorer_id = ?", explorerId));
         jdbc.update("UPDATE scene SET slot_hat = NULL, slot_hand = NULL, slot_badge = NULL, slot_bag = NULL, slot_pet = NULL, "
             + "slot_bg = NULL, props = '', version = version + 1 WHERE explorer_id = ?", explorerId);

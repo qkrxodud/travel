@@ -12,6 +12,8 @@ final class ItemViews {
         return new ItemView(item.itemId(), item.regionCode() == null ? null : item.regionCode().value(), item.name(),
             item.emoji(), item.slot().name(), item.tier(), item.theme(),
             item.look() == null ? null : new ItemView.Look(item.look().type(), item.look().primary(), item.look().secondary()),
-            item.grantRule().type().name(), item.grantRule().ref(), item.validPeriod().from(), item.validPeriod().to());
+            item.grantRule().type().name(), item.grantRule().ref(), item.validPeriod().from(), item.validPeriod().to(),
+            item.revisitVariantLook() == null ? null : new ItemView.Look(item.revisitVariantLook().type(),
+                item.revisitVariantLook().primary(), item.revisitVariantLook().secondary()));
     }
 }

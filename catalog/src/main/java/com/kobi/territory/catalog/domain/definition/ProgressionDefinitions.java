@@ -13,17 +13,25 @@ import java.util.Set;
  * 생성 시 id 유일성을, {@link #requireConsistentWith}로 지역·시·도 참조 정합성을 검증한다(어긋나면 기동 실패).
  */
 public record ProgressionDefinitions(LevelRules levels, List<ThemeDefinition> themes, List<BadgeDefinition> badges,
-                                     List<QuestDefinition> quests, StreakRules streak) {
+                                     List<QuestDefinition> quests, StreakRules streak, List<SeasonDefinition> seasons) {
 
     public ProgressionDefinitions {
         Objects.requireNonNull(levels, "levels");
         Objects.requireNonNull(streak, "streak");
+        seasons = seasons == null ? List.of() : List.copyOf(seasons);
+        unique("계절", seasons.stream().map(SeasonDefinition::id).toList());
         themes = List.copyOf(themes);
         badges = List.copyOf(badges);
         quests = List.copyOf(quests);
         unique("테마(세트)", themes.stream().map(ThemeDefinition::id).toList());
         unique("뱃지", badges.stream().map(BadgeDefinition::id).toList());
         unique("퀘스트", quests.stream().map(QuestDefinition::id).toList());
+    }
+
+    /** 계절 한정 테마 없이 — 9단계 이전 정의. */
+    public ProgressionDefinitions(LevelRules levels, List<ThemeDefinition> themes, List<BadgeDefinition> badges,
+                                  List<QuestDefinition> quests, StreakRules streak) {
+        this(levels, themes, badges, quests, streak, List.of());
     }
 
     /** 연속 탐험 규칙(보호권·마일스톤) 없이 — 8단계 이전 정의. */
@@ -43,9 +51,20 @@ public record ProgressionDefinitions(LevelRules levels, List<ThemeDefinition> th
         themes.forEach(theme -> theme.regions().forEach(code -> regions.find(code)
             .orElseThrow(() -> new IllegalStateException("테마(세트) " + theme.id() + " 의 모르는 지역: " + code))));
         badges.forEach(badge -> badge.condition().referencedProvinces().forEach(provinces::require));
+        seasons.forEach(season -> season.regions().forEach(code -> regions.find(code)
+            .orElseThrow(() -> new IllegalStateException("계절 " + season.id() + " 의 모르는 지역: " + code))));
     }
 
-    /** 칭호 전체(표시 순서: 레벨 → 세트 → 상시 도전 → 연속 탐험 마일스톤(8단계) → 시·도 주인). 프로토타입 titles() 와 같은 순서·id. */
+    /** 이 회차 id(계절-연도)가 정의된 계절의 회차인지(아이템 지급 규칙 참조 검증, 9단계). */
+    public boolean definesSeasonRound(String roundId) {
+        String seasonId = SeasonDefinition.seasonIdOf(roundId);
+        return seasonId != null && seasons.stream().anyMatch(season -> season.id().equals(seasonId));
+    }
+
+    /**
+     * 칭호 전체(표시 순서: 레벨 → 세트 → 상시 도전 → 연속 탐험 마일스톤(8단계) → 계절 한정(9단계) → 시·도 주인). 프로토타입 titles() 와 같은
+     * 순서·id.
+     */
     public List<TitleDefinition> titles(Provinces provinces) {
         List<TitleDefinition> out = new ArrayList<>();
         levels.titles().forEach(levelTitle -> out.add(new TitleDefinition("lv" + levelTitle.level(), levelTitle.name(), "Lv." + levelTitle.level(),
@@ -56,6 +75,8 @@ public record ProgressionDefinitions(LevelRules levels, List<ThemeDefinition> th
             quest.name(), TitleDefinition.Source.QUEST, quest.id())));
         streak.milestones().forEach(milestone -> out.add(new TitleDefinition(milestone.titleId(), milestone.title(),
             milestone.months() + "개월 연속 탐험", TitleDefinition.Source.STREAK, String.valueOf(milestone.months()))));
+        seasons.forEach(season -> out.add(new TitleDefinition(season.titleId(), season.title(), season.name() + " 완성(계절 한정)",
+            TitleDefinition.Source.SEASON, season.id())));
         provinces.inDisplayOrder().forEach(province -> out.add(new TitleDefinition("own-" + province.code(), province.name() + "의 주인",
             province.name() + " 100%", TitleDefinition.Source.PROVINCE, province.code())));
         return List.copyOf(out);

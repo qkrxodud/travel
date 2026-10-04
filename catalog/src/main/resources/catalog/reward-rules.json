@@ -8,5 +8,8 @@
  "setCompleteBonus": 100,
  "claimBonus": 10,
  "mysteryBonus": 50,
- "provinceConquestBonus": 300
+ "provinceConquestBonus": 300,
+ "seasonCompleteBonus": 150,
+ "revisitStampBonus": 10,
+ "wishFulfilledBonus": 20
 }

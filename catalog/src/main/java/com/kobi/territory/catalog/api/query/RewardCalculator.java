@@ -27,4 +27,13 @@ public interface RewardCalculator {
 
     /** 시·도 정복 보상(8단계 — 탐험가 단위로 한 시·도의 현행 지역을 모두 칠했을 때 한 번). */
     RewardLineView provinceConquest();
+
+    /** 계절 한정 테마 회차 완성 보상(9단계 — 완성 시점 지도 멤버 전원, 탐험가당 회차당 한 번). */
+    RewardLineView seasonComplete();
+
+    /** 재방문 도장 보상(9단계 — 지역·연도당 한 번). */
+    RewardLineView revisitStamp();
+
+    /** 가고 싶은 곳을 다녀옴 보상(9단계 — 지역당 한 번). */
+    RewardLineView wishFulfilled();
 }

@@ -7,6 +7,8 @@ import com.kobi.territory.exploration.api.event.ExplorerMerged;
 import com.kobi.territory.exploration.api.event.MapCreated;
 import com.kobi.territory.exploration.api.event.MemberJoined;
 import com.kobi.territory.exploration.api.event.RegionVisited;
+import com.kobi.territory.exploration.api.event.RevisitStamped;
+import com.kobi.territory.progression.api.event.SeasonCompleted;
 import com.kobi.territory.exploration.api.event.VisitCancelled;
 import com.kobi.territory.exploration.api.query.ExplorerProfileQuery;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
@@ -146,6 +148,24 @@ public class InventoryService {
         InventoryChange change = inventory.grantRewards(rewards, at);
         inventories.save(inventory);
         publish(inventory, change);
+    }
+
+    /** 계절 한정 테마 회차 완성(9단계, 수령자마다) → 회차 배경(SEASON_COMPLETE). 회수 없음, 아이템 단위로 멱등. */
+    @Transactional
+    public void onSeasonCompleted(SeasonCompleted event) {
+        grantAchievement(ExplorerId.of(event.explorerId()),
+            catalog.grantedBySeasonCompletion(event.roundId(), event.completedAt()), event.completedAt());
+    }
+
+    /**
+     * 재방문 도장(9단계) → 그 지역 특산물을 2회차 색 변형으로(보유 아이템의 변형 속성 — 새 아이템·이벤트 없음, 가방·장면 조회가 variant 로 그린다).
+     * 멱등.
+     */
+    @Transactional
+    public void onRevisitStamped(RevisitStamped event) {
+        Inventory inventory = loadLocked(recipientOf(event.explorerId()));
+        inventory.markRevisited(RegionCode.of(event.regionCode()), event.stampedAt());
+        inventories.save(inventory);
     }
 
     /** 지도 생성 — 지도장의 인벤토리 루트 행을 보장한다(가입 때 개인 지도로 미리 생겨, 이후 이벤트 처리·재계산이 항상 있는 행을 잠근다 — S3-1 과 같은 이유). 멱등. */

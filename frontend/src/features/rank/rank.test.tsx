@@ -20,10 +20,12 @@ vi.mock('../../api/social', () => ({ socialApi: { compare: vi.fn() } }));
 
 const feed = (overrides: Partial<FeedItemResponse>): FeedItemResponse => ({
   handle: 'lee', kind: 'VISIT', regionCode: null, rarity: null, themeId: null, level: null, badgeId: null, daysAgo: 0, when: '오늘',
-  provinceCode: null, months: null, weekStart: null, ...overrides,
+  provinceCode: null, months: null, weekStart: null, roundId: null, year: null, ...overrides,
 });
 const COMPARE: CompareResponse = { me: { handle: 'kim', regionCount: 2 }, other: { handle: 'lee', regionCount: 2 }, mutual: true, onlyMine: ['KR-37430'], both: ['KR-11010'], onlyTheirs: ['KR-31370'], lead: 0 };
 const noName = () => undefined;
+const names = (setName: (id: string) => string | undefined = noName, badgeName: (id: string) => string | undefined = noName) =>
+  ({ setName, badgeName, seasonName: (roundId: string) => (roundId === 'autumn-2026' ? '2026 단풍 명소' : roundId) });
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -65,36 +67,44 @@ describe('친구 알아보기', () => {
 
 describe('친구 소식', () => {
   it('새 지역을 칠하면 지역 이름과 희귀도를 붙여 알려 준다', () => {
-    expect(feedParts(feed({ regionCode: 'KR-37430', rarity: 'LEGEND' }), CATALOG, noName, noName)).toEqual({ strong: '경북 울릉군', text: '에 발 도장 · 전설 지역' });
-    expect(feedParts(feed({ regionCode: 'KR-31370', rarity: 'RARE' }), CATALOG, noName, noName).text).toBe('에 발 도장 · 희귀 지역');
-    expect(feedParts(feed({ regionCode: 'KR-11010', rarity: 'COMMON' }), CATALOG, noName, noName).text).toBe('에 발 도장');
+    expect(feedParts(feed({ regionCode: 'KR-37430', rarity: 'LEGEND' }), CATALOG, names())).toEqual({ strong: '경북 울릉군', text: '에 발 도장 · 전설 지역' });
+    expect(feedParts(feed({ regionCode: 'KR-31370', rarity: 'RARE' }), CATALOG, names()).text).toBe('에 발 도장 · 희귀 지역');
+    expect(feedParts(feed({ regionCode: 'KR-11010', rarity: 'COMMON' }), CATALOG, names()).text).toBe('에 발 도장');
   });
 
   it('테마 세트를 완성하면 세트 이름으로 알려 준다', () => {
-    expect(feedParts(feed({ kind: 'THEME_COMPLETED', themeId: 'jiri' }), CATALOG, () => '지리산 둘레', noName)).toEqual({ strong: '지리산 둘레', text: ' 테마를 완성했어요' });
+    expect(feedParts(feed({ kind: 'THEME_COMPLETED', themeId: 'jiri' }), CATALOG, names(() => '지리산 둘레'))).toEqual({ strong: '지리산 둘레', text: ' 테마를 완성했어요' });
   });
 
   it('레벨이 오르면 새 레벨을 알려 준다', () => {
-    expect(feedParts(feed({ kind: 'LEVEL_UP', level: 4 }), CATALOG, noName, noName)).toEqual({ strong: 'Lv.4', text: ' 달성' });
+    expect(feedParts(feed({ kind: 'LEVEL_UP', level: 4 }), CATALOG, names())).toEqual({ strong: 'Lv.4', text: ' 달성' });
   });
 
   it('뱃지를 얻으면 뱃지 이름을 알려 준다', () => {
-    expect(feedParts(feed({ kind: 'BADGE_EARNED', badgeId: 'first' }), CATALOG, noName, () => '첫 발자국').prefix).toBe('뱃지 「첫 발자국」를 얻었어요');
+    expect(feedParts(feed({ kind: 'BADGE_EARNED', badgeId: 'first' }), CATALOG, names(noName, () => '첫 발자국')).prefix).toBe('뱃지 「첫 발자국」를 얻었어요');
   });
 
   it('연속 탐험 마일스톤을 달성하면 몇 개월 연속 탐험을 달성했는지 알린다', () => {
-    expect(feedParts(feed({ kind: 'STREAK_MILESTONE', months: 3 }), CATALOG, noName, noName)).toEqual({ strong: '3개월 연속 탐험', text: '을 달성했어요' });
+    expect(feedParts(feed({ kind: 'STREAK_MILESTONE', months: 3 }), CATALOG, names())).toEqual({ strong: '3개월 연속 탐험', text: '을 달성했어요' });
   });
 
   it('시·도를 정복하면 시·도 이름으로 알리고, 모르는 시·도는 코드 그대로 부른다', () => {
-    expect(feedParts(feed({ kind: 'PROVINCE_CONQUERED', provinceCode: 'KR-11' }), CATALOG, noName, noName)).toEqual({ strong: '서울', text: '을 정복했어요' });
-    expect(feedParts(feed({ kind: 'PROVINCE_CONQUERED', provinceCode: 'KR-31' }), CATALOG, noName, noName).text).toBe('를 정복했어요');
-    expect(feedParts(feed({ kind: 'PROVINCE_CONQUERED', provinceCode: 'KR-99' }), CATALOG, noName, noName).strong).toBe('KR-99');
+    expect(feedParts(feed({ kind: 'PROVINCE_CONQUERED', provinceCode: 'KR-11' }), CATALOG, names())).toEqual({ strong: '서울', text: '을 정복했어요' });
+    expect(feedParts(feed({ kind: 'PROVINCE_CONQUERED', provinceCode: 'KR-31' }), CATALOG, names()).text).toBe('를 정복했어요');
+    expect(feedParts(feed({ kind: 'PROVINCE_CONQUERED', provinceCode: 'KR-99' }), CATALOG, names()).strong).toBe('KR-99');
   });
 
   it('이번 주 미스터리 지역을 찾으면 그 지역 이름으로 알린다', () => {
-    expect(feedParts(feed({ kind: 'MYSTERY_FOUND', regionCode: 'KR-31370', weekStart: '2026-09-28' }), CATALOG, noName, noName))
+    expect(feedParts(feed({ kind: 'MYSTERY_FOUND', regionCode: 'KR-31370', weekStart: '2026-09-28' }), CATALOG, names()))
       .toEqual({ prefix: '이번 주 미스터리 지역 ', strong: '가평군', text: '을 찾았어요' });
+  });
+
+  it('친구가 계절 한정 회차를 완성하면 회차 이름으로 알린다', () => {
+    expect(feedParts(feed({ kind: 'SEASON_COMPLETED', roundId: 'autumn-2026' }), CATALOG, names())).toEqual({ strong: '2026 단풍 명소', text: '를 완성했어요' });
+  });
+
+  it('친구가 칠한 곳에 다시 다녀와 도장을 받으면 지역과 도장 연도를 알린다', () => {
+    expect(feedParts(feed({ kind: 'REVISIT_STAMPED', regionCode: 'KR-31370', year: 2027 }), CATALOG, names())).toEqual({ strong: '경기 가평군', text: '에 다시 다녀왔어요(2027 도장)' });
   });
 
   it('이름 끝 글자에 받침이 있으면 "을", 없으면 "를"을 붙인다', () => {

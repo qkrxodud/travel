@@ -18,6 +18,12 @@ const SAMPLE_MS = 3000;     // 이동 0.9초 + 반영 대기 창(재조회) 대�
  * 떠난 뒤 두 번째 체크인을 하므로 예전 엔진이면 90px 이상 튄다.
  */
 const MAX_FRAME_STEP = 50;
+/**
+ * 위 상한이 기준으로 삼는 프레임 간격(ms). 머신이 바빠 한 프레임이 늦게 오면(예: 120ms) 정상 이동도 그만큼 많이 움직이므로,
+ * 상한을 그 프레임 간격에 비례해 늘린다(9단계 QA r2 P3-r2-4: 부하가 큰 실행에서 정상 이동이 상한을 넘던 일시 실패 대비).
+ * 순간이동(출발점으로 되돌아가 다시 출발)은 보통 프레임에서 90px 이상 튀므로 여전히 잡힌다.
+ */
+const FRAME_STEP_BASE_MS = 50;
 
 const region = (page: Page, code: string) => page.locator(`path.region[data-code="${code}"]`);
 
@@ -148,6 +154,9 @@ test.describe('지도 위 캐릭터 이동', () => {
       expect(samples.length, '샘플 프레임').toBeGreaterThan(30);
       const steps = samples.slice(1).map((sample, i) => Math.hypot(sample.x - samples[i].x, sample.y - samples[i].y));
       const maxStep = Math.max(...steps);
+      // 프레임마다 그 간격에 맞춘 상한 대비 비율 — 1 을 넘으면 순간이동
+      const overshoot = Math.max(...samples.slice(1).map((sample, i) =>
+        steps[i] / (MAX_FRAME_STEP * Math.max(1, (sample.at - samples[i].at) / FRAME_STEP_BASE_MS))));
       // 두 번째 체크인을 누른 순간 캐릭터는 종로를 떠나 있어야 이 시나리오가 의미 있다(아직 출발 전이면 이어 갈 위치가 없다)
       const beforeSecond = samples.filter(sample => sample.at <= secondAt).pop();
       const leftJongno = beforeSecond ? Math.hypot(beforeSecond.x - startX, beforeSecond.y - startY) : 0;
@@ -155,7 +164,7 @@ test.describe('지도 위 캐릭터 이동', () => {
       console.log(`이동 중 두 번째 체크인: 샘플 ${samples.length}프레임 · 최대 한 프레임 ${maxStep.toFixed(1)}px · 두 번째 체크인 때 종로에서 ${leftJongno.toFixed(1)}px`);
 
       expect(leftJongno, '두 번째 체크인 때 이미 해운대로 이동 중').toBeGreaterThan(60);
-      expect(maxStep, '한 프레임 이동량(순간이동 없음)').toBeLessThan(MAX_FRAME_STEP);
+      expect(overshoot, `한 프레임 이동량(순간이동 없음, 최대 ${maxStep.toFixed(1)}px)`).toBeLessThan(1);
       // 목포(서쪽)에 도착 — 해운대(동쪽)보다 왼쪽, 종로에서도 멀리
       expect(end.x, '목포에 도착').toBeLessThan(startX);
       expect(samples.slice(-5).every(sample => sample.x === end.x && sample.y === end.y), '도착 뒤 멈춤').toBe(true);

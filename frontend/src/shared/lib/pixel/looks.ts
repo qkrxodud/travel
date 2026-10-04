@@ -15,6 +15,13 @@ export interface PixelItem {
   slot: ClientSlot;
   look: ItemLook | null;
   theme: string | null;
+  /** 2 = 재방문 2회차 색 변형(look 이 이미 변형 룩) — 같은 아이템 id 라도 그림이 달라 캐시 키에 넣는다 */
+  variant?: number;
+}
+
+/** 그림 캐시 키(아이템 id + 색 변형) */
+export function pixelKey(item: Pick<PixelItem, 'code' | 'variant'>): string {
+  return item.variant && item.variant > 1 ? `${item.code}~v${item.variant}` : item.code;
 }
 
 export interface Look {

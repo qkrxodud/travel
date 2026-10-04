@@ -197,6 +197,57 @@ class ItemDefinitionsTest {
     }
 
     @Nested
+    @DisplayName("계절 한정 테마 회차를 완성하면")
+    class SeasonComplete {
+
+        private final ItemDefinitions 계절배경 = ItemDefinitions.of(List.of(
+            아이템("season:autumn-2026", ItemSlot.BG, new GrantRule.SeasonComplete("autumn-2026"), null),
+            아이템("season:autumn-2027", ItemSlot.BG, new GrantRule.SeasonComplete("autumn-2027"), null)));
+
+        @Test
+        @DisplayName("그 회차의 배경만 받는다")
+        void onlyThatRound() {
+            assertThat(계절배경.grantedBySeasonCompletion("autumn-2026", 십월삼일, 정오(십월삼일))).extracting(ItemDefinition::itemId)
+                .containsExactly("season:autumn-2026");
+        }
+
+        @Test
+        @DisplayName("회차 규칙의 대상은 계절-연도 형식이다")
+        void roundIdRequired() {
+            assertThatThrownBy(() -> GrantRule.of(GrantRule.Type.SEASON_COMPLETE, "autumn")).isInstanceOf(TerritoryException.class);
+            assertThat(GrantRule.of(GrantRule.Type.SEASON_COMPLETE, "spring-2027").ref()).isEqualTo("spring-2027");
+        }
+
+        @Test
+        @DisplayName("체크인이나 테마 완성으로는 계절 배경을 받지 않는다")
+        void notByOthers() {
+            assertThat(계절배경.grantedByCheckIn(종로구, "KR-11", 십월삼일, 정오(십월삼일))).isEmpty();
+            assertThat(계절배경.grantedByThemeCompletion("autumn-2026", 십월삼일, 정오(십월삼일))).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("재방문 2회차 색 변형")
+    class RevisitVariant {
+
+        @Test
+        @DisplayName("지역 특산물은 주색과 보조색을 바꾼 룩으로 그린다")
+        void swapped() {
+            ItemDefinition 청사초롱 = new ItemDefinition("region:KR-11010", "청사초롱", "*", ItemSlot.HAND, Rarity.COMMON, null,
+                new ItemDefinition.Look("lantern", "#e63946", "#f4c542"), new GrantRule.RegionVisit(종로구), null, 정의시각);
+
+            assertThat(청사초롱.revisitVariantLook()).isEqualTo(new ItemDefinition.Look("lantern", "#f4c542", "#e63946"));
+        }
+
+        @Test
+        @DisplayName("지역 특산물이 아니면 변형이 없다")
+        void onlyRegionItems() {
+            assertThat(한강_배경.revisitVariantLook()).isNull();
+            assertThat(선물.revisitVariantLook()).isNull();
+        }
+    }
+
+    @Nested
     @DisplayName("정의 목록은")
     class Definitions {
 

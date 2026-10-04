@@ -67,4 +67,26 @@ class RewardRulesTest {
             assertThat(규칙8.provinceConquest()).isEqualTo(new RewardLine(RewardSource.PROVINCE_CONQUEST, 300));
         }
     }
+
+    @Nested
+    @DisplayName("9단계 게임 보상")
+    class SecondGameRewards {
+
+        private final RewardRules 규칙9 = new RewardRules(Map.of(Rarity.COMMON, 10, Rarity.RARE, 20, Rarity.LEGEND, 50),
+            15, 100, 10, 50, 300, 150, 10, 20);
+
+        @Test
+        @DisplayName("계절 한정 테마 완성 150, 재방문 도장 10, 가고 싶은 곳 다녀옴 20 이다")
+        void amounts() {
+            assertThat(규칙9.seasonComplete()).isEqualTo(new RewardLine(RewardSource.SEASON_COMPLETE, 150));
+            assertThat(규칙9.revisitStamp()).isEqualTo(new RewardLine(RewardSource.REVISIT_STAMP, 10));
+            assertThat(규칙9.wishFulfilled()).isEqualTo(new RewardLine(RewardSource.WISH_FULFILLED, 20));
+        }
+
+        @Test
+        @DisplayName("체크인 보상 줄에는 끼지 않는다")
+        void notCheckInLines() {
+            assertThat(규칙9.checkIn(Rarity.COMMON, false, false, false)).containsExactly(new RewardLine(RewardSource.REGION_BASE, 10));
+        }
+    }
 }

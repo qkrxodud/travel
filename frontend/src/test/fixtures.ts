@@ -25,7 +25,7 @@ export const PROVINCES: ProvinceView[] = [
 ];
 
 const item = (itemId: string, regionCode: string | null, name: string, emoji: string, slot: ItemView['slot'], tier: ItemView['tier'], look: ItemView['look'], theme: string | null = null): ItemView =>
-  ({ itemId, regionCode, name, emoji, slot, tier, theme, look, grantRule: 'REGION_VISIT', grantRef: regionCode, validFrom: null, validTo: null });
+  ({ itemId, regionCode, name, emoji, slot, tier, theme, look, grantRule: 'REGION_VISIT', grantRef: regionCode, validFrom: null, validTo: null, variantLook: look ? { type: look.type, primary: look.secondary, secondary: look.primary } : null });
 
 export const ITEMS: ItemView[] = [
   item('region:KR-11010', 'KR-11010', '청사초롱 등불', '🏮', 'HAND', 'COMMON', { type: 'lantern', primary: '#e63946', secondary: '#f4c542' }),
@@ -34,7 +34,7 @@ export const ITEMS: ItemView[] = [
   item('region:KR-37430', 'KR-37430', '울릉 독도 바다 풍경', '🌊', 'BG', 'LEGEND', null, 'dokdo'),
 ];
 
-export const RULES: RewardRulesView = { xpByRarity: { COMMON: 10, RARE: 20, LEGEND: 50 }, provinceFirstBonus: 15, setCompleteBonus: 100, claimBonus: 10, mysteryBonus: 50, provinceConquestBonus: 300 };
+export const RULES: RewardRulesView = { xpByRarity: { COMMON: 10, RARE: 20, LEGEND: 50 }, provinceFirstBonus: 15, setCompleteBonus: 100, claimBonus: 10, mysteryBonus: 50, provinceConquestBonus: 300, seasonCompleteBonus: 150, revisitStampBonus: 10, wishFulfilledBonus: 20 };
 
 export const CATALOG = buildCatalog(GEO, PROVINCES, ITEMS, RULES);
 

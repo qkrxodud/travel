@@ -4,6 +4,7 @@ import { Bar } from '../../../shared/ui/Bar';
 import { useUiStore } from '../../../store/uiStore';
 import { useCatalog } from '../../../shared/queries/catalog';
 import { useCollection } from '../../../shared/queries/collection';
+import { SeasonSection } from './SeasonSection';
 
 /** 도감 탭: 테마 세트(지도 기준 서버 값) — 지역을 누르면 지도에서 보여 준다 */
 export function CollectionTab() {
@@ -17,6 +18,7 @@ export function CollectionTab() {
         <h2>테마 도감 <span id="sets-sum">{collection ? `${collection.completed} / ${collection.total} 완성` : ''}</span></h2>
         <p className="sub" style={{ margin: 0 }}>같은 테마의 지역을 모두 모으면 세트가 완성되고 칭호와 보너스 XP를 받습니다. 지역을 누르면 지도에서 보여줘요.</p>
       </div>
+      <SeasonSection />
       <div className="sets" id="sets">
         {!collection ? <p className="empty">불러오는 중…</p> : collection.sets.map(set => (
           <div key={set.id} className={`set ${set.completed ? 'done' : ''}`} data-set={set.id}>

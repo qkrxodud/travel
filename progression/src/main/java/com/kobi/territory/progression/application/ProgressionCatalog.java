@@ -21,6 +21,8 @@ import com.kobi.territory.progression.domain.policy.StreakRules;
 import com.kobi.territory.progression.domain.progress.MysteryFact;
 import com.kobi.territory.progression.domain.quest.QuestRule;
 import com.kobi.territory.progression.domain.quest.QuestRules;
+import com.kobi.territory.progression.domain.collectionbook.Season;
+import com.kobi.territory.progression.domain.collectionbook.SeasonCalendar;
 import com.kobi.territory.progression.domain.collectionbook.Theme;
 import com.kobi.territory.progression.domain.collectionbook.Themes;
 import com.kobi.territory.progression.domain.policy.TitleRule;
@@ -30,6 +32,7 @@ import com.kobi.territory.progression.domain.policy.XpRewards;
 import com.kobi.territory.progression.domain.policy.XpSource;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.MonthDay;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.time.YearMonth;
@@ -55,6 +58,7 @@ public class ProgressionCatalog implements XpRewards {
     private final ProgressionPolicy policy;
     private final Themes themes;
     private final QuestRules questRules;
+    private final SeasonCalendar seasonCalendar;
 
     public ProgressionCatalog(ProgressionRules rules, RewardCalculator rewards, RegionCatalog regions,
                               MysteryRegionQuery mysteries, Clock clock) {
@@ -78,6 +82,10 @@ public class ProgressionCatalog implements XpRewards {
             .map(setView -> new Theme(setView.id(),
                 setView.regionCodes().stream().map(RegionCode::of).collect(Collectors.toSet())))
             .toList());
+        this.seasonCalendar = SeasonCalendar.of(rules.seasons().stream()
+            .map(season -> new Season(season.id(), MonthDay.parse("--" + season.start()), MonthDay.parse("--" + season.end()),
+                season.regionCodes().stream().map(RegionCode::of).collect(Collectors.toSet())))
+            .toList(), clock.getZone());
         this.questRules = new QuestRules(rules.quests().stream()
             .map(quest -> new QuestRule(quest.id(), QuestRule.Scope.valueOf(quest.scope()),
                 QuestRule.Metric.valueOf(quest.metric()), quest.param(), quest.target(), quest.xp()))
@@ -96,6 +104,8 @@ public class ProgressionCatalog implements XpRewards {
             case "STREAK_MONTHS" -> new BadgeRule.StreakMonths(condition.min());
             case "CONQUEST_RATIO" -> new BadgeRule.ConquestRatio(condition.ratio());
             case "MYSTERY_FOUND" -> new BadgeRule.MysteryFound(condition.min());
+            case "REVISIT_STAMPS" -> new BadgeRule.RevisitStamps(condition.min());
+            case "WISHES_FULFILLED" -> new BadgeRule.WishesFulfilled(condition.min());
             default -> throw new IllegalStateException("모르는 뱃지 조건: " + condition.type());
         };
     }
@@ -120,6 +130,26 @@ public class ProgressionCatalog implements XpRewards {
     @Override
     public int provinceConquest() {
         return rewards.provinceConquest().amount();
+    }
+
+    @Override
+    public int seasonComplete() {
+        return rewards.seasonComplete().amount();
+    }
+
+    @Override
+    public int revisitStamp() {
+        return rewards.revisitStamp().amount();
+    }
+
+    @Override
+    public int wishFulfilled() {
+        return rewards.wishFulfilled().amount();
+    }
+
+    /** 계절 한정 테마 달력(9단계). */
+    public SeasonCalendar seasonCalendar() {
+        return seasonCalendar;
     }
 
     /** 이번 주 미스터리 지역 보너스 XP. */

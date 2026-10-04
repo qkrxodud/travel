@@ -11,6 +11,8 @@ import com.kobi.territory.exploration.api.query.ExplorerProfileQuery;
 import com.kobi.territory.progression.api.event.BadgeEarned;
 import com.kobi.territory.progression.api.event.LevelUp;
 import com.kobi.territory.progression.api.event.MysteryBonusEarned;
+import com.kobi.territory.progression.api.event.SeasonCompleted;
+import com.kobi.territory.exploration.api.event.RevisitStamped;
 import com.kobi.territory.progression.api.event.ProvinceConquered;
 import com.kobi.territory.progression.api.event.StreakMilestoneReached;
 import com.kobi.territory.progression.api.event.SetCompleted;
@@ -35,7 +37,7 @@ public class FeedProjector {
     /** 투영하는 이벤트 타입(구독자 등록·재구성 재생이 같은 목록을 쓴다). */
     public static final List<Class<? extends DomainEvent>> EVENT_TYPES = List.of(RegionVisited.class, VisitCancelled.class,
         VisitsHidden.class, VisitsRestored.class, SetCompleted.class, LevelUp.class, BadgeEarned.class, ExplorerMerged.class,
-        StreakMilestoneReached.class, ProvinceConquered.class, MysteryBonusEarned.class);
+        StreakMilestoneReached.class, ProvinceConquered.class, MysteryBonusEarned.class, SeasonCompleted.class, RevisitStamped.class);
 
     private final FeedEntryRepository feed;
     private final FeedGenerationRepository generations;
@@ -100,6 +102,16 @@ public class FeedProjector {
                 ExplorerId explorer = ExplorerId.of(mystery.explorerId());
                 feed.addIfAbsent(generation, FeedEntry.mysteryFound(explorer, mystery.regionCode(), mystery.weekStart(),
                     mystery.earnedAt()).attributedTo(actorOf(explorer)));
+            }
+            case SeasonCompleted completed -> {
+                ExplorerId explorer = ExplorerId.of(completed.explorerId());
+                feed.addIfAbsent(generation, FeedEntry.seasonCompleted(explorer, completed.roundId(), completed.completedAt())
+                    .attributedTo(actorOf(explorer)));
+            }
+            case RevisitStamped stamped -> {
+                ExplorerId explorer = ExplorerId.of(stamped.explorerId());
+                feed.addIfAbsent(generation, FeedEntry.revisitStamped(explorer, stamped.regionCode(), stamped.year(),
+                    stamped.stampedAt()).attributedTo(actorOf(explorer)));
             }
             // 계정 병합 → from 의 소식을 into 로, from 개인 지도 체크인 소식은 into 개인 지도로(익명은 handle 이 없어 아무도 팔로우할 수 없었다)
             case ExplorerMerged merged -> feed.absorbMerged(generation, ExplorerId.of(merged.fromExplorerId()),

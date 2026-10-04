@@ -3,6 +3,8 @@ package com.kobi.territory.progression.domain;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
+import com.kobi.territory.progression.domain.collectionbook.Season;
+import com.kobi.territory.progression.domain.collectionbook.SeasonCalendar;
 import com.kobi.territory.progression.domain.collectionbook.Theme;
 import com.kobi.territory.progression.domain.collectionbook.Themes;
 import com.kobi.territory.progression.domain.policy.Badge;
@@ -27,6 +29,8 @@ import com.kobi.territory.progression.domain.quest.QuestPeriod;
 import com.kobi.territory.progression.domain.quest.QuestRule;
 import com.kobi.territory.progression.domain.quest.QuestRules;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.MonthDay;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -41,7 +45,8 @@ import java.util.Set;
  *   <li>지역: 서울 종로구·중구·용산구(일반), 경기 가평군(희귀)·수원시(일반), 경북 울릉군(전설). 미니 카탈로그의 시·도 합계는 서울 3곳·경기 2곳,
  *       전국 5곳.</li>
  *   <li>테마: "han" = 종로구 + 중구, "mix" = 중구 + 가평군.</li>
- *   <li>보상: 기본 10/20/50, 시·도 첫 발 15, 선점 10, 테마 완성 100, 이번 주 미스터리 50, 시·도 정복 300. 레벨 L 하한 = 20·L·(L−1).</li>
+ *   <li>보상: 기본 10/20/50, 시·도 첫 발 15, 선점 10, 테마 완성 100, 이번 주 미스터리 50, 시·도 정복 300, 9단계 계절 완성 150·
+ *       재방문 도장 10·가고 싶은 곳 20. 레벨 L 하한 = 20·L·(L−1).</li>
  *   <li>8단계: 시·도 현행 지역 명부 = 서울 {종로구, 중구, 용산구}, 경기 {가평군, 수원시} — 서울에는 폐지된 옛 지역(옛서울구)도 있지만
  *       명부에 없다.
  *       보호권 최대 2개·월간 퀘스트 완주 1개, 마일스톤 3·6·12·24개월(XP 50·100·200·400, 보호권 1).</li>
@@ -97,6 +102,21 @@ public final class Fixtures {
         public int provinceConquest() {
             return 300;
         }
+
+        @Override
+        public int seasonComplete() {
+            return 150;
+        }
+
+        @Override
+        public int revisitStamp() {
+            return 10;
+        }
+
+        @Override
+        public int wishFulfilled() {
+            return 20;
+        }
     };
 
     /** 서울 3곳·경기 2곳짜리 미니 카탈로그의 현행 지역 명부(옛서울구는 폐지돼 없다). */
@@ -112,7 +132,9 @@ public final class Fixtures {
         new Badge("streak3", new BadgeRule.StreakMonths(3)),
         new Badge("half", new BadgeRule.ConquestRatio(0.5)),
         new Badge("mystery1", new BadgeRule.MysteryFound(1)),
-        new Badge("mystery5", new BadgeRule.MysteryFound(5))));
+        new Badge("mystery5", new BadgeRule.MysteryFound(5)),
+        new Badge("revisit5", new BadgeRule.RevisitStamps(5)),
+        new Badge("wish3", new BadgeRule.WishesFulfilled(3))));
 
     public static final TitleRules 칭호 = new TitleRules(List.of(
         new TitleRule("lv1", TitleRule.Source.LEVEL, "1"),
@@ -120,6 +142,7 @@ public final class Fixtures {
         new TitleRule("set-han", TitleRule.Source.SET, "han"),
         new TitleRule("long-leg5", TitleRule.Source.QUEST, "leg5"),
         new TitleRule("streak-3", TitleRule.Source.STREAK, "3"),
+        new TitleRule("season-autumn", TitleRule.Source.SEASON, "autumn"),
         new TitleRule("own-KR-11", TitleRule.Source.PROVINCE, "KR-11")));
 
     /** 보호권 최대 2개, 월간 퀘스트를 모두 받으면 1개, 마일스톤 3·6·12·24개월(XP 50·100·200·400, 보호권 1). */
@@ -132,6 +155,19 @@ public final class Fixtures {
     public static final Themes 테마 = new Themes(List.of(
         new Theme("han", Set.of(종로구, 중구)),
         new Theme("mix", Set.of(중구, 가평군))));
+
+    /**
+     * 계절 한정 테마(9단계): 가을 "autumn" = 종로구 + 중구(매년 10/1~11/30), 봄 "spring" = 가평군 + 종로구(매년 3/20~4/30). 기준 시각
+     * 2026-10-02 은 가을 회차 autumn-2026 기간이다.
+     */
+    public static final SeasonCalendar 계절 = SeasonCalendar.of(List.of(
+        new Season("autumn", MonthDay.of(10, 1), MonthDay.of(11, 30), Set.of(종로구, 중구)),
+        new Season("spring", MonthDay.of(3, 20), MonthDay.of(4, 30), Set.of(가평군, 종로구))), 서울시각);
+
+    /** 서울 시각 그 날 정오. */
+    public static Instant 서울정오(int year, int month, int day) {
+        return LocalDate.of(year, month, day).atTime(12, 0).atZone(서울시각).toInstant();
+    }
 
     /** 월간 4개(m3 새 지역 3곳, mgun 일반 아닌 지역 1곳, mprov 처음 가는 시·도 1곳, mset 테마 지역 2곳), 상시 2개(leg5 전설 5곳, p3 2곳 이상 칠한 시·도 2개). */
     public static final QuestRules 퀘스트 = new QuestRules(List.of(

@@ -7,6 +7,7 @@ import com.kobi.territory.common.model.RegionCode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -74,8 +75,9 @@ public final class Territory {
         }
         requireNotFuture(date, ctx);
         requirePhoto(photo, ctx);
-        if (!ctx.inOnboarding() && checkInsOn(member, ctx) >= ctx.policy().dailyCap()) {
-            throw ExplorationError.DAILY_CAP_EXCEEDED.exception(ctx.policy().dailyCap());
+        if (ctx.capReachedWith(checkInsOn(member, ctx))) {
+            throw ctx.alsoUsedToday() > 0 ? ExplorationError.dailyCapWithStamps(ctx.policy().dailyCap())
+                : ExplorationError.DAILY_CAP_EXCEEDED.exception(ctx.policy().dailyCap());
         }
         Visit visit = Visit.checkedIn(region, member, date, memo, photo, ctx.now(), generations.next(region.code(), member));
         visits.add(visit);
@@ -127,12 +129,14 @@ public final class Territory {
     public RestoreResult restoreMember(ExplorerId member, Instant at) {
         List<RegionCode> restored = new ArrayList<>();
         List<RegionCode> back = new ArrayList<>();
+        Map<RegionCode, Instant> visitedAt = new LinkedHashMap<>();
         for (Visit visit : visits.hiddenOf(member)) {
             if (!visits.anyIn(visit.regionCode())) back.add(visit.regionCode());
             visit.restoreAt(at);
             restored.add(visit.regionCode());
+            visitedAt.put(visit.regionCode(), visit.visitedAt());
         }
-        return new RestoreResult(mapId, member, restored, back);
+        return new RestoreResult(mapId, member, restored, back, visitedAt);
     }
 
     /** 유예가 끝남: 이 멤버의 숨긴 방문을 지운다(하드 삭제). 회차 기록은 남긴다. @return 지운 방문 */

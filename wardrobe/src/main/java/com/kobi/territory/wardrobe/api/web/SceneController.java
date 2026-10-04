@@ -50,11 +50,11 @@ public class SceneController {
             .collect(Collectors.toMap(ItemView::itemId, Function.identity()));
         Map<String, ItemResponse> slots = new LinkedHashMap<>();
         for (EquipSlot slot : EquipSlot.values()) {
-            slots.put(slot.name(), scene.equippedSlots().itemAt(slot).map(itemId -> ItemResponse.of(itemId, worn.get(itemId)))
+            slots.put(slot.name(), scene.equippedSlots().itemAt(slot).map(itemId -> ItemResponse.of(itemId, worn.get(itemId), view.variantOf(itemId)))
                 .orElse(null));
         }
         return new SceneResponse(scene.gender().name(), slots,
-            scene.propSlots().itemIds().stream().map(itemId -> ItemResponse.of(itemId, worn.get(itemId))).toList(),
+            scene.propSlots().itemIds().stream().map(itemId -> ItemResponse.of(itemId, worn.get(itemId), view.variantOf(itemId))).toList(),
             view.stylePoints(), scene.wornItemIds().size(), scene.updatedAt());
     }
 }

@@ -4,7 +4,7 @@
  */
 import { backgroundOps, CHAR_SCALE, CHAR_X, CHAR_Y, cozyScene, GROUND_Y, SCENE_HEIGHT, SCENE_WIDTH, seededRandom, themeOf } from './backgrounds';
 import { drawBag, drawHand, drawHat, drawKeyring, drawPet, drawProp, OUTLINE } from './equipment';
-import { backgroundThemeKey, HAND_TYPES, HAT_TYPES, lookOf, PET_TYPES, PROP_TYPES, type Look, type PixelItem } from './looks';
+import { backgroundThemeKey, HAND_TYPES, HAT_TYPES, lookOf, PET_TYPES, pixelKey, PROP_TYPES, type Look, type PixelItem } from './looks';
 import { Painter, type CanvasFactory } from './painter';
 
 export type Gender = 'm' | 'f';
@@ -52,7 +52,7 @@ const SLOT_ORDER = ['hat', 'hand', 'badge', 'back', 'pet', 'bg'] as const;
 
 /** 착용 조합 키(성별 + 슬롯별 아이템 + 장식) */
 export function equipmentKey(equipment: Equipment): string {
-  return JSON.stringify([equipment.gender, SLOT_ORDER.map(slot => equipment[slot]?.code ?? ''), equipment.props.map(item => item.code)]);
+  return JSON.stringify([equipment.gender, SLOT_ORDER.map(slot => { const worn = equipment[slot]; return worn ? pixelKey(worn) : ''; }), equipment.props.map(pixelKey)]);
 }
 
 const themeColors = (key: string) => themeOf(key);
@@ -88,7 +88,7 @@ export class PixelRenderer {
 
   /** 아이템 아이콘 */
   item(item: PixelItem, scale = 3): HTMLCanvasElement {
-    return this.memo('i' + scale + item.code + item.slot, () => this.paintItem(item, scale));
+    return this.memo('i' + scale + pixelKey(item) + item.slot, () => this.paintItem(item, scale));
   }
 
   /** 장면(배경 + 장식 + 캐릭터) */
@@ -98,7 +98,7 @@ export class PixelRenderer {
   }
 
   itemUrl(item: PixelItem): string {
-    return this.memoUrl('i' + item.code + item.slot, () => this.item(item, 3));
+    return this.memoUrl('i' + pixelKey(item) + item.slot, () => this.item(item, 3));
   }
 
   sceneUrl(equipment: Equipment): string {

@@ -3,7 +3,12 @@ package com.kobi.territory.progression.application;
 import com.kobi.territory.common.event.EventBacklog;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.exploration.api.event.RegionVisited;
+import com.kobi.territory.common.model.RegionCode;
+import com.kobi.territory.exploration.api.query.RevisitQuery;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
+import com.kobi.territory.exploration.api.query.WishlistQuery;
+import com.kobi.territory.progression.domain.progress.StampFact;
+import com.kobi.territory.progression.domain.progress.WishFact;
 import com.kobi.territory.progression.domain.collectionbook.CollectionBook;
 import com.kobi.territory.progression.domain.collectionbook.CollectionBookRepository;
 import com.kobi.territory.progression.domain.progress.ExplorerProgress;
@@ -54,11 +59,15 @@ public class RecalculateService {
     private final EventBacklog backlog;
     private final TransactionTemplate perExplorerTx;
     private final ProgressService progressService;
+    private final RevisitQuery revisits;
+    private final WishlistQuery wishlists;
 
     public RecalculateService(TerritoryQuery territories, ProgressService progressService, ExplorerProgressRepository progresses,
                               CollectionBookRepository collectionBooks, QuestBoardRepository boards,
                               ProgressionCatalog catalog, Clock clock, EventBacklog backlog,
-                              PlatformTransactionManager transactionManager) {
+                              PlatformTransactionManager transactionManager, RevisitQuery revisits, WishlistQuery wishlists) {
+        this.revisits = revisits;
+        this.wishlists = wishlists;
         this.backlog = backlog;
         this.progressService = progressService;
         this.territories = territories;
@@ -112,8 +121,14 @@ public class RecalculateService {
         List<QuestBoard> explorerBoards = boards.loadAll(explorerId);
         YearMonth now = catalog.currentMonth();
 
+        List<StampFact> stamps = revisits.stampsOf(explorerId.value()).stream()
+            .map(stamp -> new StampFact(RegionCode.of(stamp.regionCode()), stamp.year(), stamp.stampedAt())).toList();
+        List<WishFact> wishes = wishlists.fulfilledOf(explorerId.value()).stream()
+            .map(wish -> new WishFact(RegionCode.of(wish.regionCode()), wish.fulfilledAt())).toList();
+
         ProgressionReplay.Result result = ProgressionReplay.replay(explorerId, current, histories, existingBooks,
-            explorerBoards, catalog.policy(), catalog.themes(), catalog.questRules(), now, clock.instant());
+            explorerBoards, catalog.policy(), catalog.themes(), catalog.seasonCalendar(), catalog.questRules(), now,
+            clock.instant(), stamps, wishes);
 
         // 재계산은 통째로 바꾸는 경로 — 저장소에 replace 를 명시해 호출한다(어댑터가 의도를 추측하지 않게)
         progresses.replace(result.progress());
@@ -161,9 +176,11 @@ public class RecalculateService {
 
     /**
      * 보류 판정 구독자: 진행 구독자 + 탐험 영토 구독자(exploration.territory — 탈퇴 숨김·재가입 복구·병합 흡수가 아직 영토에 반영되지
-     * 않았으면 재계산이 그 지도를 덜 읽어 회수해 버린다, P3-R3-1).
+     * 않았으면 재계산이 그 지도를 덜 읽어 회수해 버린다, P3-R3-1). 9단계: 도장첩·가고 싶은 곳 구독자(병합으로 옮겨 올 도장·핀이 아직이면
+     * 복구 규칙이 그 보상을 놓친다).
      */
-    static final List<String> HOLD_SUBSCRIBERS = List.of(SUBSCRIBER_PREFIX, "exploration.territory", "exploration.expedition-map");
+    static final List<String> HOLD_SUBSCRIBERS = List.of(SUBSCRIBER_PREFIX, "exploration.territory", "exploration.expedition-map",
+        "exploration.stamp-book", "exploration.wishlist");
 
     /**
      * @param failedExplorerIds   재시도를 다 쓰고도 실패한 탐험가(다시 돌리면 된다)

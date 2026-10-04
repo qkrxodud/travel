@@ -22,13 +22,17 @@ public interface ProgressionRules {
     /** 연속 탐험 규칙(8단계): 보호권 보유 상한·월간 퀘스트 완주 보상, 마일스톤. */
     StreakRulesView streakRules();
 
+    /** 계절 한정 테마(9단계) — 매년 start~end(양 끝 포함, 서비스 시간대 날짜)에 새 회차 {id}-{연도}로 열린다. */
+    List<SeasonView> seasons();
+
     record LevelTitleView(int level, String name) {}
 
     /** @param regionCodes KR-xxxxx */
     record SetView(String id, String name, String desc, String title, List<String> regionCodes, String backgroundName) {}
 
     /** @param type REGION_COUNT | PROVINCES_COMPLETE | PROVINCE_GROUPS_TOUCHED | LEGEND_COUNT | ALL_PROVINCES_TOUCHED |
-     *              SETS_COMPLETED | STREAK_MONTHS | CONQUEST_RATIO | MYSTERY_FOUND(8단계) */
+     *              SETS_COMPLETED | STREAK_MONTHS | CONQUEST_RATIO | MYSTERY_FOUND(8단계) |
+     *              REVISIT_STAMPS | WISHES_FULFILLED(9단계) */
     record BadgeConditionView(String type, int min, List<String> provinces, List<List<String>> groups, double ratio) {}
 
     record BadgeView(String id, String ico, String name, String desc, BadgeConditionView condition) {}
@@ -38,7 +42,22 @@ public interface ProgressionRules {
     record QuestView(String id, String scope, String ico, String name, String desc, String metric, int param, int target,
                      int xp, String title) {}
 
-    /** @param source LEVEL | SET | QUEST | PROVINCE | STREAK(8단계), @param ref 레벨 숫자·세트 id·퀘스트 id·시·도 코드·개월 수 */
+    /**
+     * 계절 한정 테마 정의(9단계).
+     *
+     * @param start       매년 열리는 날 "MM-dd"
+     * @param end         매년 닫히는 날 "MM-dd"(이 날까지 포함)
+     * @param regionCodes KR-xxxxx
+     * @param titleId     season-{id}(회차 무관 하나)
+     */
+    record SeasonView(String id, String name, String desc, String start, String end, List<String> regionCodes, String titleId,
+                      String titleName, String emoji) {
+        public SeasonView {
+            regionCodes = List.copyOf(regionCodes);
+        }
+    }
+
+    /** @param source LEVEL | SET | QUEST | PROVINCE | STREAK(8단계) | SEASON(9단계), @param ref 레벨 숫자·세트 id·퀘스트 id·시·도 코드·개월 수 */
     record TitleView(String id, String name, String how, String source, String ref) {}
 
     /** 연속 탐험 마일스톤 하나: 처음 도달하면 XP·칭호(titleId)·보호권(freezes, 보유 상한 안)·한정 아이템(STREAK_MILESTONE). */

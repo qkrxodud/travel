@@ -6,16 +6,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { Painter } from './painter';
 import { equipmentKey, PixelRenderer, type Equipment, type SpriteSource } from './renderer';
 import { backgroundThemeKey, lookOf, type PixelItem } from './looks';
+import { themeOf } from './backgrounds';
 
 /** 그리기 호출만 세는 가짜 캔버스(jsdom 에는 2D 컨텍스트가 없다) */
 function fakeCanvasFactory() {
-  const created: { width: number; height: number; fills: number }[] = [];
+  const created: { width: number; height: number; fills: number; colors: Set<string> }[] = [];
   const factory = vi.fn((width: number, height: number) => {
-    const record = { width, height, fills: 0 };
+    const record = { width, height, fills: 0, colors: new Set<string>() };
     created.push(record);
+    let style = '';
     const context = {
-      imageSmoothingEnabled: true, fillStyle: '',
-      fillRect: () => { record.fills += 1; }, drawImage: () => undefined, beginPath: () => undefined, ellipse: () => undefined, fill: () => undefined,
+      imageSmoothingEnabled: true,
+      get fillStyle() { return style; },
+      set fillStyle(color: string) { style = color; },
+      fillRect: () => { record.fills += 1; record.colors.add(style); }, drawImage: () => undefined, beginPath: () => undefined, ellipse: () => undefined, fill: () => undefined,
     };
     return { width, height, getContext: () => context, toDataURL: vi.fn(() => `data:${width}x${height}#${created.length}`) } as unknown as HTMLCanvasElement;
   });
@@ -83,6 +87,14 @@ describe('캐릭터 그림 다시 쓰기', () => {
   it('옷차림은 성별·칸마다 입은 아이템·장식 순서로 구별한다', () => {
     expect(equipmentKey({ gender: 'f', hat: beanie, props: [lantern] })).toBe(JSON.stringify(['f', ['region:KR-36330', '', '', '', '', ''], ['region:KR-11010']]));
   });
+
+  it('같은 아이템이라도 재방문 2회차 색이면 다른 그림으로 그린다', () => {
+    const { factory } = fakeCanvasFactory();
+    const renderer = new PixelRenderer(factory, sprites(true));
+    const recolored: PixelItem = { ...lantern, variant: 2, look: { type: 'lantern', primary: '#f4c542', secondary: '#e63946' } };
+    expect(renderer.itemUrl(recolored)).not.toBe(renderer.itemUrl(lantern));
+    expect(equipmentKey({ gender: 'm', hand: recolored, props: [] })).not.toBe(equipmentKey({ gender: 'm', hand: lantern, props: [] }));
+  });
 });
 
 describe('픽셀 그리기', () => {
@@ -123,6 +135,23 @@ describe('아이템 모양', () => {
     expect(lookOf(item('pet', 'crown'), themes).type).toBe('dog');
     expect(lookOf(item('prop', 'crown'), themes).type).toBe('vase');
     expect(lookOf(item('hat', null), themes).type).toBe('beanie');
+  });
+
+  it('계절 한정 배경(단풍·벚꽃)은 저마다의 풍경 테마로 그린다', () => {
+    expect(themeOf('autumn')).not.toBe(themeOf('plain'));
+    expect(themeOf('blossom')).not.toBe(themeOf('plain'));
+    expect(themeOf('autumn').sky).not.toEqual(themeOf('blossom').sky);
+    const { factory, created } = fakeCanvasFactory();
+    const renderer = new PixelRenderer(factory, sprites(true));
+    const colorsOf = (theme: string) => {
+      const before = created.length;
+      renderer.scene({ gender: 'm', bg: { code: `season:${theme}`, emoji: '🍁', slot: 'bg', look: null, theme }, props: [] });
+      return new Set(created.slice(before).flatMap(canvas => [...canvas.colors]));
+    };
+    // 단풍 풍경에는 단풍잎 빨강이, 벚꽃 풍경에는 벚꽃 분홍이 칠해진다(민무늬에는 없다)
+    expect(colorsOf('autumn').has('#d84315')).toBe(true);
+    expect(colorsOf('blossom').has('#f8bbd0')).toBe(true);
+    expect(colorsOf('plain').has('#d84315')).toBe(false);
   });
 
   it('배경은 테마의 하늘·땅 색으로 그리고, 테마가 없으면 이모지로, 그것도 없으면 민무늬로 고른다', () => {

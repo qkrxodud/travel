@@ -117,6 +117,10 @@ export interface ProgressResponse {
   milestones: MilestoneResponse[];
   provinces: ProvinceProgressResponse[];
   mysteryFoundCount: number;
+  /** 받은 재방문 도장 수(9단계) */
+  revisitStampCount: number;
+  /** 다녀온 가고 싶은 곳 수(9단계) */
+  wishFulfilledCount: number;
 }
 
 export type MysteryRarity = 'RARE' | 'LEGEND';
@@ -204,4 +208,64 @@ export interface QuestClaimResponse {
   period: string;
   xp: number;
   claimedAt: string;
+}
+
+/** 계절 회차의 지역 — SeasonRegionResponse(코드 KR-xxxxx). collected = 이 회차 기간 안에 이 지도에서 칠해 센 지역 */
+export interface SeasonRegionResponse {
+  code: string;
+  name: string;
+  provinceCode: string;
+  collected: boolean;
+}
+
+export type SeasonId = 'spring' | 'autumn';
+
+/** 계절 한정 테마 회차 하나 — SeasonRoundResponse(9단계) */
+export interface SeasonRoundResponse {
+  /** {계절}-{연도} (autumn-2026) */
+  roundId: string;
+  seasonId: SeasonId;
+  /** "2026 단풍 명소" */
+  name: string;
+  emoji: string;
+  year: number;
+  startsAt: string;
+  /** 닫히는 순간(마지막 날 다음 날 00:00 KST) */
+  endsAt: string;
+  /** 열린 회차면 닫힐 때까지 남은 초, 닫힌 회차는 0 */
+  remainingSeconds: number;
+  open: boolean;
+  have: number;
+  total: number;
+  completed: boolean;
+  completedAt: string | null;
+  /** 내가 완성 보상 수령자인지(완성 시점 멤버) */
+  rewarded: boolean;
+  xp: number;
+  titleId: string;
+  titleName: string;
+  /** season:{roundId} */
+  backgroundItemId: string;
+  regions: SeasonRegionResponse[];
+}
+
+/** 다음에 열리는 회차 — NextSeasonResponse */
+export interface NextSeasonResponse {
+  roundId: string;
+  seasonId: SeasonId;
+  name: string;
+  emoji: string;
+  startsAt: string;
+  endsAt: string;
+}
+
+/** GET /seasons/current — SeasonsResponse(9단계, mapId 생략 = 개인 지도) */
+export interface SeasonsResponse {
+  mapId: string;
+  now: string;
+  /** 지금 열린 회차(보통 0~1개) — 비었으면 계절 기간이 아니다 */
+  current: SeasonRoundResponse[];
+  next: NextSeasonResponse | null;
+  /** 이 지도에 기록이 있는 닫힌 회차(최근 순, 미완성 포함) */
+  history: SeasonRoundResponse[];
 }

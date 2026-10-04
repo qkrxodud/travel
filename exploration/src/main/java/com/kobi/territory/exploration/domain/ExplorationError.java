@@ -32,7 +32,14 @@ public enum ExplorationError {
     HANDLE_TAKEN(ErrorKind.CONFLICT, "이미 누가 쓰고 있는 핸들이에요: %s"),
     ACCOUNT_INVALID(ErrorKind.INVALID, "로그인 정보가 올바르지 않습니다: %s"),
     LOGIN_REQUIRED(ErrorKind.UNAUTHENTICATED, "로그인해야 할 수 있어요."),
-    MERGE_NOT_ALLOWED(ErrorKind.CONFLICT, "이 탐험가는 병합할 수 없어요: %s");
+    MERGE_NOT_ALLOWED(ErrorKind.CONFLICT, "이 탐험가는 병합할 수 없어요: %s"),
+    // ---- 9단계 재방문 도장·가고 싶은 곳 ----
+    // DAILY_CAP_EXCEEDED 의 도장 합산 문구(코드는 같다 — 화면 분기는 그대로, 메시지만 상황에 맞게)
+    REVISIT_NOT_PAINTED(ErrorKind.RULE_VIOLATION, "아직 칠하지 않은 지역이라 재방문 도장을 받을 수 없어요: %s"),
+    REVISIT_SAME_YEAR(ErrorKind.RULE_VIOLATION, "%d년에 처음 칠한 지역이라 %d년부터 재방문 도장을 받을 수 있어요."),
+    REVISIT_ALREADY_STAMPED(ErrorKind.CONFLICT, "%d년 재방문 도장을 이미 받았어요."),
+    WISH_ALREADY_VISITED(ErrorKind.CONFLICT, "이미 칠한 지역이라 가고 싶은 곳에 꽂을 수 없어요: %s"),
+    WISHLIST_FULL(ErrorKind.RULE_VIOLATION, "가고 싶은 곳은 %d곳까지 꽂을 수 있어요.");
 
     private final ErrorKind kind;
     private final String template;
@@ -44,6 +51,12 @@ public enum ExplorationError {
 
     public ErrorKind kind() {
         return kind;
+    }
+
+    /** 하루 상한이 체크인·재방문 도장 합산으로 찼을 때의 DAILY_CAP_EXCEEDED 문구(9단계 QA P3-7). */
+    public static ExplorationException dailyCapWithStamps(int cap) {
+        return new ExplorationException(DAILY_CAP_EXCEEDED,
+            "오늘 체크인과 재방문 도장을 합친 하루 상한(" + cap + "건)에 도달했어요. 내일 다시 해 주세요.");
     }
 
     public ExplorationException exception(Object... args) {

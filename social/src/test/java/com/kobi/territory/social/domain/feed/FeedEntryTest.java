@@ -128,6 +128,36 @@ class FeedEntryTest {
     }
 
     @Nested
+    @DisplayName("계절 한정 테마·재방문 도장 소식")
+    class SecondGameNews {
+
+        @Test
+        @DisplayName("같은 회차 완성은 한 번만 소식이 되고 회차를 담는다")
+        void season() {
+            FeedEntry autumn = FeedEntry.seasonCompleted(KIM, "autumn-2026", T0);
+
+            assertThat(FeedEntry.seasonCompleted(KIM, "autumn-2026", T0.plusSeconds(9)).refId()).isEqualTo(autumn.refId());
+            assertThat(FeedEntry.seasonCompleted(KIM, "autumn-2027", T0).refId()).isNotEqualTo(autumn.refId());
+            assertThat(autumn.kind()).isEqualTo(FeedKind.SEASON_COMPLETED);
+            assertThat(autumn.detail().roundId()).isEqualTo("autumn-2026");
+        }
+
+        @Test
+        @DisplayName("재방문 도장 소식은 지역·연도마다 하나이고 해가 바뀌면 같은 지역도 새 소식이다")
+        void revisit() {
+            FeedEntry thisYear = FeedEntry.revisitStamped(KIM, "KR-11010", 2027, T0);
+            FeedEntry nextYear = FeedEntry.revisitStamped(KIM, "KR-11010", 2028, T0);
+
+            assertThat(FeedEntry.revisitStamped(KIM, "KR-11010", 2027, T0.plusSeconds(9)).refId()).isEqualTo(thisYear.refId());
+            assertThat(nextYear.refId()).isNotEqualTo(thisYear.refId());
+            assertThat(nextYear.sameNewsKey()).isNotEqualTo(thisYear.sameNewsKey());
+            assertThat(thisYear.kind()).isEqualTo(FeedKind.REVISIT_STAMPED);
+            assertThat(thisYear.detail().regionCode()).isEqualTo("KR-11010");
+            assertThat(thisYear.detail().year()).isEqualTo(2027);
+        }
+    }
+
+    @Nested
     @DisplayName("익명 탐험가가 계정으로 합쳐지면")
     class Merge {
 
@@ -144,6 +174,7 @@ class FeedEntryTest {
     @DisplayName("소식에는 메모·사진·방문일이 담길 자리가 없다")
     void noPrivateFields() {
         assertThat(Arrays.stream(FeedDetail.class.getRecordComponents()).map(RecordComponent::getName))
-            .containsExactly("regionCode", "rarity", "themeId", "level", "badgeId", "provinceCode", "months", "weekStart");
+            .containsExactly("regionCode", "rarity", "themeId", "level", "badgeId", "provinceCode", "months", "weekStart", "roundId",
+                "year");
     }
 }

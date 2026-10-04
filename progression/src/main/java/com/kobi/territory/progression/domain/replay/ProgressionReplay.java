@@ -1,7 +1,11 @@
 package com.kobi.territory.progression.domain.replay;
 
 import com.kobi.territory.progression.domain.collectionbook.CollectionBook;
+import com.kobi.territory.progression.domain.collectionbook.SeasonCalendar;
+import com.kobi.territory.progression.domain.collectionbook.SeasonCompletion;
 import com.kobi.territory.progression.domain.collectionbook.ThemeCompletion;
+import com.kobi.territory.progression.domain.progress.StampFact;
+import com.kobi.territory.progression.domain.progress.WishFact;
 import com.kobi.territory.progression.domain.collectionbook.Themes;
 import com.kobi.territory.progression.domain.policy.ProgressionPolicy;
 import com.kobi.territory.progression.domain.progress.ExplorerProgress;
@@ -17,6 +21,7 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +41,10 @@ import java.util.Map;
  *   <li>보호권(8단계): 장부를 비우고, 장부에 남은 보상에서 다시 만든 "받을 일"(마일스톤·한 달 월간 퀘스트 완주)과 체크인(빈 달 소모)을
  *       처리 시각 순으로 섞어 다시 쌓는다 — 같은 입력이면 몇 번을 돌려도 같은 보유 수. 미스터리·시·도 정복·마일스톤 XP 는 회수 없는
  *       보상이라 남고, 재생에서 새로 닿은 시·도 정복은 그때 지급된다(복구 규칙)</li>
+ *   <li>계절 한정 테마(9단계): 지금 아직 닫히지 않은 회차만 비우고 같은 방문 재생으로 다시 센다(회차 기간 안에 처리된 방문만).
+ *       닫힌 회차는 확정 기록이라 그대로 — 재생도 닫힌 회차를 건드리지 않는다. 본인이 수령자인 새 완성은 테마 완성처럼 시간 순으로 반영</li>
+ *   <li>복구 규칙(9단계): 계절 회차 완성 기록(본인이 완성 시점 멤버)·재방문 도장·다녀온 가고 싶은 곳이 있는데 장부에 보상이 없으면
+ *       그 기록 시각으로 지급(병합으로 옮겨 온 도장·핀 포함)</li>
  * </ul>
  */
 public final class ProgressionReplay {
@@ -50,23 +59,41 @@ public final class ProgressionReplay {
     public static Result replay(ExplorerId explorer, ExplorerProgress current, Map<String, List<ReplayVisit>> histories,
                                 Map<String, CollectionBook> collections, List<QuestBoard> boards,
                                 ProgressionPolicy policy, Themes themes, QuestRules questRules, YearMonth now, Instant at) {
+        return replay(explorer, current, histories, collections, boards, policy, themes, SeasonCalendar.none(policy.zone()),
+            questRules, now, at, List.of(), List.of());
+    }
+
+    /**
+     * @param seasons 계절 한정 테마 달력(9단계)
+     * @param stamps  탐험이 기록한 이 탐험가의 재방문 도장(복구 규칙)
+     * @param wishes  탐험이 기록한 이 탐험가의 다녀온 가고 싶은 곳(복구 규칙)
+     */
+    public static Result replay(ExplorerId explorer, ExplorerProgress current, Map<String, List<ReplayVisit>> histories,
+                                Map<String, CollectionBook> collections, List<QuestBoard> boards,
+                                ProgressionPolicy policy, Themes themes, SeasonCalendar seasons, QuestRules questRules,
+                                YearMonth now, Instant at, List<StampFact> stamps, List<WishFact> wishes) {
         List<Step> timeline = new ArrayList<>();
         List<CollectionBook> rebuilt = new ArrayList<>();
+        SeasonCalendar openSeasons = seasons.excludingEndedBy(at);
         histories.forEach((mapId, visits) -> {
-            CollectionBook collectionBook = collections.getOrDefault(mapId, CollectionBook.empty(mapId)).rebuildBase();
+            CollectionBook collectionBook = collections.getOrDefault(mapId, CollectionBook.empty(mapId)).rebuildBase(seasons, at);
             for (ReplayVisit replayVisit : visits) {
                 List<ThemeCompletion> completions = collectionBook.applyVisit(replayVisit.visit().region(),
                     replayVisit.explorer(), replayVisit.visit().visitedAt(), themes, replayVisit.members());
+                List<SeasonCompletion> seasonCompletions = collectionBook.applySeasonVisit(replayVisit.visit().region(),
+                    replayVisit.explorer(), replayVisit.visit().visitedAt(), openSeasons, replayVisit.members());
                 if (replayVisit.explorer().equals(explorer)) {
-                    timeline.add(new Step(replayVisit.visit().visitedAt(), 0, replayVisit, null, null));
+                    timeline.add(new Step(replayVisit.visit().visitedAt(), 0, replayVisit, null, null, null));
                 }
                 completions.stream().filter(completion -> completion.rewards(explorer))
-                    .forEach(completion -> timeline.add(new Step(completion.completedAt(), 1, null, completion, null)));
+                    .forEach(completion -> timeline.add(new Step(completion.completedAt(), 1, null, completion, null, null)));
+                seasonCompletions.stream().filter(completion -> completion.rewards(explorer))
+                    .forEach(completion -> timeline.add(new Step(completion.completedAt(), 1, null, null, completion, null)));
             }
             rebuilt.add(collectionBook);
         });
         ExplorerProgress progress = current.rebuildBase(histories.keySet());
-        progress.freezeGrantsOnRecord(policy).forEach(grant -> timeline.add(new Step(grant.at(), 2, null, null, grant)));
+        progress.freezeGrantsOnRecord(policy).forEach(grant -> timeline.add(new Step(grant.at(), 2, null, null, null, grant)));
         timeline.sort(Comparator.comparing(Step::at).thenComparingInt(Step::order));
 
         QuestBoard monthly = boardOf(boards, explorer, QuestPeriod.of(now));
@@ -83,6 +110,8 @@ public final class ProgressionReplay {
                 always.applyVisit(fact, questRules, now);
             } else if (step.completion() != null) {
                 progress.applyThemeCompleted(step.completion().themeId(), step.at(), policy);
+            } else if (step.seasonCompletion() != null) {
+                progress.applySeasonCompleted(step.seasonCompletion().roundId(), step.at(), policy);
             } else {
                 progress.applyFreezeGrant(step.freezeGrant(), policy);
             }
@@ -93,6 +122,13 @@ public final class ProgressionReplay {
         List<QuestXp> claimed = boards.stream().flatMap(board -> board.claimedRewards(questRules).stream())
             .map(reward -> new QuestXp(reward.period(), reward.questId(), reward.xp())).toList();
         progress.recoverRewards(completedThemeIds, claimed, at, policy);
+        Map<String, Instant> seasonCompletedAt = new LinkedHashMap<>();
+        List<String> rewardedRounds = new ArrayList<>();
+        rebuilt.forEach(book -> book.seasonRoundIdsRewardedTo(explorer).forEach(roundId -> {
+            rewardedRounds.add(roundId);
+            seasonCompletedAt.putIfAbsent(roundId, book.seasonProgressOf(roundId).completedAt());
+        }));
+        progress.recoverRecords(rewardedRounds, seasonCompletedAt, stamps, wishes, at, policy);
         return new Result(progress, rebuilt, monthly, always);
     }
 
@@ -101,8 +137,9 @@ public final class ProgressionReplay {
             .orElseGet(() -> QuestBoard.empty(explorer, period));
     }
 
-    /** 재생 한 걸음 — 같은 시각이면 체크인(0) → 테마 완성(1) → 보호권 받기(2) 순(이벤트 처리 순서와 같다). */
-    private record Step(Instant at, int order, ReplayVisit visit, ThemeCompletion completion, FreezeGrant freezeGrant) {}
+    /** 재생 한 걸음 — 같은 시각이면 체크인(0) → 테마·계절 완성(1) → 보호권 받기(2) 순(이벤트 처리 순서와 같다). */
+    private record Step(Instant at, int order, ReplayVisit visit, ThemeCompletion completion, SeasonCompletion seasonCompletion,
+                        FreezeGrant freezeGrant) {}
 
     /** 재계산 결과. 컬렉션은 방어 복사. */
     public record Result(ExplorerProgress progress, List<CollectionBook> collectionBooks, QuestBoard monthly, QuestBoard always) {

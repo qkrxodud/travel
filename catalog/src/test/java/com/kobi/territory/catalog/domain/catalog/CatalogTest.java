@@ -24,7 +24,9 @@ import com.kobi.territory.catalog.domain.reward.RewardRules;
 import com.kobi.territory.common.error.TerritoryException;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
+import com.kobi.territory.catalog.domain.definition.SeasonDefinition;
 import java.time.Instant;
+import java.time.MonthDay;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -115,6 +117,47 @@ class CatalogTest {
     void duplicateMilestone() {
         assertThatThrownBy(() -> new StreakRules(2, 1, List.of(new StreakMilestone(3, 50, 1, "a"), new StreakMilestone(3, 60, 1, "b"))))
             .hasMessageContaining("중복");
+    }
+
+    private static ProgressionDefinitions 가을만(List<RegionCode> regions) {
+        return new ProgressionDefinitions(레벨, List.of(), List.of(), List.of(), StreakRules.none(), List.of(
+            new SeasonDefinition("autumn", "단풍 명소", "", MonthDay.of(10, 1), MonthDay.of(11, 30), regions, "단풍 사냥꾼", "*")));
+    }
+
+    @Test
+    @DisplayName("계절 한정 테마가 모르는 지역을 가리키면 기동하지 않는다")
+    void seasonWithUnknownRegion() {
+        assertThatThrownBy(() -> new Catalog(종로구만, 서울만, 보상, "{}", 가을만(List.of(RegionCode.of("KR-99999")))))
+            .hasMessageContaining("모르는 지역");
+    }
+
+    @Test
+    @DisplayName("계절 한정 테마마다 회차와 무관한 칭호가 하나 생긴다")
+    void seasonTitle() {
+        assertThat(new Catalog(종로구만, 서울만, 보상, "{}", 가을만(List.of(종로구))).titles())
+            .extracting(title -> title.id() + ":" + title.name() + ":" + title.source() + ":" + title.ref())
+            .contains("season-autumn:단풍 사냥꾼:SEASON:autumn");
+    }
+
+    @Test
+    @DisplayName("계절 배경이 정의되지 않은 계절의 회차를 가리키면 받지 않는다")
+    void seasonBackgroundUnknownSeason() {
+        Catalog catalog = new Catalog(종로구만, 서울만, 보상, "{}", 가을만(List.of(종로구)));
+
+        catalog.requireReferences(계절배경("autumn-2031"));
+        assertThatThrownBy(() -> catalog.requireReferences(계절배경("winter-2031"))).isInstanceOf(TerritoryException.class);
+    }
+
+    @Test
+    @DisplayName("계절 기간이 해를 넘기면 기동하지 않는다")
+    void seasonWithinYear() {
+        assertThatThrownBy(() -> new SeasonDefinition("winter", "겨울", "", MonthDay.of(12, 1), MonthDay.of(2, 28), List.of(종로구),
+            "눈", "*")).hasMessageContaining("한 해 안");
+    }
+
+    private static ItemDefinition 계절배경(String roundId) {
+        return new ItemDefinition("event:bg-" + roundId, "i", "*", ItemSlot.BG, Rarity.LEGEND, null, null,
+            new GrantRule.SeasonComplete(roundId), ValidPeriod.ALWAYS, Instant.EPOCH);
     }
 
     private static ItemDefinition 마일스톤아이템(int months) {

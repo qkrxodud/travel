@@ -17,7 +17,7 @@ import com.kobi.territory.exploration.domain.territory.ClaimTransfer;
 import com.kobi.territory.exploration.domain.policy.CheckInPolicy;
 import com.kobi.territory.exploration.domain.territory.CheckInPreview;
 import com.kobi.territory.exploration.domain.territory.CheckInResult;
-import com.kobi.territory.exploration.domain.map.ExpeditionMapRepository;
+import com.kobi.territory.exploration.domain.revisit.StampBookRepository;
 import com.kobi.territory.exploration.domain.map.MapId;
 import com.kobi.territory.exploration.domain.map.MapSelector;
 import com.kobi.territory.exploration.domain.territory.Memo;
@@ -31,6 +31,8 @@ import com.kobi.territory.exploration.domain.territory.VisitPatch;
 import com.kobi.territory.exploration.domain.territory.VisitView;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -59,19 +61,21 @@ public class CheckInService {
     static final String AGGREGATE = "Territory";
 
     private final TerritoryRepository territories;
-    private final ExpeditionMapRepository maps;
     private final MapAccess mapAccess;
     private final CatalogRegionDirectory regions;
     private final RegionCatalog catalog;
     private final EventOutbox outbox;
     private final ExplorationSettings settings;
     private final Clock clock;
+    private final MemberTerritoryLock locks;
+    private final StampBookRepository stampBooks;
 
-    public CheckInService(TerritoryRepository territories, ExpeditionMapRepository maps, MapAccess mapAccess,
-                          CatalogRegionDirectory regions,
-                          RegionCatalog catalog, EventOutbox outbox, ExplorationSettings settings, Clock clock) {
+    public CheckInService(TerritoryRepository territories, MemberTerritoryLock locks, MapAccess mapAccess,
+                          CatalogRegionDirectory regions, RegionCatalog catalog, EventOutbox outbox, ExplorationSettings settings,
+                          StampBookRepository stampBooks, Clock clock) {
         this.territories = territories;
-        this.maps = maps;
+        this.locks = locks;
+        this.stampBooks = stampBooks;
         this.mapAccess = mapAccess;
         this.regions = regions;
         this.catalog = catalog;
@@ -111,8 +115,13 @@ public class CheckInService {
             regions);
         CheckInPolicy policy = Optional.ofNullable(policyOverride)
             .orElseGet(() -> mm.map().checkInPolicy(settings.onboardingGrace()));
+        CheckInContext ctx = context(policy, mm, now);
+        LocalDate today = ctx.today();
+        ZoneId zone = ctx.zone();
+        // 9단계: 개인 지도 상한은 오늘 받은 재방문 도장과 함께 쓴다(도장 커맨드도 같은 territory 행을 잠가 직렬화된다)
+        ctx = ctx.alsoUsing(mm.map().capSharedWithStamps(() -> stampBooks.load(cmd.explorerId()).stamps().countOn(today, zone)));
         CheckInResult result = territory.checkIn(cmd.explorerId(), region, VisitDate.of(cmd.visitDate()),
-            Memo.of(cmd.memo()), PhotoRef.ofNullable(cmd.photoUrl()), context(policy, mm, now));
+            Memo.of(cmd.memo()), PhotoRef.ofNullable(cmd.photoUrl()), ctx);
         territories.save(territory);
 
         outbox.append(AGGREGATE, mapId.value(), regionVisited(result, mm.map().memberIds()));
@@ -174,11 +183,7 @@ public class CheckInService {
      * 멤버 확인을 먼저 해 비멤버가 남의 지도 행을 잠그지 못하게 한다(N2). 잠글 행이 없으면 원인(탐험가/지도 없음)을 낸다.
      */
     private MapMembership lockAsMember(ExplorerId explorerId, MapSelector selector) {
-        MapId mapId = mapAccess.mapIdOf(explorerId, selector);
-        mapAccess.requireMembership(explorerId, mapId);              // 비멤버는 잠그기 전에 거른다(N2)
-        if (!maps.lockShared(mapId) || !territories.lock(mapId)) throw selector.notFound(); // 지도 S → territory X
-        mapAccess.requireActiveLocked(explorerId);                   // → 탐험가 S: 그사이 커밋된 병합(로그인)이면 404(4단계)
-        return mapAccess.resolve(explorerId, MapSelector.of(mapId)); // 잠금 뒤 다시 확인 — 그사이 커밋된 탈퇴면 403
+        return locks.lockAsMember(explorerId, selector);
     }
 
     private CheckInContext context(CheckInPolicy policy, MapMembership mm, Instant now) {

@@ -39,4 +39,7 @@ public interface ItemCatalog {
 
     /** 연속 탐험 마일스톤(8단계, STREAK_MILESTONE 규칙)으로 받는 아이템. 기간은 도달 시각의 날짜로 본다. 회수 없음. */
     List<ItemView> grantedByStreakMilestone(int months, Instant reachedAt);
+
+    /** 계절 한정 테마 회차 완성(9단계, SEASON_COMPLETE 규칙 — 회차별 계절 배경)으로 받는 아이템. 기간은 완성 시각의 날짜로 본다. 회수 없음. */
+    List<ItemView> grantedBySeasonCompletion(String roundId, Instant completedAt);
 }

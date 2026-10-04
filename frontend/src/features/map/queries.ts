@@ -15,7 +15,8 @@ import { useCollection } from '../../shared/queries/collection';
 import { recapKeys } from '../../shared/queries/recap';
 import { usePercentile } from '../../shared/queries/social';
 import { mapKeys } from '../../shared/queries/territory';
-import { settleAfterChange } from '../../store/syncStore';
+import { wishlistKeys } from '../../shared/queries/wishlist';
+import { SETTLED_ROOT, settleAfterChange, settleInterval } from '../../store/syncStore';
 import { toast, toastError } from '../../store/toastStore';
 import { useUiStore } from '../../store/uiStore';
 import { setChips } from './model/territory';
@@ -98,6 +99,61 @@ export function useClearVisits() {
     onSuccess: async () => {
       useUiStore.getState().setSampleMode(false);
       await afterVisitChange(queryClient, false);
+    },
+  });
+}
+
+export const revisitKeys = {
+  status: (code: string) => [SETTLED_ROOT, 'revisit', code] as const,
+};
+
+/** GET /revisits/{code} — 고른 지역의 "다시 다녀왔어요" 판정(칠했는지·처음 칠한 해·도장 연도). 체크인·도장 뒤 반영 대기 창에서 함께 다시 읽는다. */
+export function useRevisitStatus(code: string | null) {
+  return useQuery({
+    queryKey: revisitKeys.status(code ?? ''),
+    queryFn: () => explorationApi.revisitStatus(code as string),
+    enabled: !!code,
+    refetchInterval: settleInterval,
+    meta: { silent: true },
+  });
+}
+
+/** POST /revisits/{code} — 도장(+XP·뱃지·색 변형은 이벤트로 늦게 반영 → 반영 대기 창, 알림 켬) */
+export function useStamp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => explorationApi.stamp(code),
+    // 다시 읽기를 기다리지 않는다(버튼은 바로 풀리고, 값은 반영 대기 창이 채운다)
+    onSuccess: () => {
+      void settleAfterChange(queryClient, true);
+    },
+    // 누르는 사이 판정이 바뀌었으면(해·하루 상한) 안내를 서버 판정으로 다시 맞춘다
+    onError: (_error, code) => {
+      void queryClient.invalidateQueries({ queryKey: revisitKeys.status(code) });
+    },
+  });
+}
+
+/** PUT /wishlist/{code} — 꽂은 뒤 전체 목록을 돌려주므로 그 값으로 바꾼다. 거절되면(가득·이미 칠함) 목록과 판정을 다시 읽어 토글을 맞춘다 */
+export function usePin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => explorationApi.pin(code),
+    onSuccess: wishlist => queryClient.setQueryData(wishlistKeys.list(), wishlist),
+    onError: (_error, code) => {
+      void queryClient.invalidateQueries({ queryKey: wishlistKeys.list() });
+      void queryClient.invalidateQueries({ queryKey: revisitKeys.status(code) });
+    },
+  });
+}
+
+/** DELETE /wishlist/{code} */
+export function useUnpin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => explorationApi.unpin(code),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: wishlistKeys.list() });
     },
   });
 }

@@ -166,5 +166,45 @@
    "type": "MYSTERY_FOUND",
    "min": 10
   }
+ },
+ {
+  "id": "revisit5",
+  "ico": "단",
+  "name": "단골 여행자",
+  "desc": "재방문 도장 5개",
+  "condition": {
+   "type": "REVISIT_STAMPS",
+   "min": 5
+  }
+ },
+ {
+  "id": "revisit20",
+  "ico": "단골",
+  "name": "오랜 단골",
+  "desc": "재방문 도장 20개",
+  "condition": {
+   "type": "REVISIT_STAMPS",
+   "min": 20
+  }
+ },
+ {
+  "id": "wish3",
+  "ico": "꿈",
+  "name": "꿈을 이룬 여행자",
+  "desc": "가고 싶은 곳 3곳 다녀오기",
+  "condition": {
+   "type": "WISHES_FULFILLED",
+   "min": 3
+  }
+ },
+ {
+  "id": "wish10",
+  "ico": "꿈꿈",
+  "name": "꿈의 수집가",
+  "desc": "가고 싶은 곳 10곳 다녀오기",
+  "condition": {
+   "type": "WISHES_FULFILLED",
+   "min": 10
+  }
  }
 ]

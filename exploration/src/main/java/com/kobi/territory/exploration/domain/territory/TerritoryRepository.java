@@ -5,7 +5,9 @@ import com.kobi.territory.exploration.domain.map.MapSelector;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Territory 저장소. Territory 루트 행(territory 테이블)이 지도 단위 직렬화 잠금 대상이다.
@@ -38,4 +40,10 @@ public interface TerritoryRepository {
 
     /** 이 탐험가의 보이는 방문이 어느 지도에든 이 지역에 있는지(읽기 — 지도 경계를 넘는 조회). */
     boolean hasVisibleVisit(ExplorerId member, RegionCode region);
+
+    /** 이 탐험가의 보이는 방문 중 이 지역의 가장 이른 처리 시각(어느 지도든 — 9단계 재방문 도장의 "처음 칠한 해"). 없으면 빈 값. */
+    Optional<Instant> firstVisibleVisitAt(ExplorerId member, RegionCode region);
+
+    /** 이 탐험가가 어느 지도에든 보이는 방문을 가진 지역 중 regions 에 든 것(9단계 — 병합 뒤 대기 핀 다녀옴 판정). */
+    Set<RegionCode> visibleRegionsAmong(ExplorerId member, Collection<RegionCode> regions);
 }

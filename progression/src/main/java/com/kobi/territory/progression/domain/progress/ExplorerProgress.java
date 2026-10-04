@@ -38,6 +38,10 @@ import java.util.TreeMap;
  * - 연속 탐험 마일스톤: 처음 닿으면 한 번(XP·칭호·보호권), 끊겼다 다시 쌓아도 다시 없음.
  * - 이번 주 미스터리 지역: 그 주(처리 시각 기준)에 칠하면 주마다 한 번 보너스, 취소해도 회수 없음.
  * - 시·도 정복: 탐험가 단위로 한 시·도의 현행 지역(폐지 지역 제외)을 모두 칠하면 한 번, 취소해도 회수 없음.
+ * 9단계(게임 요소 2순위) — 셋 다 회수 없는 보상, refId 로 한 번
+ * - 계절 한정 테마 회차 완성(수령자마다): XP + 칭호 season-{계절}(회차 무관 하나).
+ * - 재방문 도장(지역·연도당): XP + 뱃지(도장 수).
+ * - 가고 싶은 곳 다녀옴(지역당 — 핀을 뺐다 다시 꽂아도 한 번): XP + 뱃지(다녀온 곳 수).
  */
 public final class ExplorerProgress {
 
@@ -149,6 +153,47 @@ public final class ExplorerProgress {
         long xpBefore = ledger.total();
         int levelBefore = level;
         ledger.grantOnce(XpSource.SET_COMPLETE, RefIds.theme(explorerId, themeId), policy.rewards().themeComplete(), at);
+        return settle(policy, at, xpBefore, levelBefore);
+    }
+
+    /** 계절 한정 테마 회차 완성 보너스(SeasonCompleted, 9단계). 탐험가당 회차당 1회, 회수 없음. */
+    public ProgressChange applySeasonCompleted(String roundId, Instant at, ProgressionPolicy policy) {
+        long xpBefore = ledger.total();
+        int levelBefore = level;
+        ledger.grantOnce(XpSource.SEASON_COMPLETE, RefIds.season(explorerId, roundId), policy.rewards().seasonComplete(), at);
+        return settle(policy, at, xpBefore, levelBefore);
+    }
+
+    /** 재방문 도장(RevisitStamped, 9단계). 지역·연도당 1회, 회수 없음. */
+    public ProgressChange applyRevisitStamp(RegionCode region, int year, Instant at, ProgressionPolicy policy) {
+        long xpBefore = ledger.total();
+        int levelBefore = level;
+        ledger.grantOnce(XpSource.REVISIT_STAMP, RefIds.revisit(explorerId, region, year), policy.rewards().revisitStamp(), at);
+        return settle(policy, at, xpBefore, levelBefore);
+    }
+
+    /** 가고 싶은 곳 다녀옴(WishFulfilled, 9단계). 지역당 1회(핀을 뺐다 다시 꽂아 또 다녀와도 한 번), 회수 없음. */
+    public ProgressChange applyWishFulfilled(RegionCode region, Instant at, ProgressionPolicy policy) {
+        long xpBefore = ledger.total();
+        int levelBefore = level;
+        ledger.grantOnce(XpSource.WISH_FULFILLED, RefIds.wish(explorerId, region), policy.rewards().wishFulfilled(), at);
+        return settle(policy, at, xpBefore, levelBefore);
+    }
+
+    /**
+     * 재계산 복구 규칙(9단계): 탐험 기록(계절 회차 완성 수령·재방문 도장·다녀온 가고 싶은 곳)은 있는데 장부에 그 보상이 없으면 그 기록의 시각으로
+     * 지급한다 — 계정 병합으로 옮겨 온 도장·핀처럼 이벤트 없이 생긴 기록도 맞춘다. 칭호·뱃지는 settle 이 보정한다. refId 가 같아 멱등.
+     */
+    public ProgressChange recoverRecords(List<String> rewardedSeasonRoundIds, Map<String, Instant> seasonCompletedAt,
+                                         List<StampFact> stamps, List<WishFact> wishes, Instant at, ProgressionPolicy policy) {
+        long xpBefore = ledger.total();
+        int levelBefore = level;
+        rewardedSeasonRoundIds.forEach(roundId -> ledger.grantOnce(XpSource.SEASON_COMPLETE, RefIds.season(explorerId, roundId),
+            policy.rewards().seasonComplete(), seasonCompletedAt.getOrDefault(roundId, at)));
+        stamps.forEach(stamp -> ledger.grantOnce(XpSource.REVISIT_STAMP, RefIds.revisit(explorerId, stamp.region(), stamp.year()),
+            policy.rewards().revisitStamp(), stamp.at()));
+        wishes.forEach(wish -> ledger.grantOnce(XpSource.WISH_FULFILLED, RefIds.wish(explorerId, wish.region()),
+            policy.rewards().wishFulfilled(), wish.at()));
         return settle(policy, at, xpBefore, levelBefore);
     }
 
@@ -325,13 +370,21 @@ public final class ExplorerProgress {
             case QUEST -> ledger.has(RefIds.quest(explorerId, QuestPeriod.ALL, title.ref()));
             case PROVINCE -> policy.provinceRoster().conquered(title.ref(), regions.activeCodes());
             case STREAK -> ledger.has(RefIds.milestone(explorerId, Integer.parseInt(title.ref())));
+            case SEASON -> ledger.entriesOf(XpSource.SEASON_COMPLETE).stream()
+                .anyMatch(entry -> seasonOfRound(RefIds.subjectOf(entry.refId())).equals(title.ref()));
         };
     }
 
     private BadgeFacts badgeFacts(ProgressionPolicy policy) {
         return new BadgeFacts(regions.activeCount(), regions.count(Rarity.LEGEND), regions.perProvince(),
             policy.provinceTotals(), Set.copyOf(policy.provinceRoster().conqueredBy(regions.activeCodes())),
-            policy.totalRegions(), ledger.count(XpSource.SET_COMPLETE), streak.months(), ledger.count(XpSource.MYSTERY_BONUS));
+            policy.totalRegions(), ledger.count(XpSource.SET_COMPLETE), streak.months(), ledger.count(XpSource.MYSTERY_BONUS),
+            ledger.count(XpSource.REVISIT_STAMP), ledger.count(XpSource.WISH_FULFILLED));
+    }
+
+    /** 회차 id({계절}-{연도})의 계절 id. */
+    private static String seasonOfRound(String roundId) {
+        return roundId.substring(0, Math.max(0, roundId.lastIndexOf('-')));
     }
 
     // ---- 조회 ----------------------------------------------------------------------------------------------
@@ -415,6 +468,23 @@ public final class ExplorerProgress {
     public int mysteryFoundCount() {
         return ledger.count(XpSource.MYSTERY_BONUS);
     }
+    /** 받은 재방문 도장 수(9단계). */
+    public int revisitStampCount() {
+        return ledger.count(XpSource.REVISIT_STAMP);
+    }
+
+    /** 다녀온 가고 싶은 곳 수(9단계). */
+    public int wishesFulfilledCount() {
+        return ledger.count(XpSource.WISH_FULFILLED);
+    }
+
+    /** 완성 보상을 받은 계절 회차(회차 id → 받은 시각, 9단계). */
+    public Map<String, Instant> seasonsCompleted() {
+        Map<String, Instant> completed = new LinkedHashMap<>();
+        ledger.entriesOf(XpSource.SEASON_COMPLETE).forEach(entry -> completed.put(RefIds.subjectOf(entry.refId()), entry.at()));
+        return completed;
+    }
+
     public Map<String, Instant> badges() { return Collections.unmodifiableMap(badges); }
     public Map<String, Instant> titles() { return Collections.unmodifiableMap(titles); }
     public Optional<String> selectedTitle() { return Optional.ofNullable(selectedTitle); }

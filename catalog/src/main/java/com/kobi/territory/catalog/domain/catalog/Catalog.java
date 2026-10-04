@@ -66,6 +66,7 @@ public record Catalog(Regions regions, Provinces provinces, RewardRules rewardRu
             case GrantRule.Invitation invitation -> true;
             case GrantRule.ProvinceComplete provinceComplete -> provinces.find(provinceComplete.provinceCode()).isPresent();
             case GrantRule.StreakMilestone streakMilestone -> progression.streak().defines(streakMilestone.months());
+            case GrantRule.SeasonComplete seasonComplete -> progression.definesSeasonRound(seasonComplete.roundId());
         };
         if (!known) throw CatalogError.UNKNOWN_ITEM_REFERENCE.exception("지급 규칙이 모르는 대상을 가리킵니다: " + rule.type() + " " + rule.ref());
     }

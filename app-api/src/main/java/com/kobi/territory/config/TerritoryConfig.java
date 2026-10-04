@@ -3,6 +3,7 @@ package com.kobi.territory.config;
 import com.kobi.territory.catalog.application.MysterySettings;
 import com.kobi.territory.exploration.application.AccountSettings;
 import com.kobi.territory.exploration.application.ExplorationSettings;
+import com.kobi.territory.exploration.application.WishlistSettings;
 import java.time.Clock;
 import java.time.ZoneId;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,6 +40,12 @@ public class TerritoryConfig {
     @Bean
     public MysterySettings mysterySettings(@Value("${territory.mystery.salt}") String salt) {
         return new MysterySettings(salt);
+    }
+
+    /** 가고 싶은 곳 규칙 값(9단계): 아직 다녀오지 않은 핀의 최대 수. */
+    @Bean
+    public WishlistSettings wishlistSettings(@Value("${territory.wishlist.max-pins:30}") int maxPins) {
+        return new WishlistSettings(maxPins);
     }
 
     /** 계정 규칙 값(4단계): 바꾸기 전 handle 예약 기간. */

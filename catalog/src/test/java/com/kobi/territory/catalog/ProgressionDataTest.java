@@ -72,9 +72,9 @@ class ProgressionDataTest {
     }
 
     @Test
-    @DisplayName("뱃지는 열다섯 개(기획 열두 개 + 미스터리 탐험가 세 단계)이고 조건은 기획한 그대로다")
+    @DisplayName("뱃지는 열아홉 개(기획 열두 개 + 미스터리 탐험가 세 단계 + 단골 여행자 두 단계 + 꿈을 이룬 여행자 두 단계)이고 조건은 기획한 그대로다")
     void badges() {
-        assertThat(카탈로그.badges()).hasSize(15);
+        assertThat(카탈로그.badges()).hasSize(19);
         Map<String, ProgressionRules.BadgeView> byId = 카탈로그.badges().stream()
             .collect(Collectors.toMap(ProgressionRules.BadgeView::id, badge -> badge));
         assertThat(byId.get("ten").condition()).extracting("type", "min").containsExactly("REGION_COUNT", 10);
@@ -85,6 +85,10 @@ class ProgressionDataTest {
         assertThat(List.of(byId.get("mystery1"), byId.get("mystery5"), byId.get("mystery10")))
             .extracting(badge -> badge.condition().type() + ":" + badge.condition().min())
             .containsExactly("MYSTERY_FOUND:1", "MYSTERY_FOUND:5", "MYSTERY_FOUND:10");
+        assertThat(List.of(byId.get("revisit5"), byId.get("revisit20"), byId.get("wish3"), byId.get("wish10")))
+            .extracting(badge -> badge.name() + ":" + badge.condition().type() + ":" + badge.condition().min())
+            .containsExactly("단골 여행자:REVISIT_STAMPS:5", "오랜 단골:REVISIT_STAMPS:20", "꿈을 이룬 여행자:WISHES_FULFILLED:3",
+                "꿈의 수집가:WISHES_FULFILLED:10");
     }
 
     @Test
@@ -98,11 +102,11 @@ class ProgressionDataTest {
     }
 
     @Test
-    @DisplayName("칭호는 레벨 6·테마 9·상시 도전 3·연속 탐험 4·시·도 17개다")
+    @DisplayName("칭호는 레벨 6·테마 9·상시 도전 3·연속 탐험 4·계절 2·시·도 17개다")
     void titles() {
-        assertThat(카탈로그.titles()).hasSize(6 + 9 + 3 + 4 + 17);
+        assertThat(카탈로그.titles()).hasSize(6 + 9 + 3 + 4 + 2 + 17);
         assertThat(카탈로그.titles()).extracting(ProgressionRules.TitleView::id)
-            .contains("lv1", "lv16", "set-jiri", "long-leg5", "streak-3", "streak-24", "own-KR-11");
+            .contains("lv1", "lv16", "set-jiri", "long-leg5", "streak-3", "streak-24", "season-spring", "season-autumn", "own-KR-11");
         assertThat(카탈로그.titles().stream().filter(title -> title.id().equals("own-KR-11")).findFirst().orElseThrow().name())
             .isEqualTo("서울의 주인");
     }
@@ -140,6 +144,35 @@ class ProgressionDataTest {
         void mysteryRules() {
             assertThat(데이터.mystery().rarities()).containsExactlyInAnyOrder(Rarity.RARE, Rarity.LEGEND);
             assertThat(데이터.mystery().bottomFraction()).isEqualTo(0.3);
+        }
+    }
+
+    @Nested
+    @DisplayName("9단계 게임 규칙 값")
+    class SecondGameRules {
+
+        @Test
+        @DisplayName("계절 한정 테마는 봄 벚꽃 명소(3/20~4/30)와 가을 단풍 명소(10/1~11/30) 열 곳씩이다")
+        void seasons() {
+            assertThat(카탈로그.seasons()).extracting(season -> season.id() + ":" + season.name() + ":" + season.start() + "~" + season.end()
+                    + ":" + season.regionCodes().size() + ":" + season.titleId())
+                .containsExactly("spring:벚꽃 명소:03-20~04-30:10:season-spring", "autumn:단풍 명소:10-01~11-30:10:season-autumn");
+        }
+
+        @Test
+        @DisplayName("계절 지역은 모두 카탈로그에 있는 현행 지역이다")
+        void seasonRegionsKnown() {
+            카탈로그.seasons().forEach(season -> season.regionCodes().forEach(regionCode ->
+                assertThat(카탈로그.findRegion(RegionCode.of(regionCode))).as(regionCode).isPresent()));
+        }
+
+        @Test
+        @DisplayName("계절 완성 150, 재방문 도장 10, 가고 싶은 곳 다녀옴 20 이다")
+        void bonuses() {
+            assertThat(카탈로그.seasonComplete()).isEqualTo(new RewardLineView("SEASON_COMPLETE", 150));
+            assertThat(카탈로그.revisitStamp()).isEqualTo(new RewardLineView("REVISIT_STAMP", 10));
+            assertThat(카탈로그.wishFulfilled()).isEqualTo(new RewardLineView("WISH_FULFILLED", 20));
+            assertThat(카탈로그.rewardRules().seasonCompleteBonus()).isEqualTo(150);
         }
     }
 }

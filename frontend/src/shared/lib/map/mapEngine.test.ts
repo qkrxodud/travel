@@ -26,7 +26,7 @@ function mount() {
 }
 
 const paint = (mine: string[], selected: string | null = null): RegionPaint =>
-  ({ mine: new Set(mine), selected, highlight: null, claimColor: new Map(), claimer: new Map() });
+  ({ mine: new Set(mine), selected, highlight: null, claimColor: new Map(), claimer: new Map(), group: new Set<string>() });
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -225,6 +225,43 @@ describe('이번 주 미스터리 마커', () => {
     engine.setMystery({ code: '31370', received: false });
     engine.setMystery(null);
     expect(markOf(svg)).toBeNull();
+  });
+});
+
+describe('가고 싶은 곳 핀', () => {
+  const pinsOf = (svg: SVGSVGElement) => [...svg.querySelectorAll('g.wish-pin')].map(pin => pin.getAttribute('data-wish'));
+
+  it('꽂은 지역마다 한가운데 핀을 세우고, 핀은 눌러도 아래 지역이 눌린다', () => {
+    const { engine, svg } = mount();
+    engine.setWishPins(new Set(['31370', '11010']));
+    expect(pinsOf(svg)).toEqual(['11010', '31370']);
+    expect(svg.querySelector('g.wish-pin')?.getAttribute('transform')).toMatch(/^translate\(/);
+    expect((svg.querySelector('g.wish-layer') as SVGGElement).style.pointerEvents).toBe('none');
+  });
+
+  it('다녀와서 목록에서 빠진 지역의 핀은 걷고, 같은 목록이면 다시 그리지 않는다', () => {
+    const { engine, svg } = mount();
+    engine.setWishPins(new Set(['31370', '11010']));
+    const kept = svg.querySelector('g.wish-pin[data-wish="11010"]');
+    engine.setWishPins(new Set(['11010']));
+    expect(pinsOf(svg)).toEqual(['11010']);
+    expect(svg.querySelector('g.wish-pin[data-wish="11010"]')).toBe(kept);
+  });
+
+  it('지도에 없는 지역은 핀을 세우지 않는다', () => {
+    const { engine, svg } = mount();
+    engine.setWishPins(new Set(['99999']));
+    expect(pinsOf(svg)).toEqual([]);
+  });
+});
+
+describe('지역 묶음 강조', () => {
+  it('함께 보여 줄 지역 묶음을 모두 강조하고, 묶음이 풀리면 강조도 걷는다', () => {
+    const { engine, svg } = mount();
+    engine.setPaint({ ...paint([]), group: new Set(['11010', '31370']) });
+    expect([...svg.querySelectorAll('path.region.grp')].map(path => path.getAttribute('data-code')).sort()).toEqual(['11010', '31370']);
+    engine.setPaint(paint([]));
+    expect(svg.querySelectorAll('path.region.grp')).toHaveLength(0);
   });
 });
 

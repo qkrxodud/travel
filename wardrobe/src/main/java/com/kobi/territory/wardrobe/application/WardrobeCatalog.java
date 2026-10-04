@@ -3,6 +3,7 @@ package com.kobi.territory.wardrobe.application;
 import com.kobi.territory.catalog.api.query.ItemCatalog;
 import com.kobi.territory.catalog.api.query.ItemView;
 import com.kobi.territory.progression.api.query.AchievementsView;
+import com.kobi.territory.progression.api.query.CompletedSeasonView;
 import com.kobi.territory.progression.api.query.CompletedSetView;
 import com.kobi.territory.wardrobe.domain.item.GrantKind;
 import com.kobi.territory.wardrobe.domain.item.ItemSlot;
@@ -58,6 +59,17 @@ public class WardrobeCatalog {
     /** 연속 탐험 마일스톤 보상(8단계) — 기간은 도달 시각으로 판정. */
     public List<ItemSpec> grantedByStreakMilestone(int months, Instant reachedAt) {
         return items.grantedByStreakMilestone(months, reachedAt).stream().map(WardrobeCatalog::specOf).toList();
+    }
+
+    /** 계절 한정 테마 회차 완성 보상(9단계 — 회차 배경) — 기간은 완성 시각으로 판정. */
+    public List<ItemSpec> grantedBySeasonCompletion(String roundId, Instant completedAt) {
+        return items.grantedBySeasonCompletion(roundId, completedAt).stream().map(WardrobeCatalog::specOf).toList();
+    }
+
+    /** 지도들에서 완성된 계절 회차 중 이 탐험가가 수령자(완성 시점 멤버)인 것의 보상(재계산 복구, 9단계) — 각 회차의 완성 시각으로 판정. */
+    public List<ItemSpec> grantedBySeasonCompletions(List<CompletedSeasonView> completedSeasons, String recipientId) {
+        return completedSeasons.stream().filter(completed -> completed.recipientIds().contains(recipientId))
+            .flatMap(completed -> grantedBySeasonCompletion(completed.roundId(), completed.completedAt()).stream()).toList();
     }
 
     /** 진행 기록에 남은 업적(시·도 정복·마일스톤)의 보상 전부(재계산 복구) — 각자 받은 시각으로 판정. */

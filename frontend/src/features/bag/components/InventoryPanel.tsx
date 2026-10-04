@@ -1,14 +1,15 @@
 import type { MouseEvent } from 'react';
 import type { SceneRequest } from '../../../api/types/wardrobe';
-import { achievementOf, SLOT_NAME, SLOT_TO_SERVER, type DisplayItem } from '../../../shared/lib/item/displayItem';
+import { achievementOf, REVISIT_VARIANT, SLOT_NAME, SLOT_TO_SERVER, type DisplayItem } from '../../../shared/lib/item/displayItem';
 import { ItemImage } from '../../../shared/ui/ItemImage';
 import { toast, toastError } from '../../../store/toastStore';
 import { useUiStore } from '../../../store/uiStore';
 import { BAG_FILTERS, filterAndSort, isSetReward } from '../model/bag';
 import { useFavorite } from '../queries';
 
-/** 업적 보상 표시(시·도 정복 👑 · 연속 탐험 🔥) */
+/** 업적 보상 표시(시·도 정복 👑 · 연속 탐험 🔥 · 계절 한정은 그 배경 이모지) */
 const ACHIEVEMENT_MARK = { conquest: '👑', streak: '🔥' } as const;
+const achievementMark = (kind: 'conquest' | 'streak' | 'season', item: DisplayItem) => (kind === 'season' ? item.emoji : ACHIEVEMENT_MARK[kind]);
 
 const MAX_PROPS = 3;
 
@@ -61,17 +62,20 @@ export function InventoryPanel({ items, sceneProps, onEdit }: InventoryPanelProp
           <div className="inv">
             {list.map(item => {
               const achievement = achievementOf(item.code);
+              const revisited = item.variant === REVISIT_VARIANT;
               return (
                 <button
                   key={item.code}
                   className={`item ${item.tier} ${item.equipped ? 'on' : ''} ${isSetReward(item) ? 'set' : ''}`}
                   data-equip={item.code}
-                  title={`${item.name} · ${item.from}`}
+                  title={`${item.name} · ${item.from}${revisited ? ' · 재방문 2회차 색' : ''}`}
                   data-origin={item.from}
+                  data-variant={item.variant}
                   onClick={() => toggle(item)}
                 >
                   <ItemImage item={item} />
-                  {achievement ? <span className={`ach ${achievement}`} title={item.from}>{ACHIEVEMENT_MARK[achievement]}</span> : null}
+                  {achievement ? <span className={`ach ${achievement}`} title={item.from}>{achievementMark(achievement, item)}</span> : null}
+                  {revisited ? <span className="variant" title="재방문 도장으로 받은 2회차 색">2회차</span> : null}
                   <span className="sb">{SLOT_NAME[item.slot]}</span>
                   <span className="n">{item.name}</span>
                   <span className={`fav ${item.favorite ? 'on' : ''}`} data-fav={item.code} role="button" aria-pressed={item.favorite} title="즐겨찾기" aria-label="즐겨찾기" onClick={event => star(event, item)}>

@@ -55,6 +55,8 @@ const rewardRules = {
   provinceFirstBonus: api.BONUS.prov, setCompleteBonus: api.BONUS.set, claimBonus: 10,
   // 8단계(게임 요소 1순위): 이번 주 미스터리 지역 보너스·시·도 정복 보상 — 프로토타입에 없는 값이라 여기서 정한다
   mysteryBonus: 50, provinceConquestBonus: 300,
+  // 9단계(게임 요소 2순위): 계절 한정 테마 완성·재방문 도장·가고 싶은 곳 다녀옴
+  seasonCompleteBonus: 150, revisitStampBonus: 10, wishFulfilledBonus: 20,
 };
 const sample = api.SAMPLE.map(([p, n, mo, day, memo]) => {
   const c = api.findCode(p, n); if (!c) throw new Error('sample missing ' + p + n);
@@ -97,6 +99,13 @@ badges.push(
   { id: 'mystery1', ico: '?', name: '미스터리 탐험가', desc: '이번 주 미스터리 지역 1번 찾기', condition: { type: 'MYSTERY_FOUND', min: 1 } },
   { id: 'mystery5', ico: '??', name: '미스터리 추적자', desc: '이번 주 미스터리 지역 5번 찾기', condition: { type: 'MYSTERY_FOUND', min: 5 } },
   { id: 'mystery10', ico: '謎', name: '미스터리 마스터', desc: '이번 주 미스터리 지역 10번 찾기', condition: { type: 'MYSTERY_FOUND', min: 10 } },
+);
+// 9단계: 재방문 도장·가고 싶은 곳 누적 뱃지
+badges.push(
+  { id: 'revisit5', ico: '단', name: '단골 여행자', desc: '재방문 도장 5개', condition: { type: 'REVISIT_STAMPS', min: 5 } },
+  { id: 'revisit20', ico: '단골', name: '오랜 단골', desc: '재방문 도장 20개', condition: { type: 'REVISIT_STAMPS', min: 20 } },
+  { id: 'wish3', ico: '꿈', name: '꿈을 이룬 여행자', desc: '가고 싶은 곳 3곳 다녀오기', condition: { type: 'WISHES_FULFILLED', min: 3 } },
+  { id: 'wish10', ico: '꿈꿈', name: '꿈의 수집가', desc: '가고 싶은 곳 10곳 다녀오기', condition: { type: 'WISHES_FULFILLED', min: 10 } },
 );
 const QUEST_RULES = {
   m3:    { metric: 'NEW_REGIONS' },

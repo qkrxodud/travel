@@ -8,7 +8,7 @@ img{max-width:100%}
 /* 프로토타입 CSS(이전 index.html 두 번째 <style> — 클래스명·id 그대로 유지) */
 /* Layout: header + stat strip, then a tab bar (지도·도감·퀘스트·랭킹·프로필). 지도 tab is map-left/ledger-right; the others are card grids. Stacks to one column on phones. */
 :root{
-  --bg:#eef1f4; --panel:#ffffff; --fg:#1b2430; --muted:#5f6b7a; --line:#d6dce4;
+  --bg:#eef1f4; --panel:#ffffff; --fg:#1b2430; --muted:#5b6776; --line:#d6dce4;
   --unvisited:#d9dfe6; --unvisited-line:#ffffff;
   --accent:#0f8f7e; --accent-soft:#d6f1ec; --accent-deep:#0b6b5f;
   --gold:#d99a1b; --gold-soft:#fbefd4; --legend:#8b4bd6; --legend-soft:#efe4fb;
@@ -395,5 +395,40 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
 .card.mystery.received .mystery-body .x{color:var(--accent-deep);font-size:13px}
 .gains .mystery span{color:var(--gold)}
 .prov .crown{font-style:normal;margin-right:3px}
-.item .ach{position:absolute;right:4px;bottom:3px;font-size:11px;line-height:1}
+.item .ach{position:absolute;right:4px;top:20px;font-size:11px;line-height:1}
 @media (prefers-reduced-motion:reduce){.conquest.flash path{animation:none}}
+/* 9단계: 계절 한정 · 재방문 도장 · 가고 싶은 곳 */
+:root{--autumn:#d2551e;--autumn-soft:#fbe4d4;--blossom:#d6457f;--blossom-soft:#fbe1ec}
+/* 다크: 계절 카드 바탕을 어둡게 — 설명(--muted)·미수집 칸 글자가 AA(4.5:1) 이상 */
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--autumn:#f08a5d;--autumn-soft:#3a2117;--blossom:#f27aa8;--blossom-soft:#381d2a}}
+:root[data-theme="dark"]{--autumn:#f08a5d;--autumn-soft:#3a2117;--blossom:#f27aa8;--blossom-soft:#381d2a}
+.region.grp{stroke:var(--autumn);stroke-width:1.6;stroke-dasharray:3 2}
+/* 계절 배지는 지도 도구 줄의 끝(오른쪽)에 붙고, 좁은 지도에서는 다음 줄로 내려간다 — 도구 버튼을 덮지 않는다 */
+.maptools{right:10px;pointer-events:none}
+.maptools > *{pointer-events:auto}
+.maptools .season-badge{margin-left:auto;background:var(--panel);border:1.5px solid var(--autumn);color:var(--fg);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.maptools .season-badge.spring{border-color:var(--blossom)}
+.maptools .season-badge.done{background:var(--gold-soft);border-color:var(--gold)}
+.card.season .season-round{border-color:var(--autumn);background:linear-gradient(135deg,var(--autumn-soft),var(--panel) 75%)}
+.card.season .season-round.spring{border-color:var(--blossom);background:linear-gradient(135deg,var(--blossom-soft),var(--panel) 75%)}
+.card.season .season-round .bar i{background:var(--autumn)}
+.card.season .season-round.spring .bar i{background:var(--blossom)}
+.card.season .season-round.done .bar i{background:var(--gold)}
+.card.season .row{margin-top:10px}
+.season-next{margin:10px 0 0;font-size:12px}
+.season-history{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+.season-history li[data-completed="true"]{color:var(--fg)}
+.maplegend .w::before{display:none}
+.wish-pin text{font-size:13px;user-select:none}
+.detail .revisit,.detail .wish{margin-top:10px}
+.detail .why{margin:6px 0 0;font-size:12px;color:var(--muted)}
+.detail .stamps{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:12px;color:var(--muted)}
+.detail .stamps .stamp{border:1px solid var(--accent);color:var(--accent-deep);background:var(--accent-soft);border-radius:6px;padding:1px 7px;font-weight:600}
+.wish-toggle.on{border-color:var(--gold);background:var(--gold-soft)}
+.wish-toggle:disabled{opacity:.6;cursor:not-allowed}
+.btn:disabled{cursor:not-allowed;opacity:.6}
+.card.wishes h3{font-size:13px;margin:12px 0 4px;color:var(--muted);font-weight:600}
+.wish-list{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.wish-list button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px}
+.wish-list.done button{border-color:var(--accent);color:var(--accent-deep);background:var(--accent-soft)}
+.item .variant{position:absolute;right:4px;top:20px;font-size:9px;line-height:1;padding:2px 4px;border-radius:4px;background:var(--legend-soft);color:var(--legend);font-weight:700}

@@ -1,0 +1,97 @@
+### 9단계(게임 요소 2순위) 왕복 확인 — 계절 한정 테마·가고 싶은 곳·재방문 도장
+### 서버: ./gradlew :app-api:bootRun --args='--server.port=18081'   (8080·18080·18090 은 쓰지 않는다)
+### 진행·가방·위시리스트 다녀옴은 outbox 릴레이(비동기)로 반영 — 체크인·도장 뒤 1초쯤 뒤에 조회한다.
+### 해 넘김은 local 전용 서버 시계(POST /dev/clock — 앞으로만, DELETE /dev/reset·/dev/clock 이 되돌린다)로 옮긴다.
+### 오늘(2026-10-04)은 가을 "단풍 명소" 회차(autumn-2026, 10/1~11/30) 기간이다. 가입 후 72시간은 하루 상한이 없다(열 곳을 한 번에 칠한다).
+@host = http://localhost:18081
+
+### 0. [local] 전체 초기화(밀어 둔 서버 시계도 되돌린다) → 204
+DELETE {{host}}/dev/reset
+
+### 1. 탐험가 발급 → 201 {explorerId, accessToken, personalMapId}
+POST {{host}}/explorers
+
+> {% client.global.set("token", response.body.accessToken); %}
+
+### 2. 계절 한정 테마 → 200 {mapId, now, current:[{roundId:"autumn-2026", name:"2026 단풍 명소", emoji, year:2026, startsAt, endsAt,
+###    remainingSeconds>0, open:true, have:0, total:10, completed:false, completedAt:null, rewarded:false, xp:150, titleId:"season-autumn",
+###    titleName:"단풍 사냥꾼", backgroundItemId:"season:autumn-2026", regions:[{code,name,provinceCode,collected:false}×10]}], next:{roundId:"spring-2027",…}, history:[]}
+GET {{host}}/seasons/current
+X-Explorer-Token: {{token}}
+
+### 3. 가고 싶은 곳 — 가평군에 핀 → 200 {max:30, pendingCount:1, fulfilledCount:0, xpPerWish:20, items:[{regionCode:"KR-31370", regionName, provinceCode, status:"WANTED", pinnedAt, fulfilledAt:null}]}
+PUT {{host}}/wishlist/KR-31370
+X-Explorer-Token: {{token}}
+
+### 4. 핀 하나 상태 → 200 {regionCode, pinned:true, status:"WANTED", pinnedAt, fulfilledAt:null}
+GET {{host}}/wishlist/KR-31370
+X-Explorer-Token: {{token}}
+
+### 5. 단풍 명소 열 곳 체크인(아래 하나 예시 — 속초·정읍·평창·청송·장성·보은·합천·강북·가평·완주 KR-32060·35040·32340·37330·36450·33320·38400·11090·31370·35310) → 201
+POST {{host}}/visits
+X-Explorer-Token: {{token}}
+Content-Type: application/json
+
+{"regionCode": "KR-31370", "visitDate": "2026-10-04"}
+
+### 6. (열 곳 다 칠하고 1초 뒤) 계절 → current[0]{have:10, completed:true, completedAt, rewarded:true}
+GET {{host}}/seasons/current
+X-Explorer-Token: {{token}}
+
+### 7. 진행 → 200 recentXp 에 SEASON_COMPLETE +150·WISH_FULFILLED +20, titles[season-autumn].earned:true, wishFulfilledCount:1, revisitStampCount:0
+GET {{host}}/progress
+X-Explorer-Token: {{token}}
+
+### 8. 가고 싶은 곳 → items[0].status:"VISITED", fulfilledAt, pendingCount:0, fulfilledCount:1 (화면은 새로 VISITED 가 된 것으로 축하 토스트)
+GET {{host}}/wishlist
+X-Explorer-Token: {{token}}
+
+### 9. 가방 → items 에 season:autumn-2026("2026 단풍 명소 배경", BG·LEGEND, source SET_REWARD) — 빈 배경 칸이면 자동 착용
+GET {{host}}/inventory
+X-Explorer-Token: {{token}}
+
+### 10. 이미 칠한 곳에는 핀 불가 → 409 {code:"WISH_ALREADY_VISITED"}  (아직 안 다녀온 핀이 30개면 422 WISHLIST_FULL)
+PUT {{host}}/wishlist/KR-32060
+X-Explorer-Token: {{token}}
+
+### 11. 재방문 도장 안내 — 올해 처음 칠한 곳 → 200 {regionCode, regionName, painted:true, firstYear:2026, year:2026, stampedYears:[], canStamp:false,
+###     reason:"SAME_YEAR", availableFromYear:2027, xp:10}
+GET {{host}}/revisits/KR-32060
+X-Explorer-Token: {{token}}
+
+### 12. 같은 해 도장 → 422 {code:"REVISIT_SAME_YEAR", message:"2026년에 처음 칠한 지역이라 2027년부터 …"}
+POST {{host}}/revisits/KR-32060
+X-Explorer-Token: {{token}}
+
+### 13. [local] 서버 시계를 내년 봄으로 → 200 {now, offsetSeconds, zone}
+POST {{host}}/dev/clock
+Content-Type: application/json
+
+{"to": "2027-03-02T12:00:00+09:00"}
+
+### 14. 다시 다녀왔어요 → 201 {regionCode:"KR-32060", regionName:"속초시", year:2027, firstYear:2026, stampedAt, xp:10, stampCount:1}
+POST {{host}}/revisits/KR-32060
+X-Explorer-Token: {{token}}
+
+### 15. 내 도장첩 → 200 {count:1, xpPerStamp:10, stamps:[{regionCode, regionName, provinceCode, year:2027, stampedAt}]}
+GET {{host}}/revisits
+X-Explorer-Token: {{token}}
+
+### 16. 같은 해 또 → 409 REVISIT_ALREADY_STAMPED / 안 칠한 곳(아래) → 422 REVISIT_NOT_PAINTED
+POST {{host}}/revisits/KR-11010
+X-Explorer-Token: {{token}}
+
+### 17. (1초 뒤) 진행 → revisitStampCount:1, recentXp 에 REVISIT_STAMP +10 / 가방 → region:KR-32060 {variant:2, variantLook:{주색·보조색 바꾼 룩}}
+GET {{host}}/inventory
+X-Explorer-Token: {{token}}
+
+### 18. 계절(내년 3월) → current:[], next:{roundId:"spring-2027", name:"2027 벚꽃 명소", startsAt}, history:[{roundId:"autumn-2026", completed:true, open:false, remainingSeconds:0}]
+GET {{host}}/seasons/current
+X-Explorer-Token: {{token}}
+
+### 19. [local] 재계산 → 200 {recalculated:1, …} — 뒤의 /progress 는 XP·계절 완성·도장 수가 그대로
+POST {{host}}/dev/recalculate
+X-Explorer-Token: {{token}}
+
+### 20. [local] 시계 되돌림 → 200 {offsetSeconds:0}
+DELETE {{host}}/dev/clock

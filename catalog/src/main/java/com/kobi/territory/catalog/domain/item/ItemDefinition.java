@@ -36,7 +36,7 @@ public record ItemDefinition(
     private static final Pattern THEME = Pattern.compile("^[a-z][a-z0-9_-]{0,19}$");
     static final int NAME_MAX = 40;
     /** 이관 데이터 id 접두어 — V3_1 지역 특산물·세트 배경, V4_1 초대 보상, V6 시·도 정복(conquest:)·연속 탐험 마일스톤(streak:). */
-    static final List<String> MIGRATED_PREFIXES = List.of("region:", "set:", "invite:", "conquest:", "streak:");
+    static final List<String> MIGRATED_PREFIXES = List.of("region:", "set:", "invite:", "conquest:", "streak:", "season:");
     static final int EMOJI_MAX = 16;
 
     public ItemDefinition {
@@ -108,6 +108,23 @@ public record ItemDefinition(
             && (migrated() || !reachedAt.isBefore(createdAt));
     }
 
+    /**
+     * 완성 시각 completedAt(그 날짜 day)의 계절 한정 테마 회차 완성으로 지급되는지(9단계, 기준은 시·도 정복과 같다 — 운영이 나중에 더한
+     * 정의는 그 뒤의 완성에만, 이관 데이터 season: 은 예외).
+     */
+    public boolean grantedBySeasonCompletion(String roundId, LocalDate day, Instant completedAt) {
+        return grantRule.matchesSeasonCompletion(roundId) && validPeriod.contains(day)
+            && (migrated() || !completedAt.isBefore(createdAt));
+    }
+
+    /**
+     * 재방문 도장의 2회차 색 변형(9단계): 주색·보조색을 서로 바꾼 룩. 지역 특산물(REGION_VISIT)만 변형이 있다(새 아이템 정의를 늘리지 않고
+     * 보유 아이템의 변형 속성으로 그린다). 룩이 없으면(배경) 없음.
+     */
+    public Look revisitVariantLook() {
+        return grantRule.type() == GrantRule.Type.REGION_VISIT && look != null ? look.swapped() : null;
+    }
+
     /** 이 날짜의 초대 합류에서 그 쪽(HOST·GUEST)이 받는지(한정 아이템 — 유효 기간으로 연다·닫는다). */
     public boolean grantedByInvitation(GrantRule.InvitationSide side, LocalDate day) {
         return grantRule.matchesInvitation(side) && validPeriod.contains(day);
@@ -126,6 +143,11 @@ public record ItemDefinition(
             if (type == null || !TYPE.matcher(type).matches()) throw invalid("룩 형태가 올바르지 않습니다: " + type);
             if (primary == null || !COLOR.matcher(primary).matches()) throw invalid("주색은 #rrggbb 형식입니다: " + primary);
             if (secondary == null || !COLOR.matcher(secondary).matches()) throw invalid("보조색은 #rrggbb 형식입니다: " + secondary);
+        }
+
+        /** 주색·보조색을 바꾼 룩(재방문 2회차 변형). */
+        public Look swapped() {
+            return new Look(type, secondary, primary);
         }
     }
 }

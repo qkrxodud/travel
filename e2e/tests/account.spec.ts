@@ -102,8 +102,16 @@ test.describe('구글 로그인과 계정', () => {
     });
 
     await test.step('합친 뒤 XP 는 새 지역만큼 늘고, 처음부터 다시 세어도 같은 값이다', async () => {
-      await expect.poll(async () => (await (await second.request.get('/progress')).json()).xp, LATE).toBeGreaterThan(before.xp);
-      const settledXp = (await (await second.request.get('/progress')).json()).xp;
+      // 병합 보상은 이벤트 반영 뒤 서버의 재계산 예약(약 2초 주기)으로 한 번 더 맞춰진다 — 중간값을 "다 반영된 값"으로 읽지 않도록
+      // XP 가 3초 넘게 그대로일 때까지 기다린다(9단계 QA r2 P3-r2-4: 중간값 55 를 읽고 재계산 90 과 비교해 일시 실패)
+      const readXp = async (): Promise<number> => (await (await second.request.get('/progress')).json()).xp;
+      const seen: number[] = [];
+      await expect.poll(async () => {
+        seen.push(await readXp());
+        const recent = seen.slice(-4);
+        return recent.length === 4 && recent.every(xp => xp === recent[0]) && recent[0] > before.xp;
+      }, { timeout: 30_000, intervals: [1000] }).toBe(true);
+      const settledXp = await readXp();
       const recalculated = await (await second.request.post('/dev/recalculate')).json();
       expect(recalculated.deferred).toEqual([]);
       expect((await (await second.request.get('/progress')).json()).xp).toBe(settledXp);

@@ -285,6 +285,19 @@ class TerritoryTest {
             }
 
             @Test
+            @DisplayName("오늘 받은 재방문 도장도 한 건으로 세어 함께 다섯 건까지만 칠해진다")
+            void sharedWithRevisitStamps() {
+                Territory territory = Territory.empty(MAP);
+                for (int i = 0; i < 3; i++) checkIn(territory, ME, seoul(i), veteran(NOON));
+                CheckInContext twoStampsToday = veteran(NOON).alsoUsing(2);
+                assertThat(refusal(() -> checkIn(territory, ME, seoul(3), twoStampsToday)))
+                    .isEqualTo(ExplorationError.DAILY_CAP_EXCEEDED);
+                assertThatThrownBy(() -> checkIn(territory, ME, seoul(3), twoStampsToday)).hasMessageContaining("재방문 도장");
+                checkIn(territory, ME, seoul(3), veteran(NOON).alsoUsing(1));
+                assertThat(territory.checkInsOn(ME, veteran(NOON))).isEqualTo(4);
+            }
+
+            @Test
             @DisplayName("지도장이 상한을 낮춘 지도에서는 낮춘 값까지만 칠해진다")
             void loweredCap() {
                 Territory territory = Territory.empty(MAP);
@@ -774,6 +787,16 @@ class TerritoryTest {
                 territory.hideMember(ME, minutes(10));
                 territory.restoreMember(ME, minutes(20));
                 assertThat(territory.claimOf(JONGNO.code()).orElseThrow().checkedInBy()).isEqualTo(FRIEND);
+            }
+
+            @Test
+            @DisplayName("돌아온 방문마다 처음 칠한 처리 시각을 함께 알려 준다")
+            void tellsOriginalProcessingTime() {
+                Territory territory = shared();
+                Instant paintedAt = territory.find(GAPYEONG.code(), ME).orElseThrow().visitedAt();
+                territory.hideMember(ME, minutes(10));
+                RestoreResult result = territory.restoreMember(ME, minutes(20));
+                assertThat(result.visitedAt()).containsEntry(GAPYEONG.code(), paintedAt).hasSize(2);
             }
 
             @Test

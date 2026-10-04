@@ -16,7 +16,8 @@ export interface FriendsResponse {
   people: FriendResponse[];
 }
 
-export type FeedKind = 'VISIT' | 'THEME_COMPLETED' | 'LEVEL_UP' | 'BADGE_EARNED' | 'STREAK_MILESTONE' | 'PROVINCE_CONQUERED' | 'MYSTERY_FOUND';
+export type FeedKind = 'VISIT' | 'THEME_COMPLETED' | 'LEVEL_UP' | 'BADGE_EARNED' | 'STREAK_MILESTONE' | 'PROVINCE_CONQUERED' | 'MYSTERY_FOUND'
+  | 'SEASON_COMPLETED' | 'REVISIT_STAMPED';
 
 export interface FeedItemResponse {
   handle: string | null;
@@ -34,6 +35,10 @@ export interface FeedItemResponse {
   months: number | null;
   /** MYSTERY_FOUND(yyyy-MM-dd) */
   weekStart: string | null;
+  /** SEASON_COMPLETED(autumn-2026) */
+  roundId: string | null;
+  /** REVISIT_STAMPED 도장 연도 */
+  year: number | null;
 }
 
 /** GET /feed — FeedResponse */

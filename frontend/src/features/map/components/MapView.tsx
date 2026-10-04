@@ -15,6 +15,8 @@ interface MapViewProps {
   conqueredProvinces: ReadonlySet<string>;
   /** 이번 주 미스터리 지역 ❓ 마커 */
   mystery: MysteryMark | null;
+  /** 가고 싶은 곳 📍 핀(아직 다녀오지 않은 곳) */
+  wishPins: ReadonlySet<string>;
   children?: ReactNode;
 }
 
@@ -22,7 +24,7 @@ interface MapViewProps {
  * 지도 카드. <svg> 의 자식은 D3 엔진이 소유한다 — React 는 컨테이너만 그리고, 마운트 때 엔진을 한 번 만든 뒤
  * 데이터가 바뀌면 엔진의 update 메서드만 부른다.
  */
-export function MapView({ catalog, paint, characterCode, characterLook, handlers, conqueredProvinces, mystery, children }: MapViewProps) {
+export function MapView({ catalog, paint, characterCode, characterLook, handlers, conqueredProvinces, mystery, wishPins, children }: MapViewProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -56,6 +58,10 @@ export function MapView({ catalog, paint, characterCode, characterLook, handlers
   useEffect(() => {
     engineRef.current?.setMystery(mystery);
   }, [mystery, catalog]);
+
+  useEffect(() => {
+    engineRef.current?.setWishPins(wishPins);
+  }, [wishPins, catalog]);
 
   useEffect(() => {
     // 같은 목적지면 엔진이 아무것도 하지 않는다(이동 중 재렌더가 애니메이션을 다시 걸지 않게)

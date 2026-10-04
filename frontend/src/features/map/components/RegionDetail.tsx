@@ -10,6 +10,8 @@ import { setChips, showsProvinceFirstHint } from '../model/territory';
 import { useDispute, useEditVisit } from '../queries';
 import { useMyTerritory } from '../../../shared/queries/territory';
 import { useMapActions } from '../queries';
+import { RevisitStamp } from './RevisitStamp';
+import { WishToggle } from './WishToggle';
 
 const EMPTY_HINT = '지도에서 지역을 선택하면 방문 날짜와 한 줄 메모를 남길 수 있어요.';
 
@@ -87,6 +89,8 @@ export function RegionDetail() {
         ) : (
           <div className="row"><button className="btn primary" id="d-visit" onClick={() => openCheckin(selected)}>방문 체크 (+{xp} XP)</button></div>
         )}
+        <RevisitStamp code={selected} name={feature.properties.name} />
+        <WishToggle code={selected} name={feature.properties.name} />
         {sharedVisits.length ? (
           <ul className="vlist" id="d-members">
             {sharedVisits.map(row => {

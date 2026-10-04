@@ -22,6 +22,22 @@
 - 팔로우 경로는 존재를 숨긴다: 비공개·친구 공개(맞팔 아님) handle 팔로우는 없는 handle 과 같은 404(팔로우는 기록 — 상대가 맞팔하면 친구), 동시 요청도 같은 404, 언팔로우는 항상 204, 익명은 handle 을 찾기 전에 401. 숨은 팔로우는 내 팔로잉 수·목록·랭킹·피드 어디에도 드러나지 않는다(QA r2 P2-A).
 - **남은 위험 — 응답 시간**: 숨은 대상 팔로우는 기록(insert)·공개 범위 조회가 더해져 없는 handle 보다 몇 ms 느리다(조회 경로는 맞췄지만 insert 차이는 남음). 통계로 존재를 추정할 수 있으므로 **게이트웨이(리버스 프록시)에서 `POST /friends/*`·`/u/*`·`/compare/*` 에 사용자·IP 단위 요청 수 제한을 둔다**(권고: 분당 30회 수준). N3 과 같은 성격.
 
+## 9단계 계절 한정 테마·재방문 도장·가고 싶은 곳
+
+- **연례 작업 — 계절 회차 배경 아이템 추가(리더 결정 Q2)**: 회차 배경은 V7 에 `season:autumn-2026` ~ `season:autumn-2030`(봄·가을 9개)만 이관돼 있다. **2031 회차부터는 매년 봄 회차(3/20) 전에** 그 해 두 회차의 배경을 운영 API 로 넣는다. 정의가 없는 회차를 완성하면 XP·칭호만 받고 배경은 없다(소급 지급 없음 — 정의 생성 뒤의 완성에만 준다). `season:` 접두어는 이관 전용이라 운영 추가는 `event:` 를 쓴다:
+
+  ```http
+  POST /admin/items
+  X-Admin-Token: <territory.admin.token>
+  Content-Type: application/json
+
+  {"itemId": "event:season-spring-2031", "name": "2031 벚꽃 명소 배경", "emoji": "🌸", "slot": "BG", "tier": "LEGEND",
+   "theme": "blossom", "grantRule": "SEASON_COMPLETE", "grantRef": "spring-2031"}
+  ```
+  가을은 `"itemId": "event:season-autumn-2031"`, `"name": "2031 단풍 명소 배경"`, `"emoji": "🍁"`, `"theme": "autumn"`, `"grantRef": "autumn-2031"`. `grantRef` 는 `seasons.json` 에 있는 계절의 `{계절}-{연도}` 여야 한다(아니면 400 UNKNOWN_ITEM_REFERENCE). 계절 정의(기간·지역)를 바꾸면 재계산 영향(닫힌 회차는 확정 기록이라 다시 세지 않는다)을 확인한다.
+- **추후 과제(리더 결정 Q3)**: 계절 화면은 지금 개인 지도 기준이다 — 공유 지도에서 함께 완성한 회차는 `GET /seasons/current?mapId=` 로는 보이지만 화면의 개인 지도 배지에는 나오지 않는다. 공유 지도 회차 표시는 후속 단계에서 다룬다.
+- 새 구독 타입(SeasonCompleted·RevisitStamped → social.feed 등)이 생겼다 — 9단계 배포 직후 `POST /admin/rebuild/feed` 한 번(5단계 절차와 같다).
+
 ## Docker Compose 로컬 운영
 
 초기 운영 환경은 이 PC 의 Docker Compose 다(`compose.yaml`, 프로젝트 이름 `territory`). 이미지는 루트 `Dockerfile`(Gradle `bootJar` → Spring Boot 레이어 → `eclipse-temurin:21-jre`, 비루트 uid 10001, fontconfig — 카드 한글 글꼴은 sharing 리소스 번들).

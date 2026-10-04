@@ -6,6 +6,7 @@ import com.kobi.territory.common.model.ExplorerId;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.function.IntSupplier;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -213,6 +214,15 @@ public final class ExpeditionMap {
 
     public boolean shared() {
         return kind == MapKind.SHARED;
+    }
+
+    /**
+     * 이 지도의 하루 체크인 상한을 함께 쓰는 재방문 도장 수(9단계) — 도장은 탐험가 단위 기록이라 개인 지도의 상한을 함께 쓴다(공유 지도는 0).
+     *
+     * @param stampsToday 그 멤버가 오늘 받은 재방문 도장 수 — 개인 지도일 때만 센다(공유 지도 체크인은 도장첩을 읽지 않는다, QA P3-10)
+     */
+    public int capSharedWithStamps(IntSupplier stampsToday) {
+        return shared() ? 0 : stampsToday.getAsInt();
     }
 
     /** 이 탐험가의 공개 프로필에서 합류할 수 있는 지도인지 — 그가 지도장인 공유 지도이고 공개 범위가 PUBLIC(4단계). */

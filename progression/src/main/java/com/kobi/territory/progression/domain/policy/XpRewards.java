@@ -18,4 +18,13 @@ public interface XpRewards {
 
     /** 시·도 정복 보상(8단계). */
     int provinceConquest();
+
+    /** 계절 한정 테마 회차 완성 보상(9단계). */
+    int seasonComplete();
+
+    /** 재방문 도장 보상(9단계). */
+    int revisitStamp();
+
+    /** 가고 싶은 곳을 다녀옴 보상(9단계). */
+    int wishFulfilled();
 }

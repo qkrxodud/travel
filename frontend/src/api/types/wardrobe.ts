@@ -11,6 +11,10 @@ export interface ItemResponse {
   theme: string | null;
   look: ItemLook | null;
   regionCode: string | null;
+  /** 1 = 기본, 2 = 재방문 2회차 색 변형(9단계) */
+  variant: number;
+  /** variant 2 인 지역 특산물만 — 주색·보조색을 바꾼 룩(그 밖은 null) */
+  variantLook: ItemLook | null;
 }
 
 export type ItemSource = 'REGION' | 'SET_REWARD' | 'EVENT';

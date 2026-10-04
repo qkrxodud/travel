@@ -18,6 +18,10 @@ import com.kobi.territory.wardrobe.domain.scene.StylePolicy;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Map;
+import com.kobi.territory.common.model.RegionCode;
+import com.kobi.territory.catalog.api.query.ItemView;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -94,7 +98,11 @@ public class SceneService {
 
     private SceneView viewOf(Scene scene) {
         ItemSpecs wornSpecs = catalog.specsOf(scene.wornItemIds());
-        return new SceneView(scene, scene.stylePoints(wornSpecs, stylePolicy), catalog.views(scene.wornItemIds()));
+        List<ItemView> worn = catalog.views(scene.wornItemIds());
+        Inventory inventory = inventories.find(scene.explorerId()).orElseGet(() -> Inventory.empty(scene.explorerId(), clock.instant()));
+        Map<String, Integer> variants = worn.stream().collect(Collectors.toMap(ItemView::itemId,
+            view -> inventory.variantOf(view.regionCode() == null ? null : RegionCode.of(view.regionCode()))));
+        return new SceneView(scene, scene.stylePoints(wornSpecs, stylePolicy), worn, variants);
     }
 
     private void saveAndPublish(Scene scene, SceneUpdate update) {

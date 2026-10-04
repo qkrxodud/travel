@@ -2,7 +2,7 @@
 import { apiClient, toServerCode } from './client';
 import type {
   CheckInResponse, HandleResponse, InviteCodeResponse, LeaveResponse, MapDetailResponse, MapSettings, MapSummaryResponse,
-  PreviewResponse, TerritoryResponse,
+  PreviewResponse, StampBookResponse, StampResponse, StampStatusResponse, TerritoryResponse, WishlistResponse,
 } from './types/exploration';
 
 /** 지금 보는 지도를 쿼리 문자열로 붙인다(null = 개인 지도). */
@@ -44,6 +44,16 @@ export const explorationApi = {
   saveSettings: (mapId: string, settings: MapSettings) => apiClient.request<MapDetailResponse>('PUT', mapPath(mapId) + '/settings', settings),
   dispute: (mapId: string, code: string, memberId: string, disputed: boolean) =>
     apiClient.request<unknown>('PUT', `${mapPath(mapId)}/visits/${toServerCode(code)}/${memberId}/dispute`, { disputed }),
+
+  /** 재방문 도장(9단계) — 지역 상세 안내 · 받기 · 도장첩 */
+  revisitStatus: (code: string) => apiClient.request<StampStatusResponse>('GET', '/revisits/' + toServerCode(code)),
+  stamp: (code: string) => apiClient.request<StampResponse>('POST', '/revisits/' + toServerCode(code)),
+  stamps: () => apiClient.request<StampBookResponse>('GET', '/revisits'),
+
+  /** 가고 싶은 곳(9단계, 비공개) — 꽂으면 전체 목록을 돌려준다 */
+  wishlist: () => apiClient.request<WishlistResponse>('GET', '/wishlist'),
+  pin: (code: string) => apiClient.request<WishlistResponse>('PUT', '/wishlist/' + toServerCode(code)),
+  unpin: (code: string) => apiClient.request<null>('DELETE', '/wishlist/' + toServerCode(code)),
 
   changeHandle: (handle: string) => apiClient.request<HandleResponse>('PUT', '/me/handle', { handle }),
 };

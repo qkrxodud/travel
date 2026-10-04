@@ -31,6 +31,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class CatalogService implements RegionCatalog, RewardCalculator, ProgressionRules {
 
+    private static final java.time.format.DateTimeFormatter MONTH_DAY = java.time.format.DateTimeFormatter.ofPattern("MM-dd");
+
     private final Catalog catalog;
     private final List<RegionView> activeRegions;
     private final List<ProvinceView> provinces;
@@ -42,6 +44,7 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
     private final List<TitleView> titles;
     private final List<LevelTitleView> levelTitles;
     private final StreakRulesView streakRules;
+    private final List<SeasonView> seasons;
 
     public CatalogService(CatalogRepository repository, ItemDefinitionCache itemDefinitions) {
         this.catalog = repository.load();
@@ -50,7 +53,8 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
         this.provinces = catalog.provinces().inDisplayOrder().stream().map(CatalogService::toView).toList();
         RewardRules rules = catalog.rewardRules();
         this.rewardRules = new RewardRulesView(rules.xpByRarity(), rules.provinceFirstBonus(), rules.setCompleteBonus(),
-            rules.claimBonus(), rules.mysteryBonus(), rules.provinceConquestBonus());
+            rules.claimBonus(), rules.mysteryBonus(), rules.provinceConquestBonus(), rules.seasonCompleteBonus(),
+            rules.revisitStampBonus(), rules.wishFulfilledBonus());
         ProgressionDefinitions definitions = catalog.progression();
         this.levelTitles = definitions.levels().titles().stream().map(levelTitle -> new LevelTitleView(levelTitle.level(), levelTitle.name())).toList();
         this.sets = definitions.themes().stream().map(theme -> new SetView(theme.id(), theme.name(), theme.desc(), theme.title(),
@@ -66,6 +70,9 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
             .map(milestone -> new MilestoneView(milestone.months(), milestone.xp(), milestone.freezes(), milestone.titleId(),
                 milestone.title()))
             .toList());
+        this.seasons = definitions.seasons().stream().map(season -> new SeasonView(season.id(), season.name(), season.desc(),
+            MONTH_DAY.format(season.start()), MONTH_DAY.format(season.end()), season.regions().stream().map(RegionCode::value).toList(),
+            season.titleId(), season.title(), season.emoji())).toList();
         this.titles = catalog.titles().stream()
             .map(title -> new TitleView(title.id(), title.name(), title.how(), title.source().name(), title.ref())).toList();
     }
@@ -98,7 +105,27 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
         return toView(catalog.rewardRules().provinceConquest());
     }
 
+    @Override
+    public RewardLineView seasonComplete() {
+        return toView(catalog.rewardRules().seasonComplete());
+    }
+
+    @Override
+    public RewardLineView revisitStamp() {
+        return toView(catalog.rewardRules().revisitStamp());
+    }
+
+    @Override
+    public RewardLineView wishFulfilled() {
+        return toView(catalog.rewardRules().wishFulfilled());
+    }
+
     // ---- ProgressionRules ----
+
+    @Override
+    public List<SeasonView> seasons() {
+        return seasons;
+    }
 
     @Override
     public int levelDivisor() {

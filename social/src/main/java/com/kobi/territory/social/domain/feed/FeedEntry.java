@@ -71,6 +71,18 @@ public record FeedEntry(String refId, ExplorerId actorId, String mapId, FeedKind
             FeedDetail.mystery(regionCode, weekStart), at);
     }
 
+    /** 계절 한정 테마 회차 완성(SeasonCompleted, 9단계, 수령자마다) — 탐험가당 회차당 한 번(진행 refId season:{e}:{roundId} 와 같은 단위). */
+    public static FeedEntry seasonCompleted(ExplorerId actor, String roundId, Instant at) {
+        return new FeedEntry("season:" + actor.value() + ":" + roundId, actor, null, FeedKind.SEASON_COMPLETED,
+            FeedDetail.season(roundId), at);
+    }
+
+    /** 재방문 도장(RevisitStamped, 9단계) — 탐험가당 지역·연도당 한 번. */
+    public static FeedEntry revisitStamped(ExplorerId actor, String regionCode, int year, Instant at) {
+        return new FeedEntry("revisit:" + actor.value() + ":" + regionCode + "@" + year, actor, null, FeedKind.REVISIT_STAMPED,
+            FeedDetail.revisit(regionCode, year), at);
+    }
+
     /** 체크인 소식의 멱등 키(같은 체크인 이벤트가 두 번 와도 한 행). 취소는 refId 가 아니라 (주인, 지도, 지역)으로 거둔다(병합 대응). */
     public static String visitRef(ExplorerId actor, String mapId, String regionCode, int generation, Instant at) {
         String round = generation > 0 ? "#" + generation : "@" + at.toEpochMilli();

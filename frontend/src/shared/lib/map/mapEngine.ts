@@ -25,6 +25,8 @@ export interface RegionPaint {
   claimColor: ReadonlyMap<string, string>;
   /** 공유 지도: 지역 → 선점자 explorerId(data-claim) */
   claimer: ReadonlyMap<string, string>;
+  /** 함께 강조하는 지역 묶음(계절 한정 회차 "지도에서 보기", .grp) */
+  group: ReadonlySet<string>;
 }
 
 export interface MapHandlers {
@@ -66,6 +68,7 @@ export class MapEngine {
   private readonly defs: Selection<SVGDefsElement, unknown, null, undefined>;
   private readonly outlineLayer: Selection<SVGGElement, unknown, null, undefined>;
   private readonly mysteryLayer: Selection<SVGGElement, unknown, null, undefined>;
+  private readonly wishLayer: Selection<SVGGElement, unknown, null, undefined>;
   private readonly maskPrefix: string;
   private readonly charPos: Selection<SVGGElement, unknown, null, undefined>;
   private readonly charScale: Selection<SVGGElement, unknown, null, undefined>;
@@ -77,6 +80,8 @@ export class MapEngine {
   /** 정복 테두리를 그린 시·도(이름) */
   private conquered: ReadonlySet<string> = new Set();
   private mystery: MysteryMark | null = null;
+  /** 가고 싶은 곳 핀을 꽂은 지역 */
+  private wishes: ReadonlySet<string> = new Set();
   /** 캐릭터가 서 있는 곳 / 가고 있는 곳 */
   private charAt: string | null = null;
   private charTarget: string | null = null;
@@ -107,6 +112,8 @@ export class MapEngine {
     this.defs = this.svg.insert('defs', ':first-child') as unknown as Selection<SVGDefsElement, unknown, null, undefined>;
     this.outlineLayer = layer.append('g').attr('class', 'conquest-outlines').style('pointer-events', 'none') as unknown as Selection<SVGGElement, unknown, null, undefined>;
     this.pingLayer = layer.append('g') as unknown as Selection<SVGGElement, unknown, null, undefined>;
+    // 핀은 눌러도 아래 지역이 눌리게 포인터를 받지 않는다
+    this.wishLayer = layer.append('g').attr('class', 'wish-layer').style('pointer-events', 'none') as unknown as Selection<SVGGElement, unknown, null, undefined>;
     this.mysteryLayer = layer.append('g').attr('class', 'mystery-layer') as unknown as Selection<SVGGElement, unknown, null, undefined>;
     this.charPos = layer.append('g').attr('class', 'charpos').style('pointer-events', 'none') as unknown as Selection<SVGGElement, unknown, null, undefined>;
     this.charScale = this.charPos.append('g');
@@ -115,6 +122,7 @@ export class MapEngine {
       this.zoomK = event.transform.k;
       this.charScale.attr('transform', `scale(${1.1 / Math.sqrt(this.zoomK)})`);
       this.mysteryLayer.selectAll('g.mystery-mark > g').attr('transform', `scale(${1 / Math.sqrt(this.zoomK)})`);
+      this.wishLayer.selectAll('g.wish-pin > g').attr('transform', `scale(${1 / Math.sqrt(this.zoomK)})`);
     });
     this.svg.call(this.zoomBehavior).on('dblclick.zoom', null);
   }
@@ -128,12 +136,13 @@ export class MapEngine {
   setPaint(paint: RegionPaint): void {
     const before = this.paint;
     if (before && sameSet(before.mine, paint.mine) && before.selected === paint.selected && before.highlight === paint.highlight
-      && sameMap(before.claimColor, paint.claimColor) && sameMap(before.claimer, paint.claimer)) return;
+      && sameMap(before.claimColor, paint.claimColor) && sameMap(before.claimer, paint.claimer) && sameSet(before.group, paint.group)) return;
     this.paint = paint;
     this.regions
       .classed('on', feature => paint.mine.has(feature.properties.code))
       .classed('focus', feature => feature.properties.code === paint.selected)
       .classed('hl', feature => feature.properties.code === paint.highlight)
+      .classed('grp', feature => paint.group.has(feature.properties.code))
       .classed('claimed', feature => paint.claimColor.has(feature.properties.code))
       .style('fill', feature => paint.claimColor.get(feature.properties.code) ?? null)
       .attr('data-claim', feature => paint.claimer.get(feature.properties.code) ?? null);
@@ -208,6 +217,25 @@ export class MapEngine {
       })
       .call(group => group.select('g').attr('transform', `scale(${1 / Math.sqrt(this.zoomK)})`))
       .call(group => group.select('text').text(current => (current.received ? '✓' : '❓')));
+  }
+
+  /** 가고 싶은 곳 📍 핀(아직 다녀오지 않은 곳). 같은 지역 목록이면 DOM 을 건드리지 않는다. */
+  setWishPins(codes: ReadonlySet<string>): void {
+    if (sameSet(this.wishes, codes)) return;
+    this.wishes = new Set(codes);
+    const pins = [...codes].filter(code => this.byCode.has(code)).sort();
+    this.wishLayer.selectAll<SVGGElement, string>('g.wish-pin').data(pins, code => code).join(enter => {
+      const group = enter.append('g').attr('class', 'wish-pin').attr('aria-hidden', 'true');
+      const inner = group.append('g');
+      inner.append('text').attr('text-anchor', 'middle').attr('dy', '-0.1em').text('📍');
+      return group;
+    })
+      .attr('data-wish', code => code)
+      .attr('transform', code => {
+        const [atX, atY] = this.centroid(code);
+        return `translate(${atX},${atY})`;
+      })
+      .call(group => group.select('g').attr('transform', `scale(${1 / Math.sqrt(this.zoomK)})`));
   }
 
   /**

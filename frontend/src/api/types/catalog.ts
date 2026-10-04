@@ -24,6 +24,8 @@ export interface ItemView {
   grantRef: string | null;
   validFrom: string | null;
   validTo: string | null;
+  /** 재방문 2회차 색 변형 룩(지역 특산물만, 그 외 null — 9단계) */
+  variantLook: ItemLook | null;
 }
 
 /** GET /catalog/provinces 한 줄 — catalog ProvinceView */
@@ -45,6 +47,12 @@ export interface RewardRulesView {
   mysteryBonus: number;
   /** 시·도 정복 보너스(8단계) */
   provinceConquestBonus: number;
+  /** 계절 한정 테마 완성 보너스(9단계) */
+  seasonCompleteBonus: number;
+  /** 재방문 도장 보너스(9단계) */
+  revisitStampBonus: number;
+  /** 가고 싶은 곳 다녀옴 보너스(9단계) */
+  wishFulfilledBonus: number;
 }
 
 /** GET /catalog/regions.geojson 의 Feature.properties (서버 코드 KR-xxxxx) */

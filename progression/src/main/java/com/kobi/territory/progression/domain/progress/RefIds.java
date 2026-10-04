@@ -15,6 +15,8 @@ import java.time.YearMonth;
  *   <li>퀘스트 {@code quest:{e}:{period}:{questId}}</li>
  *   <li>8단계: 미스터리 {@code mystery:{e}:{weekStart}}, 시·도 정복 {@code conquest:{e}:{provinceCode}},
  *       연속 탐험 마일스톤 {@code milestone:{e}:{months}}</li>
+ *   <li>9단계: 계절 회차 완성 {@code season:{e}:{roundId}}, 재방문 도장 {@code revisit:{e}:{code}@{year}},
+ *       가고 싶은 곳 {@code wish:{e}:{code}}</li>
  *   <li>8단계 보호권 장부: 월간 퀘스트 완주 {@code freeze:{e}:quests:{yyyy-MM}}, 마일스톤 {@code freeze:{e}:milestone:{months}},
  *       사용 {@code freeze:{e}:use:{yyyy-MM}}(연속을 이은 달)</li>
  * </ul>
@@ -63,6 +65,21 @@ public final class RefIds {
 
     public static String milestone(ExplorerId explorer, int months) {
         return "milestone:" + explorer.value() + ":" + months;
+    }
+
+    /** 계절 한정 테마 회차 완성 season:{e}:{roundId}(9단계). */
+    public static String season(ExplorerId explorer, String roundId) {
+        return "season:" + explorer.value() + ":" + roundId;
+    }
+
+    /** 재방문 도장 revisit:{e}:{code}@{year}(9단계 — 마지막 마디가 지역@연도). */
+    public static String revisit(ExplorerId explorer, RegionCode region, int year) {
+        return "revisit:" + explorer.value() + ":" + region.value() + "@" + year;
+    }
+
+    /** 가고 싶은 곳 다녀옴 wish:{e}:{code}(9단계 — 지역당 한 번). */
+    public static String wish(ExplorerId explorer, RegionCode region) {
+        return "wish:" + explorer.value() + ":" + region.value();
     }
 
     public static String freezeFromQuests(ExplorerId explorer, QuestPeriod period) {

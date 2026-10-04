@@ -3,6 +3,10 @@ package com.kobi.territory.progression.application;
 import com.kobi.territory.common.event.EventSubscriber;
 import com.kobi.territory.exploration.api.event.ClaimTransferred;
 import com.kobi.territory.exploration.api.event.MapCreated;
+import com.kobi.territory.exploration.api.event.MemberReassigned;
+import com.kobi.territory.exploration.api.event.RevisitStamped;
+import com.kobi.territory.exploration.api.event.WishFulfilled;
+import com.kobi.territory.progression.api.event.SeasonCompleted;
 import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.event.VisitCancelled;
 import com.kobi.territory.exploration.api.event.VisitsHidden;
@@ -20,7 +24,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ProgressionSubscriptions {
 
-    /** ExplorerProgress: 체크인·취소·세트 완성(수령자별)·퀘스트 보상·선점 이전·개인 지도 생성(루트 선생성). */
+    /**
+     * ExplorerProgress: 체크인·취소·세트 완성(수령자별)·퀘스트 보상·선점 이전·개인 지도 생성(루트 선생성), 9단계: 계절 회차 완성(수령자별)·
+     * 재방문 도장·가고 싶은 곳 다녀옴.
+     */
     @Bean
     EventSubscriber progressSubscriber(ProgressService progress) {
         return EventSubscriber.named("progression.progress")
@@ -30,10 +37,13 @@ public class ProgressionSubscriptions {
             .on(QuestCompleted.class, progress::onQuestCompleted)
             .on(ClaimTransferred.class, progress::onClaimTransferred)
             .on(MapCreated.class, progress::onMapCreated)
+            .on(SeasonCompleted.class, progress::onSeasonCompleted)
+            .on(RevisitStamped.class, progress::onRevisitStamped)
+            .on(WishFulfilled.class, progress::onWishFulfilled)
             .build();
     }
 
-    /** CollectionBook(도감, 지도 단위): 체크인·취소·탈퇴 숨김·재가입 복구. */
+    /** CollectionBook(도감, 지도 단위): 체크인·취소·탈퇴 숨김·재가입 복구, 9단계: 병합 재귀속(계절 회차의 센 방문 주인 바꾸기). */
     @Bean
     EventSubscriber collectionBookSubscriber(CollectionBookService collectionBooks) {
         return EventSubscriber.named("progression.collection-book")
@@ -41,6 +51,7 @@ public class ProgressionSubscriptions {
             .on(VisitCancelled.class, collectionBooks::onVisitCancelled)
             .on(VisitsHidden.class, collectionBooks::onVisitsHidden)
             .on(VisitsRestored.class, collectionBooks::onVisitsRestored)
+            .on(MemberReassigned.class, collectionBooks::onMemberReassigned)
             .build();
     }
 

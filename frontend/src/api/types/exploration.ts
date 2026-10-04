@@ -177,3 +177,80 @@ export interface InviteCodeResponse {
   mapId: string;
   inviteCode: string;
 }
+
+/** 재방문 도장을 지금 못 받는 이유 — StampRefusal(9단계) */
+export type RevisitRefusal = 'NOT_PAINTED' | 'SAME_YEAR' | 'ALREADY_STAMPED' | 'DAILY_CAP';
+
+/** POST /revisits/{code} 201 — RevisitDtos.StampResponse (코드 KR-xxxxx) */
+export interface StampResponse {
+  regionCode: string;
+  /** 카탈로그에서 못 찾으면 null */
+  regionName: string | null;
+  year: number;
+  firstYear: number;
+  stampedAt: string;
+  /** 이 도장으로 받는 XP(진행 반영은 비동기) */
+  xp: number;
+  /** 이 도장을 포함한 내 도장 수 */
+  stampCount: number;
+}
+
+/** GET /revisits 한 줄 — StampItem */
+export interface StampItem {
+  regionCode: string;
+  regionName: string | null;
+  provinceCode: string | null;
+  year: number;
+  stampedAt: string;
+}
+
+/** GET /revisits — StampBookResponse(최근 먼저) */
+export interface StampBookResponse {
+  count: number;
+  xpPerStamp: number;
+  stamps: StampItem[];
+}
+
+/** GET /revisits/{code} — StampStatusResponse("다시 다녀왔어요" 버튼 안내, POST 와 같은 판정) */
+export interface StampStatusResponse {
+  regionCode: string;
+  /** 카탈로그에서 못 찾으면 null(폐지 지역 등) */
+  regionName: string | null;
+  /** 탐험가 단위로(어느 지도든) 칠한 지역인지 */
+  painted: boolean;
+  /** 처음 칠한 해(처리 시각 기준, 안 칠했으면 null) */
+  firstYear: number | null;
+  /** 지금 연도(서버 시각) */
+  year: number;
+  /** 이 지역 도장 연도(오름차순) */
+  stampedYears: number[];
+  canStamp: boolean;
+  reason: RevisitRefusal | null;
+  /** SAME_YEAR·ALREADY_STAMPED 일 때 받을 수 있게 되는 해 */
+  availableFromYear: number | null;
+  xp: number;
+}
+
+/** 가고 싶은 곳 핀 상태 */
+export type WishStatus = 'WANTED' | 'VISITED';
+
+/** WishlistDtos.WishItem (코드 KR-xxxxx) */
+export interface WishItem {
+  regionCode: string;
+  /** 카탈로그에서 못 찾으면 null(폐지 지역 등) */
+  regionName: string | null;
+  provinceCode: string | null;
+  status: WishStatus;
+  pinnedAt: string;
+  fulfilledAt: string | null;
+}
+
+/** GET /wishlist · PUT /wishlist/{code} — WishlistResponse(items 는 최근에 꽂은 순) */
+export interface WishlistResponse {
+  /** 아직 다녀오지 않은 핀 상한 */
+  max: number;
+  pendingCount: number;
+  fulfilledCount: number;
+  xpPerWish: number;
+  items: WishItem[];
+}

@@ -1,6 +1,6 @@
 package com.kobi.territory.progression.domain.policy;
 
-/** XP 장부 항목의 출처. 8단계 3종(미스터리·시·도 정복·연속 탐험 마일스톤)은 끝에 — 저장 값(xp_ledger.source)이라 이름을 바꾸지 않는다. */
+/** XP 장부 항목의 출처. 8단계 3종(미스터리·시·도 정복·연속 탐험 마일스톤)·9단계 3종(계절·재방문 도장·가고 싶은 곳)은 끝에 — 저장 값(xp_ledger.source)이라 이름을 바꾸지 않는다. */
 public enum XpSource {
     /** 지역 기본 XP(탐험가당 지역당 활성 1개, 취소 시 음수 항목으로 회수). */
     REGION_BASE,
@@ -17,5 +17,11 @@ public enum XpSource {
     /** 시·도 정복(탐험가당 시·도당 1회, 회수 없음 — 8단계). */
     PROVINCE_CONQUEST,
     /** 연속 탐험 마일스톤(탐험가당 마일스톤당 1회, 끊겼다 다시 쌓아도 다시 없음 — 8단계). */
-    STREAK_MILESTONE
+    STREAK_MILESTONE,
+    /** 계절 한정 테마 회차 완성(탐험가당 회차당 1회, 회수 없음 — 9단계). */
+    SEASON_COMPLETE,
+    /** 재방문 도장(지역·연도당 1회, 회수 없음 — 9단계). */
+    REVISIT_STAMP,
+    /** 가고 싶은 곳을 다녀옴(지역당 1회 — 핀을 뺐다 다시 꽂아도 1회, 회수 없음 — 9단계). */
+    WISH_FULFILLED
 }

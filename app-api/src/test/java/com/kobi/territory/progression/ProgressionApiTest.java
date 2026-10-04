@@ -112,7 +112,7 @@ class ProgressionApiTest {
     class Beginner {
 
         @Test
-        @DisplayName("경험치 0·레벨 1·첫 칭호이고, 뱃지 15종과 칭호 39종 목록을 본다")
+        @DisplayName("경험치 0·레벨 1·첫 칭호이고, 뱃지 19종과 칭호 41종 목록을 본다")
         void startsAtLevelOne() throws Exception {
             mvc.perform(as(get("/progress"))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.xp").value(0))
@@ -123,8 +123,8 @@ class ProgressionApiTest {
                 .andExpect(jsonPath("$.title.id").value("lv1"))
                 .andExpect(jsonPath("$.streak.months").value(0))
                 .andExpect(jsonPath("$.badgeCount").value(0))
-                .andExpect(jsonPath("$.badges", hasSize(15)))
-                .andExpect(jsonPath("$.titles", hasSize(39)))
+                .andExpect(jsonPath("$.badges", hasSize(19)))
+                .andExpect(jsonPath("$.titles", hasSize(41)))
                 .andExpect(jsonPath("$.titles[0].earned").value(true));
         }
 

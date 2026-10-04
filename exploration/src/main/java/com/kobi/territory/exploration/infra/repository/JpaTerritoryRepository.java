@@ -18,6 +18,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.Collection;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
@@ -96,6 +99,18 @@ class JpaTerritoryRepository implements TerritoryRepository {
     @Override
     public boolean hasVisibleVisit(ExplorerId member, RegionCode region) {
         return visits.existsByCheckedInByAndRegionCodeAndHiddenAtIsNull(member.value(), region.value());
+    }
+
+    @Override
+    public Set<RegionCode> visibleRegionsAmong(ExplorerId member, Collection<RegionCode> regions) {
+        if (regions.isEmpty()) return Set.of();
+        return visits.visibleRegionCodesAmong(member.value(), regions.stream().map(RegionCode::value).toList()).stream()
+            .map(RegionCode::of).collect(Collectors.toSet());
+    }
+
+    @Override
+    public Optional<Instant> firstVisibleVisitAt(ExplorerId member, RegionCode region) {
+        return Optional.ofNullable(visits.firstVisibleVisitAt(member.value(), region.value()));
     }
 
     /**

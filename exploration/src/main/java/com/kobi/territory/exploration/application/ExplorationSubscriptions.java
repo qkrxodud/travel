@@ -6,6 +6,7 @@ import com.kobi.territory.exploration.api.event.MemberJoined;
 import com.kobi.territory.exploration.api.event.MemberLeft;
 import com.kobi.territory.exploration.api.event.MemberPurged;
 import com.kobi.territory.exploration.api.event.MemberReassigned;
+import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.event.VisitsMerged;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,6 +36,25 @@ public class ExplorationSubscriptions {
     EventSubscriber expeditionMapSubscriber(ExplorerMergeService merges) {
         return EventSubscriber.named("exploration.expedition-map")
             .on(MembershipHandover.class, merges::onMembershipHandover)
+            .build();
+    }
+
+    /**
+     * 9단계: 가고 싶은 곳(Wishlist) 구독자 — 체크인으로 핀이 다녀옴이 되고(WishFulfilled), 계정 병합 때 익명 탐험가의 핀을 합친다.
+     */
+    @Bean
+    EventSubscriber wishlistSubscriber(WishlistService wishlists) {
+        return EventSubscriber.named("exploration.wishlist")
+            .on(RegionVisited.class, wishlists::onRegionVisited)
+            .on(ExplorerMerged.class, wishlists::onExplorerMerged)
+            .build();
+    }
+
+    /** 9단계: 재방문 도장첩(StampBook) 구독자 — 계정 병합 때 익명 탐험가의 도장을 합친다. */
+    @Bean
+    EventSubscriber stampBookSubscriber(RevisitService revisits) {
+        return EventSubscriber.named("exploration.stamp-book")
+            .on(ExplorerMerged.class, revisits::onExplorerMerged)
             .build();
     }
 

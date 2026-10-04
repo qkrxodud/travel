@@ -77,6 +77,10 @@ public final class ItemDefinitions {
     }
 
     /** 이 날짜의 초대 합류에서 그 쪽(HOST·GUEST)이 받는 아이템. */
+    public List<ItemDefinition> grantedBySeasonCompletion(String roundId, LocalDate day, Instant completedAt) {
+        return stream().filter(item -> item.grantedBySeasonCompletion(roundId, day, completedAt)).toList();
+    }
+
     public List<ItemDefinition> grantedByInvitation(GrantRule.InvitationSide side, LocalDate day) {
         return stream().filter(item -> item.grantedByInvitation(side, day)).toList();
     }

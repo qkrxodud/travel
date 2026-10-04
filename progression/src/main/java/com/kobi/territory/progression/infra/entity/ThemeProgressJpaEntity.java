@@ -74,9 +74,11 @@ public class ThemeProgressJpaEntity {
             CsvColumn.read(completedMemberIds).stream().map(ExplorerId::of).collect(Collectors.toSet()));
     }
 
-    /** 한 지도의 테마 행들로 도감 애그리거트를 복원한다. */
-    public static CollectionBook toCollectionBook(String mapId, List<ThemeProgressJpaEntity> rows) {
-        return CollectionBook.restore(mapId, rows.stream().map(ThemeProgressJpaEntity::toDomain).toList());
+    /** 한 지도의 테마 행들(+ 9단계 계절 회차 행들)로 도감 애그리거트를 복원한다. */
+    public static CollectionBook toCollectionBook(String mapId, List<ThemeProgressJpaEntity> rows,
+                                                  List<SeasonProgressJpaEntity> seasonRows) {
+        return CollectionBook.restore(mapId, rows.stream().map(ThemeProgressJpaEntity::toDomain).toList(),
+            seasonRows.stream().map(SeasonProgressJpaEntity::toDomain).toList());
     }
 
     @EqualsAndHashCode

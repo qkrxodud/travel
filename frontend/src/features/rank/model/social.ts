@@ -25,8 +25,16 @@ export const RELATION_LABEL: Readonly<Record<Relation, string>> = { mutual: '친
 /** 지도 전체 지역 수 대비 % */
 export const shareOfAll = (count: number, total: number): number => (total ? Math.round(100 * count / total) : 0);
 
+/** 친구 소식 이름 찾기(테마 세트·뱃지·계절 회차 — 각각 서버 값) */
+export interface FeedNames {
+  setName: (id: string) => string | undefined;
+  badgeName: (id: string) => string | undefined;
+  /** 회차 id → "2026 단풍 명소" */
+  seasonName: (roundId: string) => string;
+}
+
 /** 친구 소식 문장 조각: [강조(굵게), 나머지] */
-export function feedParts(item: FeedItemResponse, catalog: Catalog | null, setName: (id: string) => string | undefined, badgeName: (id: string) => string | undefined): { strong: string | null; text: string; prefix?: string } {
+export function feedParts(item: FeedItemResponse, catalog: Catalog | null, { setName, badgeName, seasonName }: FeedNames): { strong: string | null; text: string; prefix?: string } {
   if (item.kind === 'VISIT') {
     const label = item.regionCode && catalog ? labelOfCode(catalog, item.regionCode) : item.regionCode ?? '';
     const rarity = item.rarity === 'LEGEND' ? ' · 전설 지역' : item.rarity === 'RARE' ? ' · 희귀 지역' : '';
@@ -42,6 +50,14 @@ export function feedParts(item: FeedItemResponse, catalog: Catalog | null, setNa
   if (item.kind === 'MYSTERY_FOUND') {
     const region = item.regionCode && catalog ? catalog.byCode.get(toClientCode(item.regionCode))?.properties.name ?? item.regionCode : item.regionCode ?? '';
     return { prefix: '이번 주 미스터리 지역 ', strong: region, text: `${objectParticle(region)} 찾았어요` };
+  }
+  if (item.kind === 'SEASON_COMPLETED') {
+    const round = seasonName(item.roundId ?? '');
+    return { strong: round, text: `${objectParticle(round)} 완성했어요` };
+  }
+  if (item.kind === 'REVISIT_STAMPED') {
+    const region = item.regionCode && catalog ? labelOfCode(catalog, item.regionCode) : item.regionCode ?? '';
+    return { strong: region, text: `에 다시 다녀왔어요${item.year ? `(${item.year} 도장)` : ''}` };
   }
   return { strong: null, prefix: `뱃지 「${badgeName(item.badgeId ?? '') ?? item.badgeId ?? ''}」를 얻었어요`, text: '' };
 }

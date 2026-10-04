@@ -101,6 +101,6 @@ public class ProgressController {
             progress.provinceCoverage(policy.policy()).stream().map(coverage -> new ProvinceProgressResponse(
                 coverage.provinceCode(), provinceNames.get(coverage.provinceCode()), coverage.covered(), coverage.total(),
                 coverage.percent(), coverage.complete(), coverage.conquered(), coverage.conqueredAt())).toList(),
-            progress.mysteryFoundCount());
+            progress.mysteryFoundCount(), progress.revisitStampCount(), progress.wishesFulfilledCount());
     }
 }

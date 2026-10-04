@@ -1,9 +1,9 @@
 /**
  * 가방 탭 — 가진 아이템을 고르고 늘어놓고, 입히고 벗기고, 아직 없는 것을 구경한다. 보유·착용·꾸미기 점수는 서버 값이다.
- * 이야기 순서: 가방 늘어놓기 → 꾸미기 등급 → 갖고 싶은 것 → 입히기·즐겨찾기.
+ * 이야기 순서: 가방 늘어놓기 → 꾸미기 등급 → 갖고 싶은 것 → 입히기·즐겨찾기 → 재방문 2회차 색·계절 배경 표시.
  */
-import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, cleanup, render, renderHook } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SceneResponse } from '../../api/types/wardrobe';
 import { toDisplayItem, type DisplayItem } from '../../shared/lib/item/displayItem';
 import { wardrobeKeys } from '../../shared/queries/wardrobe';
@@ -11,9 +11,12 @@ import { CATALOG } from '../../test/fixtures';
 import { serverState } from '../../test/serverState';
 import { BAG_FILTERS, filterAndSort, isSetReward, styleRank, wantedItems } from './model/bag';
 import { useEditScene, useFavorite } from './queries';
+import { InventoryPanel } from './components/InventoryPanel';
 
 const { WORN_SCENE } = vi.hoisted(() => ({ WORN_SCENE: { gender: 'F', slots: {}, props: [], stylePoints: 8, wornCount: 0, updatedAt: null } satisfies SceneResponse }));
 
+// 아이템 그림(캔버스)은 픽셀 페인터 테스트 몫 — 여기서는 타일 표시만 본다
+vi.mock('../../shared/ui/ItemImage', () => ({ ItemImage: () => null }));
 vi.mock('../../api/wardrobe', () => ({
   wardrobeApi: {
     editScene: vi.fn(async () => WORN_SCENE),
@@ -85,5 +88,31 @@ describe('입히기와 즐겨찾기', () => {
     const { result } = renderHook(() => useFavorite(), { wrapper });
     await act(() => result.current.mutateAsync({ itemId: 'region:KR-11010', favorite: true }));
     expect(stale(wardrobeKeys.inventory())).toBe(true);
+  });
+});
+
+describe('재방문 2회차 색과 계절 배경 표시', () => {
+  afterEach(cleanup);
+  const panel = (items: DisplayItem[]) => {
+    const { wrapper } = serverState();
+    render(<InventoryPanel items={items} sceneProps={[]} onEdit={() => undefined} />, { wrapper });
+  };
+
+  it('다시 다녀와 색이 바뀐 특산물에는 2회차 표시를 단다', () => {
+    const recolored = toDisplayItem({ itemId: 'region:KR-11010', name: '청사초롱 등불', emoji: '🏮', slot: 'HAND', tier: 'COMMON', theme: null,
+      look: { type: 'lantern', primary: '#e63946', secondary: '#f4c542' }, variant: 2, variantLook: { type: 'lantern', primary: '#f4c542', secondary: '#e63946' } }, '서울 종로구');
+    panel([recolored, owned('region:KR-11020', 'badge', 'common')]);
+    const tile = document.querySelector('[data-equip="region:KR-11010"]');
+    expect(tile?.getAttribute('data-variant')).toBe('2');
+    expect(tile?.querySelector('.variant')?.textContent).toBe('2회차');
+    expect(document.querySelector('[data-equip="region:KR-11020"] .variant')).toBeNull();
+  });
+
+  it('계절 한정 배경은 받은 회차의 계절 이모지를 달고 어디서 받았는지 보인다', () => {
+    const autumn = toDisplayItem({ itemId: 'season:autumn-2026', name: '2026 단풍 명소 배경', emoji: '🍁', slot: 'BG', tier: 'LEGEND', theme: 'autumn', look: null }, '2026 계절 한정 테마 완성 보상');
+    panel([autumn]);
+    const tile = document.querySelector('[data-equip="season:autumn-2026"]');
+    expect(tile?.querySelector('.ach')?.textContent).toBe('🍁');
+    expect(tile?.getAttribute('data-origin')).toBe('2026 계절 한정 테마 완성 보상');
   });
 });

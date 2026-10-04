@@ -46,7 +46,15 @@ export const BG_THEME: Readonly<Record<string, BackgroundTheme>> = {
   punchbowl: { sky: ['#b9d3ea', '#f2f7fb'], ground: ['#f4f8fb', '#d7e3ee'], draw: 'punchbowl', legend: true, cozy: 'snow' },
   icelake: { sky: ['#9fc5e8', '#eaf3fb'], ground: ['#f4f8fb', '#d7e3ee'], draw: 'icelake', legend: true, cozy: 'snow' },
   river: { sky: ['#8ecae6', '#e8f6ff'], ground: ['#7cb342', '#558b2f'], draw: 'river', legend: true, cozy: 'river' },
+  /* 계절 한정 회차 배경(9단계) — 단풍 명소 · 벚꽃 명소 */
+  autumn: { sky: ['#f4b47a', '#f9d5a7', '#fdf0dc'], ground: ['#c9873a', '#a8682a'], draw: 'autumn', legend: true, cozy: 'field' },
+  blossom: { sky: ['#bfdcf5', '#fbe0ec', '#fff4f8'], ground: ['#9ccc65', '#7cb342'], draw: 'blossom', legend: true, cozy: 'field' },
 };
+
+/** 단풍 잎 색(빨강·주황·노랑) */
+const MAPLE = ['#d84315', '#ef6c00', '#f9a825', '#c62828'] as const;
+/** 벚꽃 색(진분홍·분홍·연분홍) */
+const BLOSSOM = ['#f48fb1', '#f8bbd0', '#fce4ec', '#ec407a'] as const;
 
 export function themeOf(key: string): BackgroundTheme {
   return BG_THEME[key] || BG_THEME.plain;
@@ -406,6 +414,22 @@ export function backgroundOps(theme: BackgroundTheme): { bands: Band[]; px: Dot[
       ripples(14, 36, 10, '#bfe6ff');
       grid(['...OOOO...', '..OaaaaO..', '.OaabaaaO.', 'OaaaaaaaaO', 'OaabaaaaaO', 'OaaaaaaabO', '.OOOOOOOO.'], { O: '#4a5a5a', a: '#7a8a7a', b: '#9aa7a7' }, 56, 30);
       break;
+    case 'autumn':
+    case 'blossom': {
+      const leaves = theme.draw === 'autumn' ? MAPLE : BLOSSOM;
+      ([[18, 12], [50, 15], [82, 11]] as const).forEach(([centerX, height]) => {
+        for (let row = 0; row < height; row++) {
+          const half = floor(row * 2.2);
+          rect(centerX - half, 34 - height + row, half * 2 + 1, 1, theme.draw === 'autumn' ? '#b5651d' : '#9ccc65');
+        }
+      });
+      for (let treeX = 2; treeX < BG_WIDTH; treeX += 13) {
+        rect(treeX + 3, 36, 2, 12, '#6d4c41');
+        grid(['..OOOO..', '.OabaacO', 'OacaabaO', 'ObaacaaO', '.OaabaO.', '..OOOO..'], { O: darken(leaves[0], 0.3), a: leaves[0], b: leaves[1], c: leaves[2] }, treeX, 28);
+      }
+      for (let i = 0; i < 24; i++) px.push([floor(rnd() * BG_WIDTH), floor(rnd() * BG_GROUND), leaves[i % leaves.length]]);
+      break;
+    }
     default:
       break;
   }
@@ -425,8 +449,9 @@ export function cozyScene(pen: Painter, theme: BackgroundTheme, rnd: () => numbe
   const snow = kind === 'snow';
   const flat: FillStyle = { flat: true, outline: false };
   const floor = Math.floor;
-  const grass = snow ? ['#eef4fa', '#dbe7f1', '#c5d6e4'] : night ? ['#2f6a3a', '#245a2e', '#1a4524'] : ['#7fc24a', '#a3d95e', '#5a9a34'];
-  const bush = night ? ['#1f4a2a', '#2a5e34'] : snow ? ['#5e8a5a', '#7faa78'] : ['#3f7d3a', '#5aa34a'];
+  const autumn = theme.draw === 'autumn';
+  const grass = snow ? ['#eef4fa', '#dbe7f1', '#c5d6e4'] : night ? ['#2f6a3a', '#245a2e', '#1a4524'] : autumn ? ['#c9a24c', '#e0b85c', '#a8802e'] : ['#7fc24a', '#a3d95e', '#5a9a34'];
+  const bush = night ? ['#1f4a2a', '#2a5e34'] : snow ? ['#5e8a5a', '#7faa78'] : autumn ? ['#c0392b', '#e67e22'] : ['#3f7d3a', '#5aa34a'];
   // 하늘
   const sky = theme.sky;
   for (let i = 0; i < sky.length; i++) pen.fill(pen.rect(0, Math.round(ground * i / sky.length), width, Math.round(ground * (i + 1) / sky.length) - Math.round(ground * i / sky.length) + 1), sky[i], flat);
@@ -443,7 +468,7 @@ export function cozyScene(pen: Painter, theme: BackgroundTheme, rnd: () => numbe
     });
   }
   // 원경 산
-  const range = night ? ['#0f2e3a', '#163d44'] : snow ? ['#9fb6cc', '#b9cde0'] : ['#6f9ab0', '#8fb6c9'];
+  const range = night ? ['#0f2e3a', '#163d44'] : snow ? ['#9fb6cc', '#b9cde0'] : autumn ? ['#a0522d', '#c97a4a'] : ['#6f9ab0', '#8fb6c9'];
   ([[20, 36, 60, range[1]], [70, 44, 70, range[1]], [150, 40, 70, range[1]], [40, 26, 46, range[0]], [120, 30, 56, range[0]], [185, 24, 50, range[0]]] as const)
     .forEach(([centerX, height, spread, color]) => {
       pen.fill(pen.poly([[centerX - spread, ground], [centerX - spread * 0.35, ground - height * 0.75], [centerX, ground - height], [centerX + spread * 0.3, ground - height * 0.8], [centerX + spread, ground]]), color, flat);
@@ -508,6 +533,25 @@ export function cozyScene(pen: Painter, theme: BackgroundTheme, rnd: () => numbe
       pen.fill(pen.poly([[88, ground - 6], [92, ground - 24], [104, ground - 30], [118, ground - 24], [122, ground - 6]]), '#7a8a7a', { ol: '#4a5a5a', wide: true });
       pen.fill(pen.ellipse(104, ground - 27, 6, 3), '#9aa7a7', flat);
       pen.fill(pen.ellipse(106, ground - 32, 3, 3), '#4caf50', { ol: '#2e5a3a' });
+    }
+    if (theme.draw === 'autumn' || theme.draw === 'blossom') {
+      // 계절 나무 줄(단풍 / 벚꽃) + 흩날리는 잎·꽃잎
+      const leaves = autumn ? MAPLE : BLOSSOM;
+      const trunk = autumn ? '#5d4037' : '#6d4c41';
+      for (let treeX = 12; treeX < width; treeX += 34) {
+        const treeY = ground - 8 - ((treeX / 34) % 2) * 5;
+        pen.fill(pen.rect(treeX - 2, treeY - 14, 4, 16), trunk, { ol: OUTLINE });
+        pen.fill(pen.ellipse(treeX, treeY - 22, 14, 11), leaves[0], { ol: darken(leaves[0], 0.35), wide: true });
+        pen.fill(pen.ellipse(treeX - 5, treeY - 25, 7, 5), leaves[1], flat);
+        pen.fill(pen.ellipse(treeX + 6, treeY - 19, 6, 4), leaves[2], flat);
+        for (let dot = 0; dot < 8; dot++) pen.dot(treeX - 10 + floor(rnd() * 20), treeY - 30 + floor(rnd() * 16), leaves[3]);
+      }
+      for (let i = 0; i < 60; i++) {
+        const fallX = floor(rnd() * width);
+        const fallY = 8 + floor(rnd() * (ground + 10));
+        pen.dot(fallX, fallY, leaves[i % leaves.length]);
+        if (i % 4 === 0) pen.dot(fallX + 1, fallY + 1, leaves[(i + 1) % leaves.length]);
+      }
     }
     if (theme.draw === 'saltfield') {
       for (let pondY = ground - 26; pondY < ground - 2; pondY += 8) {

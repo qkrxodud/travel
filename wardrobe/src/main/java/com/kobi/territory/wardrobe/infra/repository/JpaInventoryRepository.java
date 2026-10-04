@@ -9,6 +9,7 @@ import com.kobi.territory.wardrobe.infra.entity.InventoryJpaEntity;
 import com.kobi.territory.wardrobe.infra.entity.InvitationJpaEntity;
 import com.kobi.territory.wardrobe.infra.entity.OwnedItemBasisJpaEntity;
 import com.kobi.territory.wardrobe.infra.entity.OwnedItemJpaEntity;
+import com.kobi.territory.wardrobe.infra.entity.RevisitMarkJpaEntity;
 import com.kobi.territory.wardrobe.infra.entity.VisitTraceJpaEntity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -16,7 +17,8 @@ import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
 /**
- * Inventory 저장소 어댑터 — inventory(루트)·owned_item·owned_item_basis·inventory_visit·invite_reward(4단계, insert 만). "어떻게 저장할지"만 한다.
+ * Inventory 저장소 어댑터 — inventory(루트)·owned_item·owned_item_basis·inventory_visit·invite_reward(4단계, insert 만)·
+ * inventory_revisit(9단계, insert 만). "어떻게 저장할지"만 한다.
  * <ul>
  *   <li>{@link #save}: 복원 이후 새로 생긴 행 insert, 바뀐 아이템 update(근거 행은 지우고 다시 넣기), 회수된 행 delete.</li>
  *   <li>{@link #replace}: 그 탐험가의 자식 행을 지우고 애그리거트 상태로 다시 넣는다(재계산 경로).</li>
@@ -32,11 +34,14 @@ class JpaInventoryRepository implements InventoryRepository {
     private final OwnedItemBasisJpaRepository basisRows;
     private final VisitTraceJpaRepository traceRows;
     private final InvitationJpaRepository invitationRows;
+    private final RevisitMarkJpaRepository revisitRows;
     private final EntityManager entityManager;
 
     JpaInventoryRepository(InventoryJpaRepository inventoryRows, OwnedItemJpaRepository itemRows,
                            OwnedItemBasisJpaRepository basisRows, VisitTraceJpaRepository traceRows,
-                           InvitationJpaRepository invitationRows, EntityManager entityManager) {
+                           InvitationJpaRepository invitationRows, RevisitMarkJpaRepository revisitRows,
+                           EntityManager entityManager) {
+        this.revisitRows = revisitRows;
         this.invitationRows = invitationRows;
         this.inventoryRows = inventoryRows;
         this.itemRows = itemRows;
@@ -58,7 +63,7 @@ class JpaInventoryRepository implements InventoryRepository {
     private Inventory withChildren(InventoryJpaEntity root) {
         String id = root.explorerId();
         return root.toDomain(itemRows.findByExplorerId(id), basisRows.findByExplorerId(id), traceRows.findByExplorerId(id),
-            invitationRows.findByInviteeId(id));
+            invitationRows.findByInviteeId(id), revisitRows.findByExplorerId(id));
     }
 
     @Override
@@ -73,6 +78,7 @@ class JpaInventoryRepository implements InventoryRepository {
         inventory.ownedItems().updated().forEach(item -> updateItem(explorer, item));
         inventory.visitTraces().changed().forEach(trace -> saveTrace(explorer, trace));
         insertInvitations(inventory);
+        insertRevisits(inventory);
     }
 
     /**
@@ -89,7 +95,14 @@ class JpaInventoryRepository implements InventoryRepository {
         inventory.ownedItems().all().forEach(item -> insertItem(inventory.explorerId(), item));
         inventory.visitTraces().all().forEach(trace -> entityManager.persist(VisitTraceJpaEntity.from(inventory.explorerId(), trace)));
         insertInvitations(inventory);
+        insertRevisits(inventory);
         saveRoot(inventory);
+    }
+
+    /** 재방문 표시는 지우지 않는다(재계산도 유지) — 새로 생긴 표시만 insert. */
+    private void insertRevisits(Inventory inventory) {
+        inventory.revisitMarks().added()
+            .forEach(mark -> entityManager.persist(RevisitMarkJpaEntity.from(inventory.explorerId(), mark)));
     }
 
     /** 초대 보상 기록은 지우지 않는다(재계산도 유지) — 새로 생긴 기록만 insert. */

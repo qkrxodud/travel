@@ -136,6 +136,13 @@ class ExpeditionMapTest {
         }
 
         @Test
+        @DisplayName("오늘 받은 재방문 도장은 개인 지도의 하루 상한만 함께 쓴다")
+        void revisitStampsShareOnlyPersonalCap() {
+            assertThat(personalMap().capSharedWithStamps(() -> 2)).isEqualTo(2);
+            assertThat(sharedMap().capSharedWithStamps(() -> 2)).isZero();
+        }
+
+        @Test
         @DisplayName("멤버는 그 지도에 칠할 수 있다")
         void memberAllowed() {
             assertThat(personalMap().requireMember(ME).joinedAt()).isEqualTo(NOON);

@@ -79,8 +79,13 @@ export interface UiState {
   /** 영토 비교 대상 handle */
   compareHandle: string | null;
   mapCommand: (MapCommand & { id: number }) | null;
-  /** 이번 주 미스터리 지역 이름을 보여 줄지(❓ 마커·카드를 누르면 지도에서 보여 준다) */
-  mysteryRevealed: boolean;
+  /**
+   * 미스터리 지역 이름을 공개한 주(그 주의 weekStart, ❓ 마커·카드를 누르면 지도에서 보여 준다). 주차 키로 두어,
+   * 탭을 연 채 주가 넘어가면 새 주의 지역은 다시 숨는다.
+   */
+  mysteryRevealedWeek: string | null;
+  /** 함께 강조하는 지역 묶음(계절 한정 회차 "지도에서 보기") — 다른 지역을 고르면 풀린다 */
+  focusRegions: readonly string[];
 
   setTab: (tab: Tab) => void;
   setMode: (mode: MapMode) => void;
@@ -99,8 +104,10 @@ export interface UiState {
   closeCard: () => void;
   compareWith: (handle: string | null) => void;
   sendMapCommand: (command: MapCommand) => void;
-  /** 미스터리 지역을 지도에서 보여 준다(이름 공개 + 그 지역으로 확대·강조) */
-  revealMystery: (code: string) => void;
+  /** 그 주(weekStart)의 미스터리 지역을 지도에서 보여 준다(이름 공개 + 그 지역으로 확대·강조) */
+  revealMystery: (code: string, weekStart: string) => void;
+  /** 다른 탭에서 지역 묶음을 "지도에서 보기"(묶음 강조 + 전체가 보이게 확대) */
+  showRegionsOnMap: (codes: readonly string[]) => void;
 }
 
 let commandSequence = 0;
@@ -118,7 +125,8 @@ export const useUiStore = create<UiState>()(set => ({
   cardUrl: null,
   compareHandle: null,
   mapCommand: null,
-  mysteryRevealed: false,
+  mysteryRevealedWeek: null,
+  focusRegions: [],
 
   setTab: tab => {
     try {
@@ -129,7 +137,7 @@ export const useUiStore = create<UiState>()(set => ({
     set({ tab });
   },
   setMode: mode => set({ mode }),
-  select: code => set({ selected: code, highlight: null }),
+  select: code => set({ selected: code, highlight: null, focusRegions: [] }),
   setHighlight: code => set({ highlight: code }),
   showOnMap: code => {
     try {
@@ -160,8 +168,17 @@ export const useUiStore = create<UiState>()(set => ({
     commandSequence += 1;
     set({ mapCommand: { ...command, id: commandSequence } });
   },
-  revealMystery: code => {
+  revealMystery: (code, weekStart) => {
     commandSequence += 1;
-    set({ mysteryRevealed: true, highlight: code, selected: code, mapCommand: { kind: 'zoom', codes: [code], pad: 0.25, id: commandSequence } });
+    set({ mysteryRevealedWeek: weekStart, highlight: code, selected: code, mapCommand: { kind: 'zoom', codes: [code], pad: 0.25, id: commandSequence } });
+  },
+  showRegionsOnMap: codes => {
+    try {
+      history.replaceState(null, '', '#map');
+    } catch {
+      // 히스토리를 못 쓰는 환경
+    }
+    commandSequence += 1;
+    set({ tab: 'map', selected: null, highlight: null, focusRegions: [...codes], mapCommand: { kind: 'zoom', codes: [...codes], id: commandSequence } });
   },
 }));

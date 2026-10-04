@@ -3,25 +3,29 @@ package com.kobi.territory.progression.infra.repository;
 import com.kobi.territory.progression.infra.entity.ThemeProgressJpaEntity;
 import com.kobi.territory.progression.domain.collectionbook.CollectionBook;
 import com.kobi.territory.progression.domain.collectionbook.CollectionBookRepository;
+import com.kobi.territory.progression.domain.collectionbook.SeasonProgress;
 import com.kobi.territory.progression.domain.collectionbook.ThemeProgress;
+import com.kobi.territory.progression.infra.entity.SeasonProgressJpaEntity;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Repository;
 
-/** CollectionBook(도감) 저장소 어댑터 — set_progress. 행 ↔ 도메인 변환은 ThemeProgressJpaEntity 가 한다. */
+/** CollectionBook(도감) 저장소 어댑터 — set_progress(+ 9단계 season_progress). 행 ↔ 도메인 변환은 ThemeProgressJpaEntity 가 한다. */
 @Repository
 class JpaCollectionBookRepository implements CollectionBookRepository {
 
     private final ThemeProgressJpaRepository themeRows;
+    private final SeasonProgressJpaRepository seasonRows;
 
-    JpaCollectionBookRepository(ThemeProgressJpaRepository themeRows) {
+    JpaCollectionBookRepository(ThemeProgressJpaRepository themeRows, SeasonProgressJpaRepository seasonRows) {
         this.themeRows = themeRows;
+        this.seasonRows = seasonRows;
     }
 
     @Override
     public CollectionBook load(String mapId) {
-        return ThemeProgressJpaEntity.toCollectionBook(mapId, themeRows.findByMapId(mapId));
+        return ThemeProgressJpaEntity.toCollectionBook(mapId, themeRows.findByMapId(mapId), seasonRows.findByMapId(mapId));
     }
 
     /** 변경 반영: 새 테마 행은 추가, 있던 행은 갱신. */
@@ -37,6 +41,16 @@ class JpaCollectionBookRepository implements CollectionBookRepository {
                 themeRow.apply(themeProgress);
             }
         }
+        Map<String, SeasonProgressJpaEntity> savedSeasons = seasonRows.findByMapId(collectionBook.mapId()).stream()
+            .collect(Collectors.toMap(SeasonProgressJpaEntity::roundId, Function.identity()));
+        for (SeasonProgress seasonProgress : collectionBook.seasonProgresses()) {
+            SeasonProgressJpaEntity seasonRow = savedSeasons.get(seasonProgress.roundId());
+            if (seasonRow == null) {
+                seasonRows.save(SeasonProgressJpaEntity.from(collectionBook.mapId(), seasonProgress));
+            } else {
+                seasonRow.apply(seasonProgress);
+            }
+        }
     }
 
     /**
@@ -50,5 +64,6 @@ class JpaCollectionBookRepository implements CollectionBookRepository {
     public void replace(CollectionBook collectionBook) {
         save(collectionBook);
         themeRows.flush();
+        seasonRows.flush();
     }
 }

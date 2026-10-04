@@ -20,6 +20,9 @@ import java.util.Set;
  * - 세트 보상(SET_REWARD)·수동 지급은 회수하지 않는다(취소 비대칭). 탈퇴는 회수 사유가 아니다(방문 "취소"만).
  * - 초대 보상(4단계, EVENT·회수 없음): 공유 지도에 초대받아 처음 합류하면 받는다. 같은 초대자와는 한 번만, 셀프 초대·재가입은
  *   대상 아님({@link Invitations}). 초대한 쪽 보상은 그 사람 Inventory 가 따로 받는다.
+ * - 계절 회차 배경(9단계, EVENT·회수 없음): 회차 완성 시점 멤버 각자가 받는다.
+ * - 재방문 색 변형(9단계): 도장을 받은 지역의 특산물은 2회차 색 변형으로 그린다({@link RevisitMarks}) — 새 아이템이 아니라 보유 아이템의
+ *   변형 속성이고, 도장처럼 지우지 않는다.
  */
 public final class Inventory {
 
@@ -27,20 +30,22 @@ public final class Inventory {
     private final OwnedItems ownedItems;
     private final VisitTraces visitTraces;
     private final Invitations invitations;
+    private final RevisitMarks revisitMarks;
     private Instant updatedAt;
 
     private Inventory(ExplorerId explorerId, OwnedItems ownedItems, VisitTraces visitTraces, Invitations invitations,
-                      Instant updatedAt) {
+                      RevisitMarks revisitMarks, Instant updatedAt) {
         this.explorerId = Objects.requireNonNull(explorerId, "explorerId");
         this.ownedItems = Objects.requireNonNull(ownedItems, "ownedItems");
         this.visitTraces = Objects.requireNonNull(visitTraces, "visitTraces");
         this.invitations = Objects.requireNonNull(invitations, "invitations");
+        this.revisitMarks = Objects.requireNonNull(revisitMarks, "revisitMarks");
         this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt");
     }
 
     /** 아직 아무것도 없는 가방. */
     public static Inventory empty(ExplorerId explorerId, Instant at) {
-        return new Inventory(explorerId, OwnedItems.empty(), VisitTraces.empty(), Invitations.empty(), at);
+        return new Inventory(explorerId, OwnedItems.empty(), VisitTraces.empty(), Invitations.empty(), RevisitMarks.empty(), at);
     }
 
     public static Inventory restore(ExplorerId explorerId, OwnedItems ownedItems, VisitTraces visitTraces, Instant updatedAt) {
@@ -49,7 +54,12 @@ public final class Inventory {
 
     public static Inventory restore(ExplorerId explorerId, OwnedItems ownedItems, VisitTraces visitTraces,
                                     Invitations invitations, Instant updatedAt) {
-        return new Inventory(explorerId, ownedItems, visitTraces, invitations, updatedAt);
+        return restore(explorerId, ownedItems, visitTraces, invitations, RevisitMarks.empty(), updatedAt);
+    }
+
+    public static Inventory restore(ExplorerId explorerId, OwnedItems ownedItems, VisitTraces visitTraces,
+                                    Invitations invitations, RevisitMarks revisitMarks, Instant updatedAt) {
+        return new Inventory(explorerId, ownedItems, visitTraces, invitations, revisitMarks, updatedAt);
     }
 
     // ---- 커맨드 ----------------------------------------------------------------------------------------------
@@ -96,6 +106,7 @@ public final class Inventory {
     public InventoryChange absorbMerged(Inventory merged, Instant at) {
         List<OwnedItem> adopted = ownedItems.adoptUnreplayable(merged.ownedItems);
         invitations.adopt(explorerId, merged.invitations);
+        revisitMarks.adopt(merged.revisitMarks.all());
         return settle(adopted, List.of(), at);
     }
 
@@ -105,7 +116,27 @@ public final class Inventory {
      */
     Inventory rebuildBase(Set<String> replayableMaps, Instant at) {
         return new Inventory(explorerId, ownedItems.rebuildBase(replayableMaps), visitTraces.rebuildBase(replayableMaps),
-            invitations, at);
+            invitations, RevisitMarks.of(revisitMarks.all()), at);
+    }
+
+    /**
+     * 재방문 도장(RevisitStamped, 9단계): 그 지역 특산물을 2회차 색 변형으로 — 아이템을 지금 갖고 있지 않아도 표시는 남긴다(나중에 다시 얻으면
+     * 변형으로 보인다). 멱등. @return 새로 표시했는지
+     */
+    public boolean markRevisited(RegionCode region, Instant at) {
+        boolean marked = revisitMarks.mark(region, at);
+        if (marked) updatedAt = at;
+        return marked;
+    }
+
+    /** 재계산: 탐험이 기록한 도장 지역을 모두 표시한다(빠진 것만 — 지우지 않는다). */
+    void adoptRevisits(List<RevisitMark> marks) {
+        revisitMarks.adopt(marks);
+    }
+
+    /** 아이템의 색 변형 번호(지역 특산물의 지역을 넘긴다, 지역 아이템이 아니면 null → 1). */
+    public int variantOf(RegionCode itemRegion) {
+        return revisitMarks.variantOf(itemRegion);
     }
 
     /** 재계산 마무리: 예전에도 있던 아이템은 처음 얻은 시각·즐겨찾기를 유지한다. */
@@ -139,5 +170,6 @@ public final class Inventory {
     public OwnedItems ownedItems() { return ownedItems; }
     public VisitTraces visitTraces() { return visitTraces; }
     public Invitations invitations() { return invitations; }
+    public RevisitMarks revisitMarks() { return revisitMarks; }
     public Instant updatedAt() { return updatedAt; }
 }

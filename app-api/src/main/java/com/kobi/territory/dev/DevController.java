@@ -99,7 +99,7 @@ public class DevController {
         "inventory", "scene", "xp_ledger", "badge_earned",
         "title_earned", "explorer_region_mark", "explorer_region", "set_progress", "quest_progress", "explorer_progress", "visit_generation", "visit", "territory",
         "map_member", "expedition_map", "recalculation_request", "handle_reservation", "account", "share_card", "privacy_settings",
-        "invite_reward", "streak_freeze", "explorer");
+        "invite_reward", "streak_freeze", "season_progress", "revisit_stamp", "wish_pin", "wishlist", "inventory_revisit", "explorer");
 
     private final JdbcTemplate jdbc;
     private final ExplorerDataReset dataReset;
@@ -156,9 +156,10 @@ public class DevController {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
                 TABLES.forEach(table -> jdbc.update("DELETE FROM " + table));
                 // 운영 추가 아이템(event: 등)만 지운다 — 이관 데이터(region:·set:, 250+9 + V4_1 invite: 2)는 유지(QA P3-16)
-                // 8단계 V6 이관 데이터(conquest: 시·도 정복 17·streak: 마일스톤 4)도 유지
+                // 8단계 V6 이관 데이터(conquest: 시·도 정복 17·streak: 마일스톤 4)·9단계 V7(season: 계절 회차 배경 9)도 유지
                 jdbc.update("DELETE FROM item_definition WHERE item_id NOT LIKE 'region:%' AND item_id NOT LIKE 'set:%'"
-                    + " AND item_id NOT LIKE 'invite:%' AND item_id NOT LIKE 'conquest:%' AND item_id NOT LIKE 'streak:%'");
+                    + " AND item_id NOT LIKE 'invite:%' AND item_id NOT LIKE 'conquest:%' AND item_id NOT LIKE 'streak:%'"
+                    + " AND item_id NOT LIKE 'season:%'");
             });
         } finally {
             relay.ifAvailable(OutboxRelay::resume);

@@ -89,6 +89,12 @@ public class ItemCatalogService implements ItemCatalog {
         return cache.current().grantedByStreakMilestone(months, dayOf(reachedAt), reachedAt).stream().map(ItemViews::of).toList();
     }
 
+    @Override
+    public List<ItemView> grantedBySeasonCompletion(String roundId, Instant completedAt) {
+        return cache.current().grantedBySeasonCompletion(roundId, dayOf(completedAt), completedAt).stream().map(ItemViews::of)
+            .toList();
+    }
+
     private LocalDate dayOf(Instant at) {
         return LocalDate.ofInstant(at, clock.getZone());
     }

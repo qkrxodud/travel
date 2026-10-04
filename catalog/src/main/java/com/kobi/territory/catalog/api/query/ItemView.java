@@ -8,9 +8,11 @@ import java.time.LocalDate;
  * grantRule: REGION_VISIT(grantRef = 지역 코드) | PERIOD_CHECK_IN | PROVINCE_CHECK_IN(grantRef = 시·도 코드) |
  * THEME_COMPLETE(grantRef = 세트 id) | MANUAL | INVITATION(grantRef = HOST·GUEST, 4단계 초대 보상) |
  * PROVINCE_COMPLETE(grantRef = 시·도 코드, 8단계 시·도 정복) | STREAK_MILESTONE(grantRef = 개월 수, 8단계 연속 탐험 마일스톤). validFrom·validTo 는 지급 유효 기간(양 끝 포함, null 이면 열림).
- * (3단계: grantRule 이하 4개 필드 추가 — 하위 호환)
+ * (3단계: grantRule 이하 4개 필드 추가 — 하위 호환) SEASON_COMPLETE(grantRef = 계절 회차 id, 9단계 계절 배경).
+ * variantLook(9단계): 재방문 도장을 받은 지역 특산물의 2회차 색 변형 룩(지역 특산물만, 그 외 null) — 가방·장면은 보유 아이템의
+ * variant 가 2 이면 이 룩으로 그린다.
  */
 public record ItemView(String itemId, String regionCode, String name, String emoji, String slot, Rarity tier, String theme,
-                       Look look, String grantRule, String grantRef, LocalDate validFrom, LocalDate validTo) {
+                       Look look, String grantRule, String grantRef, LocalDate validFrom, LocalDate validTo, Look variantLook) {
     public record Look(String type, String primary, String secondary) {}
 }

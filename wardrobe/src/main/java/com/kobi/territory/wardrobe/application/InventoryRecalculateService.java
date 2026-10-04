@@ -5,7 +5,11 @@ import com.kobi.territory.common.event.EventOutbox;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
 import com.kobi.territory.exploration.api.event.RegionVisited;
+import com.kobi.territory.exploration.api.query.RevisitQuery;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
+import com.kobi.territory.progression.api.query.CompletedSeasonView;
+import com.kobi.territory.wardrobe.domain.inventory.RevisitMark;
+import com.kobi.territory.wardrobe.domain.item.ItemSpec;
 import com.kobi.territory.progression.api.query.CollectionBookQuery;
 import com.kobi.territory.progression.api.query.CompletedSetView;
 import com.kobi.territory.progression.api.query.ProgressQuery;
@@ -49,7 +53,7 @@ public class InventoryRecalculateService {
     private static final String SUBSCRIBER_PREFIX = "wardrobe.";
     /** 보류 판정 구독자: 꾸미기 구독자 + 탐험 영토 구독자(숨김·복구·병합 흡수 반영 전 재계산 방지, P3-R3-1). */
     private static final List<String> HOLD_SUBSCRIBERS = List.of(SUBSCRIBER_PREFIX, "exploration.territory",
-        "exploration.expedition-map");
+        "exploration.expedition-map", "exploration.stamp-book");
 
     private final InventoryRepository inventories;
     private final SceneRepository scenes;
@@ -61,11 +65,14 @@ public class InventoryRecalculateService {
     private final EventOutbox outbox;
     private final Clock clock;
     private final TransactionTemplate perExplorerTx;
+    private final RevisitQuery revisits;
 
     public InventoryRecalculateService(InventoryRepository inventories, SceneRepository scenes, TerritoryQuery territories,
                                        CollectionBookQuery collectionBooks, ProgressQuery progresses, WardrobeCatalog catalog,
                                        EventBacklog backlog,
-                                       EventOutbox outbox, Clock clock, PlatformTransactionManager transactionManager) {
+                                       EventOutbox outbox, Clock clock, PlatformTransactionManager transactionManager,
+                                       RevisitQuery revisits) {
+        this.revisits = revisits;
         this.inventories = inventories;
         this.scenes = scenes;
         this.territories = territories;
@@ -110,10 +117,18 @@ public class InventoryRecalculateService {
         List<ReplayVisit> visits = new ArrayList<>();
         mapIds.forEach(mapId -> territories.visitHistory(mapId).forEach(event -> visits.add(replayVisit(event))));
         List<CompletedSetView> completedSets = new ArrayList<>();
-        mapIds.forEach(mapId -> completedSets.addAll(collectionBooks.completedSets(mapId)));
+        List<CompletedSeasonView> completedSeasons = new ArrayList<>();
+        mapIds.forEach(mapId -> {
+            completedSets.addAll(collectionBooks.completedSets(mapId));
+            completedSeasons.addAll(collectionBooks.completedSeasons(mapId));
+        });
+        List<ItemSpec> achievementRewards = new ArrayList<>(catalog.grantedByAchievements(progresses.achievementsOf(explorerId.value())));
+        achievementRewards.addAll(catalog.grantedBySeasonCompletions(completedSeasons, explorerId.value()));
+        List<RevisitMark> revisitMarks = revisits.stampsOf(explorerId.value()).stream()
+            .map(stamp -> new RevisitMark(RegionCode.of(stamp.regionCode()), stamp.stampedAt())).toList();
 
         Inventory rebuilt = InventoryReplay.replay(current, mapIds, visits, catalog.grantedByThemeCompletions(completedSets),
-            catalog.grantedByAchievements(progresses.achievementsOf(explorerId.value())), clock.instant());
+            achievementRewards, revisitMarks, clock.instant());
 
         inventories.replace(rebuilt);
         Scene scene = scenes.find(explorerId).orElseGet(() -> Scene.blank(explorerId, clock.instant()));

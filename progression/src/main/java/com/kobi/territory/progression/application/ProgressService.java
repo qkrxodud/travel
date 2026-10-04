@@ -6,6 +6,9 @@ import com.kobi.territory.common.model.RegionCode;
 import com.kobi.territory.exploration.api.event.ClaimTransferred;
 import com.kobi.territory.exploration.api.event.MapCreated;
 import com.kobi.territory.exploration.api.event.RegionVisited;
+import com.kobi.territory.exploration.api.event.RevisitStamped;
+import com.kobi.territory.exploration.api.event.WishFulfilled;
+import com.kobi.territory.progression.api.event.SeasonCompleted;
 import com.kobi.territory.exploration.api.event.VisitCancelled;
 import com.kobi.territory.exploration.api.query.TerritoryQuery;
 import com.kobi.territory.progression.api.event.BadgeEarned;
@@ -79,6 +82,34 @@ public class ProgressService {
     public void onSetCompleted(SetCompleted event) {
         ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
         ProgressChange change = progress.applyThemeCompleted(event.setId(), event.completedAt(), catalog.policy());
+        progresses.save(progress);
+        publish(progress, change);
+    }
+
+    /** 계절 회차 완성(9단계, 수령자마다) → +XP·계절 칭호. 멱등. */
+    @Transactional
+    public void onSeasonCompleted(SeasonCompleted event) {
+        ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
+        ProgressChange change = progress.applySeasonCompleted(event.roundId(), event.completedAt(), catalog.policy());
+        progresses.save(progress);
+        publish(progress, change);
+    }
+
+    /** 재방문 도장(9단계) → +XP·"단골 여행자" 뱃지. 멱등(지역·연도당 한 번). */
+    @Transactional
+    public void onRevisitStamped(RevisitStamped event) {
+        ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
+        ProgressChange change = progress.applyRevisitStamp(RegionCode.of(event.regionCode()), event.year(), event.stampedAt(),
+            catalog.policy());
+        progresses.save(progress);
+        publish(progress, change);
+    }
+
+    /** 가고 싶은 곳 다녀옴(9단계) → +XP·"꿈을 이룬 여행자" 뱃지. 멱등(지역당 한 번). */
+    @Transactional
+    public void onWishFulfilled(WishFulfilled event) {
+        ExplorerProgress progress = loadLocked(ExplorerId.of(event.explorerId()));
+        ProgressChange change = progress.applyWishFulfilled(RegionCode.of(event.regionCode()), event.fulfilledAt(), catalog.policy());
         progresses.save(progress);
         publish(progress, change);
     }

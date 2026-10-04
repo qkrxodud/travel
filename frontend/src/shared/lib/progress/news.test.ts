@@ -1,10 +1,12 @@
 /**
  * 게임 소식 — 진행 값이 바뀌었을 때 새로 생긴 보호권 사용·연속 탐험 마일스톤·시·도 정복만 고른다(판정은 서버 값).
- * 이야기 순서: 보호권 사용 → 마일스톤 달성 → 시·도 정복.
+ * 이야기 순서: 보호권 사용 → 마일스톤 달성 → 시·도 정복 → (9단계) 가고 싶던 곳 다녀옴 → 재방문 2회차 색.
  */
 import { describe, expect, it } from 'vitest';
 import type { MilestoneResponse, ProgressResponse, ProvinceProgressResponse } from '../../../api/types/progression';
-import { conqueredProvinceCodes, gameNews } from './news';
+import type { WishItem, WishlistResponse } from '../../../api/types/exploration';
+import type { InventoryResponse, OwnedItemResponse } from '../../../api/types/wardrobe';
+import { conqueredProvinceCodes, fulfilledWishes, gameNews, newlyVariantItems, wishRegionName } from './news';
 
 type GameProgress = Pick<ProgressResponse, 'streakFreeze' | 'milestones' | 'provinces'>;
 
@@ -49,5 +51,43 @@ describe('시·도 정복', () => {
   it('정복 기록이 있는 시·도 코드를 모은다(진행 값이 아직 없으면 비어 있다)', () => {
     expect([...conqueredProvinceCodes([province('KR-11', true), province('KR-29', false)])]).toEqual(['KR-11']);
     expect(conqueredProvinceCodes(undefined).size).toBe(0);
+  });
+});
+
+describe('가고 싶던 곳 다녀옴', () => {
+  const pin = (regionCode: string, status: WishItem['status']): WishItem =>
+    ({ regionCode, regionName: regionCode === 'KR-31370' ? '가평군' : '종로구', provinceCode: 'KR-31', status, pinnedAt: '2026-10-04T00:00:00Z', fulfilledAt: status === 'VISITED' ? '2026-10-04T01:00:00Z' : null });
+  const wishlist = (...items: WishItem[]): WishlistResponse =>
+    ({ max: 30, pendingCount: items.filter(item => item.status === 'WANTED').length, fulfilledCount: items.filter(item => item.status === 'VISITED').length, xpPerWish: 20, items });
+
+  it('꽂아 둔 곳이 다녀옴이 되면 그곳을 축하한다', () => {
+    expect(fulfilledWishes(wishlist(pin('KR-31370', 'WANTED')), wishlist(pin('KR-31370', 'VISITED'))).map(item => item.regionName)).toEqual(['가평군']);
+  });
+
+  it('카탈로그에서 사라진 지역이면 이름 대신 지역 코드로 부른다', () => {
+    expect(wishRegionName({ regionCode: 'KR-31370', regionName: null })).toBe('31370');
+    expect(wishRegionName({ regionCode: 'KR-31370', regionName: '가평군' })).toBe('가평군');
+  });
+
+  it('이미 다녀온 곳이거나 이번에 처음 보는 핀은 축하하지 않는다', () => {
+    const visited = wishlist(pin('KR-31370', 'VISITED'));
+    expect(fulfilledWishes(visited, visited)).toEqual([]);
+    expect(fulfilledWishes(wishlist(), wishlist(pin('KR-11010', 'VISITED')))).toEqual([]);
+  });
+});
+
+describe('재방문 2회차 색', () => {
+  const owned = (itemId: string, variant: number): OwnedItemResponse =>
+    ({ itemId, name: '청사초롱 등불', emoji: '🏮', slot: 'HAND', tier: 'COMMON', theme: null, look: null, regionCode: 'KR-11010', variant, variantLook: null, source: 'REGION', acquiredAt: '', favorite: false, equipped: false });
+  const inventory = (...items: OwnedItemResponse[]): InventoryResponse => ({ count: items.length, items });
+
+  it('가진 특산물이 2회차 색으로 바뀌면 알린다', () => {
+    expect(newlyVariantItems(inventory(owned('region:KR-11010', 1)), inventory(owned('region:KR-11010', 2))).map(item => item.itemId)).toEqual(['region:KR-11010']);
+  });
+
+  it('이미 2회차 색이었거나 새로 들어온 아이템은 색 변형으로 알리지 않는다', () => {
+    const recolored = inventory(owned('region:KR-11010', 2));
+    expect(newlyVariantItems(recolored, recolored)).toEqual([]);
+    expect(newlyVariantItems(inventory(), recolored)).toEqual([]);
   });
 });

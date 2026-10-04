@@ -15,6 +15,7 @@ import java.util.Objects;
  *   <li>{@link Invitation} 초대로 공유 지도에 처음 합류(4단계 — 초대한 쪽 HOST·초대받은 쪽 GUEST, 회수 없음, 같은 쌍 1회는 꾸미기)</li>
  *   <li>{@link ProvinceComplete} 탐험가 단위로 한 시·도의 현행 지역을 모두 칠함(8단계 시·도 정복 — 회수 없음)</li>
  *   <li>{@link StreakMilestone} 연속 탐험 마일스톤(ref = 개월 수, 8단계 — 회수 없음)</li>
+ *   <li>{@link SeasonComplete} 계절 한정 테마 회차 완성(ref = 회차 id 예 autumn-2026, 9단계 — 완성 시점 지도 멤버 전원, 회수 없음)</li>
  * </ul>
  * 저장·공개 표현은 (type, ref) 두 값이다.
  */
@@ -49,12 +50,17 @@ public sealed interface GrantRule {
         return false;
     }
 
+    /** 이 계절 한정 테마 회차(9단계)의 완성으로 받는 규칙인지. */
+    default boolean matchesSeasonCompletion(String roundId) {
+        return false;
+    }
+
     /** 체크인으로 받는 이슈 아이템 규칙(기간 내 체크인·특정 시·도)인지 — 정의가 생긴 뒤의 체크인에만 지급한다. */
     default boolean issue() {
         return false;
     }
 
-    enum Type { REGION_VISIT, PERIOD_CHECK_IN, PROVINCE_CHECK_IN, THEME_COMPLETE, MANUAL, INVITATION, PROVINCE_COMPLETE, STREAK_MILESTONE }
+    enum Type { REGION_VISIT, PERIOD_CHECK_IN, PROVINCE_CHECK_IN, THEME_COMPLETE, MANUAL, INVITATION, PROVINCE_COMPLETE, STREAK_MILESTONE, SEASON_COMPLETE }
 
     /** 저장·입력 값(type, ref)으로 만든다. ref 형식이 틀리면 INVALID_ITEM_DEFINITION. */
     static GrantRule of(Type type, String ref) {
@@ -68,6 +74,7 @@ public sealed interface GrantRule {
             case INVITATION -> new Invitation(InvitationSide.parse(ref));
             case PROVINCE_COMPLETE -> new ProvinceComplete(ref);
             case STREAK_MILESTONE -> new StreakMilestone(StreakMilestone.parseMonths(ref));
+            case SEASON_COMPLETE -> new SeasonComplete(ref);
         };
     }
 
@@ -197,6 +204,23 @@ public sealed interface GrantRule {
         @Override
         public boolean matchesStreakMilestone(int reached) {
             return months == reached;
+        }
+    }
+
+    /** 계절 한정 테마 회차 완성(9단계): 그 회차(예 autumn-2026)를 한 지도에서 기간 안에 완성했을 때 완성 시점 멤버 전원(회수 없음). */
+    record SeasonComplete(String roundId) implements GrantRule {
+        public SeasonComplete {
+            if (roundId == null || !roundId.matches("^[a-z]{1,12}-\\d{4}$")) {
+                throw CatalogError.INVALID_ITEM_DEFINITION.exception("계절 회차 형식이 올바르지 않습니다(예: autumn-2026): " + roundId);
+            }
+        }
+
+        @Override public Type type() { return Type.SEASON_COMPLETE; }
+        @Override public String ref() { return roundId; }
+
+        @Override
+        public boolean matchesSeasonCompletion(String completed) {
+            return roundId.equals(completed);
         }
     }
 }

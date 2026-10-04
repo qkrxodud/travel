@@ -54,6 +54,16 @@ public sealed interface BadgeRule {
         public boolean satisfiedBy(BadgeFacts facts) { return facts.mysteryFound() >= min; }
     }
 
+    /** 재방문 도장이 min 개 이상(9단계 "단골 여행자"). */
+    record RevisitStamps(int min) implements BadgeRule {
+        public boolean satisfiedBy(BadgeFacts facts) { return facts.revisitStamps() >= min; }
+    }
+
+    /** 가고 싶은 곳을 min 곳 이상 다녀옴(9단계 "꿈을 이룬 여행자"). */
+    record WishesFulfilled(int min) implements BadgeRule {
+        public boolean satisfiedBy(BadgeFacts facts) { return facts.wishesFulfilled() >= min; }
+    }
+
     record ConquestRatio(double ratio) implements BadgeRule {
         public boolean satisfiedBy(BadgeFacts facts) {
             return facts.totalRegions() > 0 && facts.regions() >= ratio * facts.totalRegions();

@@ -11,6 +11,8 @@ import com.kobi.territory.catalog.domain.definition.LevelRules;
 import com.kobi.territory.catalog.domain.definition.LevelTitle;
 import com.kobi.territory.catalog.domain.definition.ProgressionDefinitions;
 import com.kobi.territory.catalog.domain.definition.QuestDefinition;
+import com.kobi.territory.catalog.domain.definition.SeasonDefinition;
+import java.time.MonthDay;
 import com.kobi.territory.catalog.domain.definition.StreakMilestone;
 import com.kobi.territory.catalog.domain.definition.StreakRules;
 import com.kobi.territory.catalog.domain.mystery.MysteryRules;
@@ -61,7 +63,8 @@ public class JsonCatalogRepository implements CatalogRepository {
         // 정합성 검증은 도메인(Catalog·일급 컬렉션)이 생성 시 한다
         this.catalog = new Catalog(Regions.of(regions), Provinces.of(provinces),
             new RewardRules(xp, rj.provinceFirstBonus, rj.setCompleteBonus, rj.claimBonus, rj.mysteryBonus,
-                rj.provinceConquestBonus), readString("regions.geojson"),
+                rj.provinceConquestBonus, rj.seasonCompleteBonus, rj.revisitStampBonus, rj.wishFulfilledBonus),
+            readString("regions.geojson"),
             progression(om), mystery(om));
     }
 
@@ -91,7 +94,16 @@ public class JsonCatalogRepository implements CatalogRepository {
             .toList();
         return new ProgressionDefinitions(
             new LevelRules(lj.divisor, lj.titles.stream().map(titleJson -> new LevelTitle(titleJson.level, titleJson.name)).toList()),
-            themes, badges, quests, streak(om));
+            themes, badges, quests, streak(om), seasons(om));
+    }
+
+    /** 9단계 계절 한정 테마: seasons.json */
+    private static List<SeasonDefinition> seasons(ObjectMapper om) {
+        return read(om, "seasons.json", new TypeReference<List<SeasonJson>>() {}).stream()
+            .map(seasonJson -> new SeasonDefinition(seasonJson.id, seasonJson.name, seasonJson.desc, MonthDay.parse("--" + seasonJson.start),
+                MonthDay.parse("--" + seasonJson.end), seasonJson.regionCodes.stream().map(RegionCode::of).toList(), seasonJson.title,
+                seasonJson.emoji))
+            .toList();
     }
 
     private static StreakRules streak(ObjectMapper om) {
@@ -149,7 +161,12 @@ public class JsonCatalogRepository implements CatalogRepository {
                      int xp, String title) {}
 
     record RewardJson(Map<String, Integer> xpByRarity, int provinceFirstBonus, int setCompleteBonus, int claimBonus,
-                      int mysteryBonus, int provinceConquestBonus) {}
+                      int mysteryBonus, int provinceConquestBonus, int seasonCompleteBonus, int revisitStampBonus,
+                      int wishFulfilledBonus) {}
+
+    /** @param start·end "MM-dd"(양 끝 포함) */
+    record SeasonJson(String id, String name, String desc, String start, String end, List<String> regionCodes, String title,
+                      String emoji) {}
 
     record FreezeJson(int maxHeld, int monthlyQuestsReward) {}
 

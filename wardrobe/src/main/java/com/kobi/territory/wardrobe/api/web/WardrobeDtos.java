@@ -3,6 +3,7 @@ package com.kobi.territory.wardrobe.api.web;
 import com.kobi.territory.catalog.api.query.ItemView;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.wardrobe.domain.inventory.OwnedItem;
+import com.kobi.territory.wardrobe.domain.inventory.RevisitMarks;
 import com.kobi.territory.wardrobe.domain.item.EquipSlot;
 import com.kobi.territory.wardrobe.domain.scene.Gender;
 import jakarta.validation.constraints.NotNull;
@@ -17,13 +18,22 @@ public final class WardrobeDtos {
 
     private WardrobeDtos() {}
 
-    /** 아이템 표시 정보(카탈로그 정의) — 정의가 사라진 아이템은 name 등이 null. */
+    /**
+     * 아이템 표시 정보(카탈로그 정의) — 정의가 사라진 아이템은 name 등이 null.
+     *
+     * @param variant     색 변형 번호(9단계): 1 = 기본, 2 = 재방문 2회차 — 2 면 variantLook 으로 그린다
+     * @param variantLook 2회차 색 변형 룩(variant 2 인 지역 특산물만, 그 외 null)
+     */
     public record ItemResponse(String itemId, String name, String emoji, String slot, Rarity tier, String theme,
-                               ItemView.Look look, String regionCode) {
+                               ItemView.Look look, String regionCode, int variant, ItemView.Look variantLook) {
         static ItemResponse of(String itemId, ItemView view) {
-            return view == null ? new ItemResponse(itemId, null, null, null, null, null, null, null)
+            return of(itemId, view, RevisitMarks.BASE_VARIANT);
+        }
+
+        static ItemResponse of(String itemId, ItemView view, int variant) {
+            return view == null ? new ItemResponse(itemId, null, null, null, null, null, null, null, RevisitMarks.BASE_VARIANT, null)
                 : new ItemResponse(itemId, view.name(), view.emoji(), view.slot(), view.tier(), view.theme(), view.look(),
-                view.regionCode());
+                view.regionCode(), variant, variant == RevisitMarks.REVISIT_VARIANT ? view.variantLook() : null);
         }
     }
 
@@ -33,12 +43,12 @@ public final class WardrobeDtos {
      */
     public record OwnedItemResponse(String itemId, String name, String emoji, String slot, Rarity tier, String theme,
                                     ItemView.Look look, String regionCode, String source, Instant acquiredAt,
-                                    boolean favorite, boolean equipped) {
-        static OwnedItemResponse of(OwnedItem item, ItemView view, boolean equipped) {
-            ItemResponse shown = ItemResponse.of(item.itemId(), view);
+                                    boolean favorite, boolean equipped, int variant, ItemView.Look variantLook) {
+        static OwnedItemResponse of(OwnedItem item, ItemView view, boolean equipped, int variant) {
+            ItemResponse shown = ItemResponse.of(item.itemId(), view, variant);
             return new OwnedItemResponse(item.itemId(), shown.name(), shown.emoji(), shown.slot(), shown.tier(), shown.theme(),
                 shown.look(), shown.regionCode(), item.source().name(), item.acquiredAt(),
-                item.favorite(), equipped);
+                item.favorite(), equipped, shown.variant(), shown.variantLook());
         }
     }
 

@@ -4,6 +4,7 @@ import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.wardrobe.domain.inventory.Invitations;
 import com.kobi.territory.wardrobe.domain.inventory.Inventory;
 import com.kobi.territory.wardrobe.domain.inventory.OwnedItems;
+import com.kobi.territory.wardrobe.domain.inventory.RevisitMarks;
 import com.kobi.territory.wardrobe.domain.inventory.VisitTraces;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -50,10 +51,12 @@ public class InventoryJpaEntity {
     }
 
     public Inventory toDomain(List<OwnedItemJpaEntity> itemRows, List<OwnedItemBasisJpaEntity> basisRows,
-                              List<VisitTraceJpaEntity> traceRows, List<InvitationJpaEntity> invitationRows) {
+                              List<VisitTraceJpaEntity> traceRows, List<InvitationJpaEntity> invitationRows,
+                              List<RevisitMarkJpaEntity> revisitRows) {
         return Inventory.restore(ExplorerId.of(explorerId),
             OwnedItems.of(itemRows.stream().map(itemRow -> itemRow.toDomain(basisRows)).toList()),
             VisitTraces.of(traceRows.stream().map(VisitTraceJpaEntity::toDomain).toList()),
-            Invitations.of(invitationRows.stream().map(InvitationJpaEntity::toDomain).toList()), updatedAt);
+            Invitations.of(invitationRows.stream().map(InvitationJpaEntity::toDomain).toList()),
+            RevisitMarks.of(revisitRows.stream().map(RevisitMarkJpaEntity::toDomain).toList()), updatedAt);
     }
 }
