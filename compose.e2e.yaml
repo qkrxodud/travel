@@ -24,6 +24,8 @@ services:
       TERRITORY_ADMIN_TOKEN: local-admin-token
       # 미스터리 지역 주차 시드 — local 프로파일 기본값과 같게(운영 .env 값이 덮지 않게 명시)
       TERRITORY_MYSTERY_SALT: local-mystery-salt
+      # 분석 탐험가 해시 비밀값 — local 프로파일 기본값과 같게(운영 .env 값이 덮지 않게 명시)
+      TERRITORY_ANALYTICS_SALT: local-analytics-salt
       # og:image 등 절대 주소 — 호스트에서 보이는 E2E 주소
       TERRITORY_PUBLIC_BASE_URL: http://localhost:18090
       GOOGLE_CLIENT_ID: ""

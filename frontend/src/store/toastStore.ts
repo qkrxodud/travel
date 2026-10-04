@@ -1,6 +1,7 @@
 /** 토스트(화면 상태). 3.2초 뒤 사라진다(프로토타입과 같게). */
 import { create } from 'zustand';
 import type { ApiError } from '../api/client';
+import { errorToastCode, track } from '../api/analytics';
 import type { ServerErrorCode } from '../api/types/common';
 
 export interface Toast {
@@ -56,4 +57,6 @@ export function toastError(error: unknown, message?: string): void {
   const apiError = error as Partial<ApiError> | null;
   const text = message ?? (error instanceof Error ? error.message : String(error));
   toast('!', errorTitle(apiError?.code), text);
+  // 분석: 어떤 오류가 화면에 보였는지(코드만 — 메시지 문장은 싣지 않는다)
+  track('error_toast', { code: errorToastCode(error) });
 }

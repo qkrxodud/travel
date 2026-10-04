@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { createMapPath, MAP_HEIGHT, MAP_WIDTH } from '../../../shared/lib/map/mapEngine';
 import { toClientCode } from '../../../api/client';
+import { track } from '../../../api/analytics';
 import { cardCanvas, vsCard } from '../../../shared/lib/cards';
 import { useUiStore } from '../../../store/uiStore';
 import { useCatalog } from '../../../shared/queries/catalog';
@@ -36,6 +37,7 @@ export function CompareCard() {
     const classes = compareClasses(compare);
     const makeCard = () => {
       if (!catalog) return;
+      track('share_click', { target: 'vs' });
       const url = vsCard(cardCanvas, {
         catalog, otherName: other,
         onlyMine: compare.onlyMine.map(toClientCode), both: compare.both.map(toClientCode), onlyTheirs: compare.onlyTheirs.map(toClientCode),

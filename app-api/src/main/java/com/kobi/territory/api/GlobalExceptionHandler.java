@@ -22,7 +22,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 전역 예외 처리. 모든 오류를 {code, message} 로 응답한다.
- * ErrorKind → HTTP: INVALID 400, UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, RULE_VIOLATION 422.
+ * ErrorKind → HTTP: INVALID 400, UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, RULE_VIOLATION 422,
+ * PAYLOAD_TOO_LARGE 413, TOO_MANY_REQUESTS 429(10단계 화면 이벤트 수집).
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -99,6 +100,8 @@ public class GlobalExceptionHandler {
             case NOT_FOUND -> HttpStatus.NOT_FOUND;
             case CONFLICT -> HttpStatus.CONFLICT;
             case RULE_VIOLATION -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case PAYLOAD_TOO_LARGE -> HttpStatus.PAYLOAD_TOO_LARGE;
+            case TOO_MANY_REQUESTS -> HttpStatus.TOO_MANY_REQUESTS;
         };
     }
 

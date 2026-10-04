@@ -13,6 +13,8 @@ dependencies {
     implementation project(':wardrobe')
     implementation project(':social')
     implementation project(':sharing')
+    // 10단계: 분석(관찰자) — 공개 이벤트 구독·화면 이벤트 수집·지표. 아무 컨텍스트도 analytics 를 참조하지 않는다.
+    implementation project(':analytics')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

@@ -8,7 +8,7 @@ import react from '@vitejs/plugin-react';
 export const API_PATHS = [
   'explorers', 'territory', 'visits', 'maps', 'me', 'progress', 'collection', 'quests',
   'inventory', 'scene', 'friends', 'feed', 'rankings', 'compare', 'catalog', 'mystery', 'seasons', 'revisits', 'wishlist',
-  'auth', 'logout', 'login', 'oauth2', 'u', 'dev', 'admin', 'health', 'actuator',
+  'events', 'auth', 'logout', 'login', 'oauth2', 'u', 'dev', 'admin', 'health', 'actuator',
 ] as const;
 
 /**

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { CardKind } from '../../../api/types/sharing';
+import { track } from '../../../api/analytics';
 import { useUiStore } from '../../../store/uiStore';
 import { useCardImage } from '../queries';
 
@@ -21,7 +22,11 @@ export function CardThumb({ kind, alt, caption, enabled }: { kind: CardKind; alt
         src={url}
         data-loaded={isError ? 'error' : loaded ? 'true' : undefined}
         onLoad={() => setLoadedUrl(url ?? null)}
-        onClick={() => { if (loaded && url) showCard(url); }}
+        onClick={() => {
+          if (!loaded || !url) return;
+          track('share_click', { target: kind });
+          showCard(url);
+        }}
       />
       <figcaption>{caption}</figcaption>
     </figure>

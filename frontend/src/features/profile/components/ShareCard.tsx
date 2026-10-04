@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import type { CardKind, MyCardsResponse, ProfileVisibility } from '../../../api/types/sharing';
 import { sharingApi } from '../../../api/sharing';
+import { track } from '../../../api/analytics';
 import { toast, toastError } from '../../../store/toastStore';
 import { useUiStore } from '../../../store/uiStore';
 import { useMaps } from '../../../shared/queries/territory';
@@ -25,6 +26,7 @@ export function ShareCard({ active }: { active: boolean }) {
 
   const link = cards?.profileUrl ? location.origin + cards.profileUrl : null;
   const openCard = (kind: CardKind) => {
+    track('share_click', { target: kind });
     openServerCard.mutateAsync(kind).then(showCard).catch(error => toastError(error));
   };
   const changePrivacy = async (visibility: ProfileVisibility, label: string) => {
@@ -36,6 +38,7 @@ export function ShareCard({ active }: { active: boolean }) {
     }
   };
   const copy = () => {
+    track('link_copy', { target: 'profile' });
     const text = urlRef.current?.textContent ?? '';
     const fallback = () => {
       const range = document.createRange();
@@ -50,7 +53,9 @@ export function ShareCard({ active }: { active: boolean }) {
   };
   const vsServerCard = () => {
     const other = normalizeHandle(vsRef.current?.value);
-    if (other && cards?.handle) showCard(sharingApi.vsCardPath(cards.handle, other));
+    if (!other || !cards?.handle) return;
+    track('share_click', { target: 'vs' });
+    showCard(sharingApi.vsCardPath(cards.handle, other));
   };
   const owned = cards?.handle ? (maps ?? []).filter(map => map.kind === 'SHARED' && map.role === 'OWNER') : [];
 

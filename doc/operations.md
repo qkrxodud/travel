@@ -38,6 +38,22 @@
 - **추후 과제(리더 결정 Q3)**: 계절 화면은 지금 개인 지도 기준이다 — 공유 지도에서 함께 완성한 회차는 `GET /seasons/current?mapId=` 로는 보이지만 화면의 개인 지도 배지에는 나오지 않는다. 공유 지도 회차 표시는 후속 단계에서 다룬다.
 - 새 구독 타입(SeasonCompleted·RevisitStamped → social.feed 등)이 생겼다 — 9단계 배포 직후 `POST /admin/rebuild/feed` 한 번(5단계 절차와 같다).
 
+## 10단계 분석 이벤트(자체 수집·익명)
+
+- **비밀값 `TERRITORY_ANALYTICS_SALT`(필수)**: 분석 저장소에는 탐험가 id 대신 이 값을 섞은 HMAC-SHA256 해시만 남는다. 없으면 기동 실패. **한 번 정하면 바꾸지 않는다** — 바꾸면 그때부터 같은 탐험가를 다른 사람으로 세어 코호트·리텐션·퍼널이 끊긴다(원본은 90일 뒤 사라지므로 되돌릴 수도 없다). 미스터리 비밀값과 다른 값을 쓴다.
+- **무엇을 남기나**: 원본 `analytics_event`(이벤트 이름·서울 날짜·행위자 열쇠(탐험가 해시 또는 `v:`+브라우저 무작위 방문 ID)·기기 유형(MOBILE/TABLET/DESKTOP/BOT/UNKNOWN)·나라(앞단 `CF-IPCountry` 헤더가 있을 때만)·검증된 짧은 필드). **IP·User-Agent·handle·메모·토큰 원문은 저장하지 않는다**(IP 는 레이트 리밋 판단에만 메모리에서 쓴다). 방문·여정(`analytics_visitor`·`analytics_explorer`)과 집계(`analytics_daily`·`analytics_daily_breakdown`·`analytics_cohort`)는 남는다.
+- **보관**: 원본은 90일(`territory.analytics.retention-days`). 일 배치(`territory.analytics.batch-cron`, 기본 매일 04:10 서울)가 지난 원본을 5,000줄씩 나눠 지우고, **마지막 활동이 보관 기간보다 오래된 방문·여정**(`analytics_visitor`·`analytics_explorer` — 90일 전보다 먼저 처음 봤고/가입했고 남은 원본이 하나도 없는 것)도 지운다. 그 사람이 다시 오면 새 방문으로 세고, 여정은 가입일을 모르는 채로 다시 시작해 코호트에는 들어가지 않는다(이미 저장된 집계는 그대로). 집계(`analytics_daily`·`_breakdown`·`analytics_cohort`)는 지우지 않는다.
+- **배치가 채우는 범위**: 원본이 남아 있는 지난 90일 전부 — 하루 지표는 최근 3일 + 아직 계산하지 않은 날, 코호트는 최근 35일 + 아직 계산하지 않은 날. 그래서 `GET /admin/metrics?days=90` 의 `missingDays` 는 배치를 한 번 돌리면 비고, 원본 보관 기간이 지나 다시 셀 수 없는 날은 `expiredDays` 로 따로 나온다. 수동 실행 `POST /admin/metrics/batch`(X-Admin-Token). 배포 첫날의 첫 배치는 90일을 다 계산한다(원본 30만 줄 기준 MySQL 약 28초, 이후 매일 약 4~5초 — 10단계 MySQL 측정). 배치가 오래 멈췄다가 늦게 채운 옛날 날은 그날의 30일 구간 앞부분 원본이 이미 지워졌을 수 있어 MAU·K 계수가 작게 나올 수 있다.
+- **지표 보기**: `GET /admin/metrics?days=30`(X-Admin-Token, 1~90일) — JSON. 지난 날은 배치 값, 오늘은 실시간(60초 재사용). 정의는 `_workspace/10_contracts.md` §3. 화면은 관리자 페이지(프론트).
+- **레이트 리밋과 요청 주소**: 방문 ID 마다 몰아서 20번·분당 30번, 요청 주소마다 몰아서 60번·분당 120번(인스턴스 메모리). 요청 주소는 **실제 접속 주소**다 — 클라이언트가 보낸 `X-Forwarded-For`·`CF-Connecting-IP` 는 믿지 않는다(바꿔 보내 상한을 피할 수 있어서, 10단계 QA P2-2). 믿는 프록시 `TERRITORY_TRUSTED_PROXIES`(CIDR, 쉼표, 기본 비어 있음)에서 온 요청만 `CF-Connecting-IP` → 없으면 `X-Forwarded-For` 를 오른쪽부터 보며 믿는 프록시를 건너뛴 첫 주소를 쓴다. 나라 헤더 `CF-IPCountry` 도 믿는 프록시를 거쳤을 때만 쓴다.
+  - **Cloudflare Tunnel 을 붙일 때**: `cloudflared` 를 compose 의 같은 네트워크에 서비스로 두고(외부 포트 없음), 그 네트워크 대역을 믿는다 — 예: compose 네트워크를 `networks: default: ipam: config: [{subnet: 172.30.0.0/24}]` 로 고정하고 `.env` 에 `TERRITORY_TRUSTED_PROXIES=172.30.0.0/24`. 이때 호스트의 `127.0.0.1:18080` 으로 직접 들어오는 요청은 도커 게이트웨이 주소(같은 대역의 .1)로 보이므로, 대역 대신 cloudflared 컨테이너 주소 하나(`ipv4_address` 로 고정, 예 `172.30.0.10/32`)만 믿는 편이 더 좁다. Cloudflare 가 아닌 리버스 프록시(nginx 등)를 쓰면 그 프록시 주소를 넣고 프록시가 `X-Forwarded-For` 에 접속 주소를 덧붙이게 한다.
+  - **여러 대로 늘리면** 인스턴스마다 따로 세어 상한이 대수만큼 커진다 — 그때는 공유 저장소(Redis 등)로 옮기거나 앞단 프록시의 요청 수 제한을 함께 쓴다.
+- **운영 비밀값 강도**: prod 프로파일은 `TERRITORY_ADMIN_TOKEN`·`TERRITORY_MYSTERY_SALT`·`TERRITORY_ANALYTICS_SALT` 가 비었거나 16자 미만이거나 `change-me`·`local-`·`example` 같은 자리표시자를 담으면 기동하지 않는다(`ProductionSecrets` — 어느 값인지만 알리고 값은 로그에 남기지 않는다). 랜덤 값: `openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-40`.
+- **CSRF**: `POST /events` 는 위조 방지 토큰 검사에서 빠진다(페이지를 닫을 때 `navigator.sendBeacon` 은 헤더를 못 붙인다). `application/json` 본문만 받아 다른 사이트 폼으로는 보낼 수 없고, 위조해도 분석 줄 하나가 늘 뿐 게임 상태는 바뀌지 않는다.
+- **봇**: 링크 미리보기(카카오톡·페이스북·슬랙 등)·크롤러(다음 `Daumoa` 등)·curl 은 User-Agent 로 거칠게 가른다 — 화면 이벤트는 버리고, 공개 카드 열람은 `botViews` 로 따로 센다. 다음 앱 안의 브라우저(`DaumApps`)는 사람으로 센다.
+- **보호권 사용·지급은 아직 안 센다** — 진행 컨텍스트에 공개 이벤트가 없다(추가되면 분석 구독자에 한 줄 더한다).
+- 배포 전 이벤트(분석을 켜기 전 가입·체크인)는 소급하지 않는다 — 그 탐험가는 가입일을 모르는 여정으로 시작해 리텐션 코호트·첫 체크인 퍼널에 들어가지 않는다.
+
 ## Docker Compose 로컬 운영
 
 초기 운영 환경은 이 PC 의 Docker Compose 다(`compose.yaml`, 프로젝트 이름 `territory`). 이미지는 루트 `Dockerfile`(Gradle `bootJar` → Spring Boot 레이어 → `eclipse-temurin:21-jre`, 비루트 uid 10001, fontconfig — 카드 한글 글꼴은 sharing 리소스 번들).
@@ -54,8 +70,10 @@
 | `DB_NAME` | DB 이름(기본 territory) |
 | `DB_USERNAME` / `DB_PASSWORD` | 앱 계정(mysql 첫 기동 때 생성). 강한 랜덤 값 |
 | `MYSQL_ROOT_PASSWORD` | root(백업·복원 스크립트가 컨테이너 안에서 사용) |
-| `TERRITORY_ADMIN_TOKEN` | `/admin/**` 의 `X-Admin-Token`. 강한 랜덤 값 |
+| `TERRITORY_ADMIN_TOKEN` | `/admin/**` 의 `X-Admin-Token`. 강한 랜덤 값(16자 이상, 자리표시자 금지 — 10단계부터 prod 기동 검사) |
 | `TERRITORY_MYSTERY_SALT` | 이번 주 미스터리 지역 주차 시드에 섞는 서버 비밀값(8단계, 필수 — 없으면 기동 실패). 강한 랜덤 값. 바꾸면 아직 기록되지 않은 주부터 다른 지역이 되고, 이미 기록된 주(`mystery_week`)는 그대로 |
+| `TERRITORY_ANALYTICS_SALT` | 분석 저장소의 탐험가 해시에 섞는 서버 비밀값(10단계, 필수 — 없으면 기동 실패). 강한 랜덤 값, 미스터리 비밀값과 다르게. **바꾸지 않는다**(바꾸면 코호트·리텐션이 끊긴다) |
+| `TERRITORY_TRUSTED_PROXIES` | 선택(10단계). 분석 레이트 리밋이 믿는 프록시 CIDR(쉼표). 비우면 아무도 믿지 않음 — Cloudflare Tunnel 을 붙일 때만(위 10단계 절) |
 | `TERRITORY_PUBLIC_BASE_URL` | 공개 기준 주소(og:image·og:url·OAuth redirect_uri). 로컬은 `http://localhost:18080` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 선택. 비우면 구글 로그인만 비활성(익명 탐험 정상) |
 

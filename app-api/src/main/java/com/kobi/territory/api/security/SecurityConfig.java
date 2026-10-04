@@ -36,7 +36,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *       local 은 /dev/login 이 같은 경로(SessionLogin)를 탄다. 로그아웃 POST /logout → 204.</li>
  *   <li><b>세션</b>: 같은 출처 웹이라 세션 쿠키(JSESSIONID, HttpOnly, SameSite=Lax, prod Secure). 세션에는 계정 신원만.</li>
  *   <li><b>CSRF</b>: 쿠키 토큰(XSRF-TOKEN → 헤더 X-XSRF-TOKEN). 검사 대상은 <b>세션이 있는</b> 변경 메서드 전부(토큰 헤더 유무와 무관 —
- *       QA P3-1). 세션 없는 요청(익명 발급 POST /explorers, 토큰 헤더 인증)은 위조할 세션이 없어 검사하지 않는다. local /dev/** 는 제외.</li>
+ *       QA P3-1). 세션 없는 요청(익명 발급 POST /explorers, 토큰 헤더 인증)은 위조할 세션이 없어 검사하지 않는다. local /dev/** 와
+ *       화면 이벤트 수집 POST /events(10단계 — {@link #EVENTS_PATH})는 제외.</li>
  * </ul>
  */
 @Configuration
@@ -93,8 +94,16 @@ public class SecurityConfig {
     static RequestMatcher sessionMutations() {
         return request -> !SAFE_METHODS.contains(request.getMethod())
             && request.getSession(false) != null
-            && !request.getRequestURI().startsWith(request.getContextPath() + "/dev/");
+            && !request.getRequestURI().startsWith(request.getContextPath() + "/dev/")
+            && !request.getRequestURI().equals(request.getContextPath() + EVENTS_PATH);
     }
+
+    /**
+     * 화면 이벤트 수집(10단계)은 CSRF 검사에서 뺀다 — 페이지를 닫을 때 보내는 navigator.sendBeacon 은 헤더(X-XSRF-TOKEN)를 붙일 수 없다.
+     * 그래도 위조 위험이 작다: 본문은 application/json 만 받아(EventController) 다른 사이트의 폼이 보낼 수 없고(JSON 은 사전 요청 대상),
+     * 위조해도 할 수 있는 일이 "분석 이벤트 한 줄 더 적기"뿐이며 게임 상태는 바뀌지 않는다.
+     */
+    static final String EVENTS_PATH = "/events";
 
     private static void writeError(HttpServletResponse response, ObjectMapper objectMapper, HttpStatus status, String code,
                                    String message) throws IOException {

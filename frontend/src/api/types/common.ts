@@ -9,7 +9,7 @@ export interface ErrorResponse {
 
 /**
  * 서버가 내는 에러 코드 전부 — 도메인 오류 enum(ExplorationError·ProgressionError·WardrobeError·SharingError·SocialError·CatalogError·
- * AccountError)의 상수 이름 + 보안·웹 계층 코드(ExplorerAuthentication·SecurityConfig·AdminTokenInterceptor·RegionCode·GlobalExceptionHandler).
+ * AccountError·AnalyticsError)의 상수 이름 + 보안·웹 계층 코드(ExplorerAuthentication·SecurityConfig·AdminTokenInterceptor·RegionCode·GlobalExceptionHandler).
  * 화면이 분기·제목에 쓰는 값이다. 모르는 코드는 HTTP_{status} 로 바꾼다(api/client.ts toErrorCode).
  * 서버에 코드를 더하거나 빼면 여기도 맞춘다(06 QA: 백엔드 grep 으로 전수 대조).
  */
@@ -31,6 +31,8 @@ export const SERVER_ERROR_CODES = [
   // 공유(sharing)·소셜(social)
   'PROFILE_MAP_NOT_FOUND', 'PROFILE_NOT_FOUND', 'INVALID_VISIBILITY', 'CARD_KIND_NOT_FOUND', 'INVALID_YEAR',
   'ALREADY_FOLLOWING', 'CANNOT_FOLLOW_SELF', 'CANNOT_COMPARE_SELF',
+  // 분석(analytics, 10단계) — 수집 오류는 화면에 보이지 않는다. INVALID_METRICS_RANGE 는 관리자 지표
+  'INVALID_VISITOR_ID', 'EVENT_BATCH_TOO_LARGE', 'EVENTS_RATE_LIMITED', 'INVALID_METRICS_RANGE',
   // 관리자 API(화면은 쓰지 않지만 서버가 내는 코드)
   'ADMIN_TOKEN_REQUIRED', 'ADMIN_TOKEN_INVALID', 'INVALID_ITEM_DEFINITION', 'ITEM_ALREADY_EXISTS',
   // 웹 계층(GlobalExceptionHandler)

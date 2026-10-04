@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { track } from '../../../api/analytics';
 import type { XpSource } from '../../../api/types/exploration';
 import { localIsoDate, setChips } from '../model/territory';
 import { pixelRenderer } from '../../../shared/lib/pixel';
@@ -40,12 +41,23 @@ export function CheckinModal() {
 
   const feature = code && catalog ? catalog.byCode.get(code) : undefined;
   const open = !!(code && feature && preview.data);
+
+  // 체크인 모달이 열린 순간(지역마다 한 번)
+  useEffect(() => {
+    if (open) track('checkin_open');
+  }, [open, code]);
+  /** 저장하지 않고 닫기(취소 버튼·배경) */
+  const cancel = () => {
+    track('checkin_cancel');
+    closeCheckin();
+  };
   const view = code && catalog ? catalog.itemByRegion.get(code) : undefined;
   const item = view && catalog ? catalogItem(view, itemOrigin(view.itemId, catalog, () => undefined)) : null;
   const itemName = preview.data?.items[0]?.name ?? item?.name ?? '';
 
   const save = async (): Promise<boolean> => {
     if (!code || !feature) return false;
+    track('checkin_save');
     try {
       const result = await checkIn.mutateAsync({
         code,
@@ -69,6 +81,7 @@ export function CheckinModal() {
     const date = dateRef.current?.value ?? '';
     const memo = (memoRef.current?.value ?? '').trim();
     if (await save()) {
+      track('share_click', { target: 'travel' });
       // 저장 직후의 내 영토(방금 칠한 곳 포함 — 가장 최근 처리)로 카드를 그린다
       const after = new Map(visits ?? []);
       after.set(code, { code, date, memo, at: Date.now() });
@@ -115,7 +128,7 @@ export function CheckinModal() {
           {detail?.settings.photoRequired ? <input type="url" id="ci-photo" ref={photoRef} placeholder="사진 주소(이 지도는 사진 필수)" aria-label="사진 주소" /> : null}
         </div>
         <div className="row">
-          <button className="btn" id="ci-cancel" onClick={closeCheckin}>취소</button>
+          <button className="btn" id="ci-cancel" onClick={cancel}>취소</button>
           <button className="btn" id="ci-card" disabled={checkIn.isPending} onClick={() => void saveAndCard()}>기록하고 카드</button>
           <button className="btn primary" id="ci-save" disabled={checkIn.isPending} onClick={() => void save()}>기록하고 닫기</button>
         </div>
@@ -124,7 +137,7 @@ export function CheckinModal() {
   }
 
   return (
-    <Modal id="checkin" boxId="checkin-body" open={open} onClose={closeCheckin}>
+    <Modal id="checkin" boxId="checkin-body" open={open} onClose={cancel}>
       {body}
     </Modal>
   );

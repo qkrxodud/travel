@@ -13,6 +13,7 @@ import { SERVER_ERROR_CODES, type ErrorCode, type ServerErrorCode } from './type
 import type { ExplorerResponse } from './types/exploration';
 
 export const EXPLORER_TOKEN_HEADER = 'X-Explorer-Token';
+export const ADMIN_TOKEN_HEADER = 'X-Admin-Token';
 export const CSRF_HEADER = 'X-XSRF-TOKEN';
 export const CSRF_COOKIE = 'XSRF-TOKEN';
 /** localStorage 키 — E2E fixture(dev.explorerOf·idOf)가 같은 키를 읽는다. 바꾸지 않는다. */
@@ -153,6 +154,22 @@ export class ApiClient {
     return response.blob();
   }
 
+  /** 지금 인증 헤더(익명 토큰) — 세션 확인·발급을 일으키지 않는다(분석 이벤트 전송용). 로그인 세션은 쿠키로 함께 간다. */
+  passiveAuthHeaders(): Record<string, string> {
+    return this.authHeaders();
+  }
+
+  /**
+   * 운영 API(X-Admin-Token) — 탐험가 발급·세션 확인 없이 보낸다(관리자 화면은 게임 탐험가를 만들지 않는다). 204 면 null.
+   * 토큰은 부르는 쪽이 메모리에만 들고 있다가 넘긴다.
+   */
+  async admin<T>(method: HttpMethod, path: string, adminToken: string): Promise<T> {
+    const headers: Record<string, string> = adminToken ? { [ADMIN_TOKEN_HEADER]: adminToken } : {};
+    const response = await this.env.transport(path, { method, headers: this.withCsrf(method, headers) });
+    if (!response.ok) throw await toApiError(response, `서버 오류 (${response.status})`);
+    return (response.status === 204 ? null : await response.json()) as T;
+  }
+
   /** 구글 로그인 시작: 지금 기기의 익명 탐험가를 세션에 기억시키고 이동할 주소를 받는다. */
   async loginIntent<T>(): Promise<T> {
     const { token, loggedIn } = this.credentials;
@@ -276,7 +293,7 @@ export class ApiClient {
   }
 }
 
-function browserStorage(): Storage | null {
+export function browserStorage(): Storage | null {
   try {
     return typeof localStorage === 'undefined' ? null : localStorage;
   } catch {

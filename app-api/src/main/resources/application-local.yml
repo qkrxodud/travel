@@ -20,6 +20,16 @@ territory:
   mystery:
     # 이번 주 미스터리 지역 주차 시드의 서버 비밀값(8단계) — 로컬 전용 고정값. 운영은 TERRITORY_MYSTERY_SALT(application-prod.yml).
     salt: local-mystery-salt
+  analytics:
+    # 분석 탐험가 해시의 서버 비밀값(10단계) — 로컬 전용 고정값. 운영은 TERRITORY_ANALYTICS_SALT(application-prod.yml).
+    salt: local-analytics-salt
+    # 로컬은 지표 화면이 방금 보낸 이벤트를 바로 보이게
+    live-cache-ttl: 0s
+    ingest:
+      rate-limit:
+        # 로컬·E2E·테스트는 한 주소(127.0.0.1)에서 여러 방문을 흉내 내므로 주소 버킷을 넉넉히(방문 버킷은 운영과 같다)
+        address-burst: 100000
+        address-per-minute: 100000
   dev:
     # /dev/**(reset·seed·login 등) 켜기 — 이 파일에만 둔다. local 프로파일 + 이 값이 모두 있어야 빈이 생긴다(QA P3-11).
     enabled: true

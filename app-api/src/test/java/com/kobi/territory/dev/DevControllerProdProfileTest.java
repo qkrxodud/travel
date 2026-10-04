@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.kobi.territory.catalog.api.query.MysteryRegionQuery;
 import com.kobi.territory.catalog.application.MysteryService;
+import com.kobi.territory.analytics.application.AnalyticsSettings;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +22,8 @@ import org.springframework.test.context.ActiveProfiles;
     "DB_PASSWORD=",
     "TERRITORY_ADMIN_TOKEN=prod-profile-test-token",
     "TERRITORY_PUBLIC_BASE_URL=https://territory.example",
-    "TERRITORY_MYSTERY_SALT=prod-profile-test-salt"
+    "TERRITORY_MYSTERY_SALT=prod-profile-test-salt",
+    "TERRITORY_ANALYTICS_SALT=prod-profile-analytics-salt"
 })
 @ActiveProfiles("prod")
 @DisplayName("운영 환경")
@@ -43,5 +45,13 @@ class DevControllerProdProfileTest {
         assertThat(context.getBeansOfType(PinnableMysteryRegionQuery.class)).isEmpty();
         assertThat(context.getBean(MysteryRegionQuery.class)).isInstanceOf(MysteryService.class);
         assertThat(context.getEnvironment().getProperty("territory.mystery.salt")).isEqualTo("prod-profile-test-salt");
+    }
+
+    @Test
+    @DisplayName("분석 시드 도구가 없고, 탐험가 해시의 비밀값은 환경변수에서 온다")
+    void analyticsSaltFromEnvironment() {
+        assertThat(context.getBeansOfType(AnalyticsDevController.class)).isEmpty();
+        assertThat(context.getBean(AnalyticsSettings.class).salt()).isEqualTo("prod-profile-analytics-salt");
+        assertThat(context.getBean(AnalyticsSettings.class).liveCacheTtl()).isPositive();
     }
 }

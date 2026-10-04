@@ -20,6 +20,7 @@ COPY progression/build.gradle progression/
 COPY wardrobe/build.gradle wardrobe/
 COPY social/build.gradle social/
 COPY sharing/build.gradle sharing/
+COPY analytics/build.gradle analytics/
 COPY app-api/build.gradle app-api/
 COPY frontend/package.json frontend/package-lock.json frontend/
 # 의존성 + Node 다운로드 + npm ci(프론트 의존성) — package-lock 이 그대로면 이 레이어를 재사용한다
@@ -37,6 +38,7 @@ COPY progression ./progression
 COPY wardrobe ./wardrobe
 COPY social ./social
 COPY sharing ./sharing
+COPY analytics ./analytics
 COPY app-api ./app-api
 COPY frontend ./frontend
 RUN --mount=type=cache,target=/root/.gradle --mount=type=cache,target=/root/.npm \

@@ -98,7 +98,7 @@ public class MapService {
         Instant now = clock.instant();
         JoinResult result = map.join(explorerId, now, settings.leaveGrace());
         maps.save(map);
-        publishJoined(map, explorerId, result, now);
+        publishJoined(map, explorerId, result, now, MemberJoined.VIA_INVITE_CODE);
         return new Joined(map, result.rejoined());
     }
 
@@ -120,15 +120,16 @@ public class MapService {
         JoinResult result = map.joinViaProfile(profileOwner, profileGate.profileOpenTo(profileOwner, explorerId), explorerId, now,
             settings.leaveGrace());
         maps.save(map);
-        publishJoined(map, explorerId, result, now);
+        publishJoined(map, explorerId, result, now, MemberJoined.VIA_PROFILE_LINK);
         return new Joined(map, result.rejoined());
     }
 
-    private void publishJoined(ExpeditionMap map, ExplorerId explorerId, JoinResult result, Instant now) {
+    /** @param via 합류 경로(MemberJoined.VIA_*) — 분석이 초대 경로를 나눠 센다(10단계) */
+    private void publishJoined(ExpeditionMap map, ExplorerId explorerId, JoinResult result, Instant now, String via) {
         result.purgedDeparture().ifPresent(expired -> outbox.append(AGGREGATE, map.id().value(),
             new MemberPurged(map.id().value(), expired.explorerId().value(), now)));
         outbox.append(AGGREGATE, map.id().value(), new MemberJoined(map.id().value(), explorerId.value(),
-            result.member().role().name(), now, result.rejoined(), result.invitedBy().value()));
+            result.member().role().name(), now, result.rejoined(), result.invitedBy().value(), via));
     }
 
     /** 탈퇴(유예 시작). 방문 숨김·선점 이전은 MemberLeft 구독자가. @return 유예 정보 + 숨겨질 내 영토 수 */

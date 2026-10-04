@@ -1,0 +1,78 @@
+### 10단계(분석 이벤트) 왕복 확인 — 화면 이벤트 수집 → 가입·체크인(서버 사실) → 공개 프로필 열람 → 운영 지표(퍼널·K 계수) → 일 배치 → 시드
+### 서버: ./gradlew :app-api:bootRun --args='--server.port=18081'   (8080·18080·18090 은 쓰지 않는다)
+### 서버 사실(가입·체크인·합류)은 outbox 릴레이(비동기)로 적힌다 — 체크인 뒤 1초쯤 뒤에 지표를 본다.
+### User-Agent 를 브라우저 값으로 보낸다 — curl·HTTP 클라이언트 기본 값은 봇으로 분류돼 화면 이벤트가 적히지 않는다(accepted 0).
+@host = http://localhost:18081
+@ua = Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148
+@visitor = 3f2b8c1e-9a4d-4e6f-8b2a-1c3d5e7f9a0b
+
+### 0. [local] 전체 초기화(분석 테이블 포함) → 204
+DELETE {{host}}/dev/reset
+
+### 1. 첫 화면 — 아직 탐험가 없음(익명 방문). 공개 카드 링크로 들어옴 → 202 {accepted:1, rejected:[]}
+POST {{host}}/events
+Content-Type: application/json
+User-Agent: {{ua}}
+
+{"visitorId": "{{visitor}}", "events": [{"name": "app_open", "props": {"entry": "card"}}]}
+
+### 2. 탐험가 발급 → 201 {explorerId, accessToken, personalMapId}
+POST {{host}}/explorers
+
+> {% client.global.set("token", response.body.accessToken); %}
+
+### 3. 토큰과 함께 — 방문이 탐험가와 이어진다. 모르는 이름·개인정보 필드는 그 이벤트만 버린다
+###    → 202 {accepted:2, rejected:[{index:2, name:"buy_item", reason:"UNKNOWN_EVENT"}, {index:3, name:"checkin_save", reason:"PERSONAL_DATA"}]}
+POST {{host}}/events
+Content-Type: application/json
+User-Agent: {{ua}}
+X-Explorer-Token: {{token}}
+
+{"visitorId": "{{visitor}}", "events": [
+  {"name": "tab_view", "props": {"tab": "map"}},
+  {"name": "checkin_open", "at": "2026-10-04T03:00:00Z"},
+  {"name": "buy_item"},
+  {"name": "checkin_save", "props": {"memo": "남산 산책"}}
+]}
+
+### 4. 체크인(서버 사실 check_in + first_check_in) → 201
+POST {{host}}/visits
+Content-Type: application/json
+X-Explorer-Token: {{token}}
+
+{"regionCode": "KR-11010", "visitDate": "2026-10-04"}
+
+### 5. 관리자 토큰 없이 → 401 ADMIN_TOKEN_REQUIRED
+GET {{host}}/admin/metrics
+
+### 6. 운영 지표(오늘 실시간) → 200 {generatedAt, timeZone:"Asia/Seoul", from, to, lastBatchAt:null, missingDays:[…6일], expiredDays:[],
+###    today:{newVisitors:1, newExplorers:1, dau:1, …}, daily:[{day:오늘, live:true, …}],
+###    funnel:[{cohortDay:오늘, firstScreen:1, firstCheckIn:1, revisitedWithin7Days:0, checkInRate:1.0, settled:false}],
+###    retention:[{cohortDay:오늘, newExplorers:1, d1:null, d7:null, d30:null}],
+###    kFactor:{cardNewExplorers:1, invitedNewExplorers:0, viralNewExplorers:1, activeExplorers:1, value:1.0},
+###    featureUsage:{activeUsers:1, features:[{name:"tab_view", users:1, rate:1.0}, …]}, topErrors:{total:0, codes:[]}}
+GET {{host}}/admin/metrics?days=7
+X-Admin-Token: local-admin-token
+
+### 7. 한 번에 51개 → 413 EVENT_BATCH_TOO_LARGE (예시는 생략 — curl 스크립트가 만든다)
+### 8. 방문 ID 형식 틀림 → 400 INVALID_VISITOR_ID
+POST {{host}}/events
+Content-Type: application/json
+User-Agent: {{ua}}
+
+{"visitorId": "x", "events": []}
+
+### 9. 일 배치 지금 실행 — 처음엔 원본이 남은 지난 90일을 모두 → 200 {from:90일 전, to:어제, dailyDays:90, cohortDays:90, purged:0, elapsedMs}
+###    다시 돌리면 dailyDays:3(최근 3일)·cohortDays:35(최근 35일). 이후 /admin/metrics?days=90 의 missingDays·expiredDays 는 []
+POST {{host}}/admin/metrics/batch
+X-Admin-Token: local-admin-token
+
+### 10. [local] 시드 — 분석 테이블을 비우고 지난 30일치 가짜 방문·가입·체크인·재방문·초대·오류·카드 열람 + 일 배치 → 200 {seeded:{days, visitors, explorers}, batch:{…}}
+POST {{host}}/dev/analytics/seed?days=30&visitorsPerDay=40
+
+### 11. 시드 뒤 지표 → 200 daily 30줄·missingDays [], 코호트 리텐션 d1/d7 채워짐, K 계수·기능별 사용률·상위 오류 코드
+GET {{host}}/admin/metrics?days=30
+X-Admin-Token: local-admin-token
+
+### 12. [local] 정리 → 204
+DELETE {{host}}/dev/reset

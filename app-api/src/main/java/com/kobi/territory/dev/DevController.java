@@ -99,7 +99,8 @@ public class DevController {
         "inventory", "scene", "xp_ledger", "badge_earned",
         "title_earned", "explorer_region_mark", "explorer_region", "set_progress", "quest_progress", "explorer_progress", "visit_generation", "visit", "territory",
         "map_member", "expedition_map", "recalculation_request", "handle_reservation", "account", "share_card", "privacy_settings",
-        "invite_reward", "streak_freeze", "season_progress", "revisit_stamp", "wish_pin", "wishlist", "inventory_revisit", "explorer");
+        "invite_reward", "streak_freeze", "season_progress", "revisit_stamp", "wish_pin", "wishlist", "inventory_revisit", "explorer",
+        "analytics_event", "analytics_visitor", "analytics_explorer", "analytics_daily_breakdown", "analytics_daily", "analytics_cohort");
 
     private final JdbcTemplate jdbc;
     private final ExplorerDataReset dataReset;

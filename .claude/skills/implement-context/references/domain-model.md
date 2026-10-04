@@ -26,6 +26,7 @@
 | wardrobe | 아이템 보유, 착용, 장면 | Inventory, Scene | 최종 일관성 |
 | social | 친구, 랭킹, 비교, 피드 | Friendship + 읽기 모델 | 최종 일관성, 배치·캐시 |
 | sharing | 공개 프로필, 자랑 카드 | ShareCard | 스냅샷 캐시 |
+| analytics | (10단계) 분석 이벤트 수집·지표 — **관찰자**(게임 규칙을 바꾸지 않는다) | ExplorerJourney(여정) + 원본 이벤트·집계 | 최종 일관성, 일 배치 + 오늘 실시간 |
 
 모듈 의존(ArchUnit로 강제):
 
@@ -38,6 +39,7 @@
 | wardrobe | common, catalog(api.query: RegionCatalog·ItemCatalog), exploration(api.event·api.query), progression(api.event·api.query: CollectionBookQuery) | social·sharing, 다른 컨텍스트 내부(ArchUnit `wardrobe_*` 규칙, 3단계) |
 | social | common, exploration(api.event·api.query), progression(api.event·api.query: ExplorerRegionQuery·ProgressQuery) — 5단계 | catalog·wardrobe·sharing(api 포함), 다른 컨텍스트 내부(ArchUnit `social_*`). **sharing 과는 서로 참조하지 않는다**(리더 결정 — 공유의 FRIENDS 판정이 소셜 맞팔을, 소셜 피드·비교가 공유 공개 범위를 물어 순환): 소셜 `application.ProfileAudience` ← app-api `ProfileAudienceAdapter` ← sharing `api.query.ProfileVisibilityQuery`, 공유 `application.FriendDirectory` ← app-api `FriendDirectoryAdapter` ← social `api.query.FriendshipQuery`(ArchUnit `sharing_does_not_reference_social`) |
 | sharing | common, catalog, 모든 컨텍스트의 api(Query) — 4단계: catalog·exploration·progression·wardrobe 의 api.event·api.query(진행 `ProgressQuery`, 꾸미기 `SceneQuery` 를 이때 추가) | 다른 컨텍스트의 domain·application·infra·api.web(ArchUnit 규칙 2), 아무도 sharing 을 참조하지 않는다 |
+| analytics | common, exploration(api.event), progression(api.event) — 10단계. 공개 카드 열람은 요청 필터(`/u/**`)로 받아 sharing 을 참조하지 않는다 | catalog·wardrobe·social·sharing, 다른 컨텍스트의 api.query·내부. **아무 컨텍스트도 analytics 를 참조하지 않는다**(ArchUnit `nobodyKnowsAnalytics`·`analyticsKnowsOnlyPublishedFacts`). analytics.api 는 web 만(공개 이벤트·Query 없음) |
 | app-api | 전부 | 도메인 로직 작성 금지 |
 
 **공개 범위(2단계 D7)**: 각 컨텍스트 api 는 `api.event`(공개 이벤트) · `api.query`(공개 Query 인터페이스·그 DTO) · `api.web`(컨트롤러·웹 DTO)로 나눈다. 다른 컨텍스트는 `api.event`·`api.query`만 참조할 수 있고(`api.web`·domain·application·infra 금지), `api.event`·`api.query`는 자기 domain·application·infra·api.web 을 참조하지 않는다(ArchUnit). 여러 컨텍스트 컨트롤러가 쓰는 `@CurrentExplorer` 애노테이션은 common(`common.identity`), 그 resolver 는 app-api 에 둔다. 3단계(결정 2)부터 인증은 비밀 접근 토큰 헤더 `X-Explorer-Token`(발급 시 `POST /explorers` 응답에 한 번만, DB 엔 SHA-256 해시) — explorerId 는 공개 식별자라 인증에 쓰지 않는다. resolver 는 exploration `api.query.ExplorerCredentials`(토큰 → explorerId)를 쓴다. 4단계부터 **인증 공존**: 로그인 세션(구글 OIDC, 세션에는 계정 신원만)의 계정 → 그 탐험가(`api.query.AccountCredentials`)가 먼저, 없으면 토큰. 세션 요청의 변경 메서드는 CSRF(쿠키 XSRF-TOKEN → 헤더 X-XSRF-TOKEN), 토큰·관리자 헤더 요청과 세션 없는 요청은 제외(app-api `SecurityConfig`). 공개 정보는 `api.query.ExplorerProfileQuery`(handle ↔ explorerId, 계정 연결 여부, 5단계 `mergedInto` — 병합돼 비활성인 탐험가의 계정 탐험가). 5단계: `@CurrentExplorer(required = false)` 는 인증이 없거나 풀리지 않으면 null(공개 경로의 선택적 방문자 식별). common 에 VS 집합 비교 `model.TerritoryComparison` 추가(공유 VS 카드·소셜 비교 공용).
@@ -164,7 +166,7 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
   - `showcase`(도메인 서비스·값): 공개 정보 `Showcase`(색칠·집계·월 단위 `VisitMonth` — 메모·사진·정확한 날짜 없음, `summaryHash`), `PublicVisits`(일급 컬렉션: 정복률·시·도 정복·전설·리캡·VS), `CardComposer`(Showcase → `CardContent` 4종), `CardRenderer` 포트(infra Java2D, OFL 글꼴 번들).
 - API: `GET /u/{handle}`(HTML + OG), `/u/{handle}/card/{territory|recent|recap}.png`, `/u/{handle}/vs/{other}.png`(둘 다 공개), `GET /me/cards`, `/me/cards/{kind}.png`, `GET·PUT /me/privacy`. 프로필 링크 합류는 exploration `POST /maps/join-via-profile/{handle}` {mapId} — 지도장 + 공개 범위 PUBLIC 공유 지도만(`ExpeditionMap.openToProfileOf`), 초대코드 노출 없음.
 - 9단계 카드 요약 해시 영향 확인: 계절 진행은 `completedSetIds`(테마)에 들어가지 않아 "도감 세트 N/9" 불변, 계절 칭호를 고르면 칭호 이름으로 반영(기존 규칙), 재방문 색 변형은 카드가 착용 아이템 이름만 그려 해시에 없음 — 코드 변경 없음.
-- 초대 보상(§7, 4단계): `MemberJoined.invitedBy`(초대코드 = 지도장, 프로필 = 프로필 주인). 꾸미기 `wardrobe.inventory` 가 초대받은 쪽 Inventory 에서 판단(`Invitations` — 처음 합류·재가입 아님·셀프 아님·같은 쌍 1회, invite_reward)하고 받은 뒤, 초대한 쪽은 `InviteRewardOwed`(aggregate Inventory/inviterId)로 각자 트랜잭션에서. 아이템은 카탈로그 `INVITATION` 규칙(HOST·GUEST, 한정 = 유효 기간), EVENT 출처·회수 없음·재계산 유지.
+- 초대 보상(§7, 4단계): `MemberJoined.invitedBy`(초대코드 = 지도장, 프로필 = 프로필 주인). 10단계: `MemberJoined.joinedVia`(`INVITE_CODE` \| `PROFILE_LINK`, 초대가 아닌 합류·예전 이벤트는 null — 분석이 초대 경로를 나눠 센다, 끝에 추가한 하위 호환 필드). 꾸미기 `wardrobe.inventory` 가 초대받은 쪽 Inventory 에서 판단(`Invitations` — 처음 합류·재가입 아님·셀프 아님·같은 쌍 1회, invite_reward)하고 받은 뒤, 초대한 쪽은 `InviteRewardOwed`(aggregate Inventory/inviterId)로 각자 트랜잭션에서. 아이템은 카탈로그 `INVITATION` 규칙(HOST·GUEST, 한정 = 유효 기간), EVENT 출처·회수 없음·재계산 유지.
 
 ### 2-9. ExpeditionMap (공유 지도)
 
@@ -242,6 +244,11 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 | inventory_revisit | Inventory | PK(explorer_id, region_code) | marked_at — 9단계 V7(재방문 2회차 색 변형), 지우지 않음 |
 | item_definition | 참조(운영 추가) | item_id PK | name, emoji, slot, tier, theme, look·color_primary·color_secondary(룩), grant_rule·grant_ref(초안의 JSON 대신 두 컬럼), valid_from/to(DATE, 양 끝 포함), created_at(이슈 아이템 소급 판정 — Q-R2-1) — 3단계 V3_1 로 DB화(지역 250 + 세트 배경 9 이관, `tools/catalog/gen-item-sql.js`). 소유 = catalog(`ItemCatalog` Query, 30초 캐시 — 무효화는 커밋 뒤 세대 증가, 읽는 동안 세대가 바뀐 결과는 캐시하지 않음, 다른 인스턴스 추가분은 최대 30초 지연 허용 — P3-R2-6). `region:`·`set:` id 는 이관 전용(운영 추가 금지 — dev reset 이 운영 추가분만 지운다) |
 
+| analytics_event | (분석 원본, 10단계 V9) | id PK, dedup_key UNIQUE | name·source(CLIENT·SERVER·REQUEST)·occurred_at(UTC)·event_day(서울)·actor_key(탐험가 해시 \| `v:`+방문 ID \| NULL)·explorer_hash·visitor_id·device·country·label·props(JSON 문자열). 90일 보관(일 배치 삭제). 커버링 인덱스 (event_day, actor_key, device)·(event_day, name, label, actor_key, device)·(actor_key, event_day, device)·(visitor_id, actor_key). JDBC(JPA 엔티티 없음) |
+| analytics_visitor | (분석 방문) | visitor_id PK | first_seen_at·first_seen_day·entry·explorer_hash·device — 한 문장 upsert(ON DUPLICATE KEY UPDATE, 비어 있는 칸만 채움 — 중복 INSERT 후 UPDATE 는 MySQL 교착) |
+| analytics_explorer | ExplorerJourney | explorer_hash PK | created_day·first_check_in_day·revisit_deadline·invited_join_day·invite_acquired — 서버 사실 구독자만 쓴다 |
+| analytics_daily / analytics_daily_breakdown / analytics_cohort | (분석 집계) | metric_day PK / PK(metric_day, kind, name) / cohort_day PK | 하루 지표·기능별(FEATURE)·오류 코드별(ERROR)·코호트(퍼널 + D1/D7/D30, 아직 셀 수 없으면 NULL). 원본을 지워도 남는다 |
+
 - 애그리거트 경계를 넘는 FK는 두지 않는다(예: scene.slots → owned_item 금지).
 - gender는 Scene이 바꾸는 값이므로 scene 테이블에 둔다(explorer 아님).
 - collected_codes·slots·props는 조회 조건이 아니므로 JSON 컬럼. 필요해지면 읽기 모델로 펼친다.
@@ -285,6 +292,7 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 | 3 | 꾸미기 | V3__shared_map(explorer 토큰 해시, map_member.left_at, visit 회차·숨김·이의, visit_generation, explorer_region_mark, expedition_map.version, set_progress.completed_member_ids, outbox_delivery.first_conflict_at) + V3_1__wardrobe(owned_item, scene, item_definition), `PUT /scene`, 자동 착용 핸들러, 아이템 정의 DB화 + `POST /admin/items`, 지도 설정·초대·탈퇴 유예 전체 기능(MapSettings, disputed, hidden_at) | 2026-11-10 |
 | 4 | 공유 + 구글 로그인 | V4__account(explorer.status·merged_into, account, recalculation_request — 파트 A) + V4_1__sharing(share_card·privacy 등 — 파트 B), 구글 OIDC 로그인(클라이언트 ID 없으면 비활성)·세션·CSRF, handle, claimExplorer 병합, 공개 프로필 `/u/{handle}`, OG 카드 렌더러(lazy), 스냅샷 저장·무효화, 초대 보상 | 2026-11-24 |
 | 9 | 게임 요소 2순위 | V7__seasons_revisits_wishlist, 계절 한정 테마(도감 통합 `SeasonProgress`·`SeasonCalendar`, `SeasonCompleted`), 재방문 도장(탐험 `StampBook`, `RevisitStamped`, 하루 상한 공유), 가고 싶은 곳(탐험 `Wishlist`, `WishFulfilled`), 진행 보상·뱃지 4·칭호 2, 꾸미기 계절 배경·2회차 색 변형, 소식 2종, `GET /seasons/current`·`/revisits`·`/wishlist` | — |
+| 10 | 분석 이벤트(백엔드) | V9__analytics, 새 컨텍스트 `analytics`(관찰자): 화면 이벤트 수집 `POST /events`(허용 목록·필드 검증·개인정보 필드 차단·묶음 50개·본문 32KB·방문/주소 레이트 리밋·익명 수집 + 토큰·세션이면 탐험가 해시 연결), 서버 사실 구독자 `analytics.events`(멱등 지문), 공개 카드 열람 필터, 일 배치·90일 삭제, `/admin/metrics`, local 시드. 탐험 `MemberJoined.joinedVia` 추가(초대 경로) | — |
 | 8 | 게임 요소 1순위 | V6__game_rewards(streak_freeze, mystery_week, conquest: 17·streak: 4 아이템 이관), 보호권·마일스톤·이번 주 미스터리·시·도 정복(진행), 미스터리 선택(카탈로그 `MysteryRegionQuery`, `MysteryDraw`), 업적 아이템(꾸미기), 소식 3종(소셜), `GET /mystery/this-week`, `GET /progress` 확장, local `GET·POST·DELETE /dev/clock`(앞으로만 미는 서버 시계 `AdjustableClock`) | — |
 | 5 | 소셜 | V5__social(friendship, feed_entry, rank_percentile, region_stats, province_stats), 피드 프로젝터(social.feed)·재구성, 랭킹 두 층(요청 시점), VS 비교(공유 커널), 상위 % 배치, FRIENDS 공개 범위 실동작 | 2026-12-08 |
 
@@ -297,6 +305,19 @@ Flyway 번호 갱신(4단계): 4단계는 마이그레이션이 생겨 V4(파트
 8단계(게임 요소 1순위) Flyway **V6__game_rewards**(V1~V5 수정 없음 — 7단계는 마이그레이션 없음).
 
 9단계(게임 요소 2순위) Flyway **V7__seasons_revisits_wishlist**(season_progress, revisit_stamp, wishlist, wish_pin, inventory_revisit, 계절 회차 배경 `season:autumn-2026`~`season:autumn-2030` 9종 이관 — 이후 회차는 운영이 SEASON_COMPLETE 규칙으로 추가). V1~V6 수정 없음.
+
+10단계(분석 이벤트) Flyway **V9__analytics**(analytics_event·analytics_visitor·analytics_explorer·analytics_daily·analytics_daily_breakdown·analytics_cohort — 게임 테이블 무수정·FK 없음).
+
+10단계 분석(analytics 컨텍스트 — `analytics/domain/{tracking, actor, journey, metrics, ratelimit}`):
+- 이벤트 허용 목록 `EventDefinitions`(화면 10·서버 사실 14·공개 페이지 3, 계약 `_workspace/10_contracts.md` §1). 필드는 짧은 식별자·오류 코드·지역 코드·작은 수·참거짓만(자유 문장 없음), 정의 밖 필드·개인정보로 보이는 키(memo·handle·email·ip·userAgent·위치·token·explorerId 등)는 이벤트째 거절. 서버 사실 이름을 화면이 보내면 거절.
+- 개인정보: 탐험가 id → `ExplorerHasher`(HMAC-SHA256, 비밀값 `territory.analytics.salt` — local 고정값, 운영 `TERRITORY_ANALYTICS_SALT` 필수). 서버 사실 멱등 지문 = 같은 해시 함수(공개 이벤트 종류 + record 내용 전체). IP·User-Agent 원문 저장 없음(기기 유형 `DeviceType` 다섯 갈래·나라 `CF-IPCountry` 만), handle·메모 없음.
+- 사람 세기: 행위자 열쇠 `ActorKey` = 요청의 탐험가 → 방문에 이어진 탐험가 → `v:`+방문 ID. 방문이 처음(또는 다시) 그 요청의 탐험가로 이어지면 방문 열쇠로 남은 이벤트를 탐험가로 다시 묶는다(`VisitorLink.relinkTarget`). 봇은 사람 지표에서 뺀다.
+- 여정 `ExplorerJourney`(가입일·첫 체크인·재방문 마감일·첫 초대 합류·초대 유입, 모두 한 번만): 가입 사실(MapCreated PERSONAL) 없이 처음 본 탐험가(분석 전 가입)는 가입일을 모르고 첫 체크인 퍼널·리텐션 코호트에 넣지 않는다. 쓰는 쪽은 구독자 하나(릴레이 한 스레드)라 불러와 바꾸고 저장한다.
+- 지표 정의(`MetricsPolicy` 기간 설정값): DAU/WAU/MAU(그날로 끝나는 1·7·30일 활동 사람), 퍼널(그날 처음 본 방문 → 첫 화면 날부터 7일 안 첫 체크인 → 첫 체크인 다음 날부터 7일 안 재방문), DN 리텐션(가입일 + N 일째 하루의 활동, 그날이 다 지나야 셈), K 계수(30일 구간 가입자 중 초대 유입 ∪ 카드 유입 ÷ 30일 활성 탐험가), 기능별 사용률(7일, 기능 이벤트를 쓴 사람 ÷ 활성 사람), 상위 오류 코드(7일 error_toast).
+- 일 배치 `MetricsBatchJob`(cron, 수동 `POST /admin/metrics/batch`·local `POST /dev/analytics/batch`): 원본이 남은 지난 90일(`MetricsPolicy.backfillRange`) 중 하루 지표는 최근 3일 + 비어 있던 날, 코호트는 최근 35일 + 비어 있던 날 — 지표 조회의 `missingDays` 와 같은 범위(QA P2-1, 보관 기간 지난 날은 `expiredDays`). 원본은 90일 지나면 5,000줄씩 삭제, 마지막 활동이 보관 기간보다 오래된 방문·여정도 삭제. 오늘은 조회 때 실시간(운영 60초 재사용).
+- 레이트 리밋 `IngestThrottle`(토큰 버킷 — 방문 ID·요청 주소 두 겹, 인스턴스 메모리 = 단일 인스턴스 가정). 요청 주소 = `TrustedProxies`(설정 `territory.analytics.trusted-proxies`, 기본 없음): 실제 접속 주소가 믿는 프록시일 때만 `CF-Connecting-IP` → `X-Forwarded-For` 오른쪽부터 믿는 프록시를 건너뛴 첫 주소(QA P2-2). 접속 주소·헤더는 가장 안쪽 서블릿 요청에서 읽는다(framework 전략의 감싼 요청 회피). `POST /events` 는 CSRF 제외(JSON 본문만, sendBeacon). 이벤트 자리 null·타입 오류는 400 `MALFORMED_REQUEST`(서버 오류 기록 없음), 받은 이벤트가 없는 묶음은 방문으로 세지 않는다.
+- infra 는 JDBC(JPA 엔티티 없음 — 저장 방식 예외는 사용자 결정 대기). 보강: 모든 SQL 상수를 MySQL 에서 EXPLAIN 하는 테스트(`AnalyticsMySqlTest.everyQueryMatchesSchema`), props JSON 은 직렬화기(Jackson)로.
+- 운영 비밀값 강도(app-api `ProductionSecrets`, prod): 관리자 토큰·미스터리·분석 비밀값이 16자 미만·자리표시자면 기동 실패.
 
 8단계 이번 주 미스터리 지역(카탈로그 소유 — `catalog/domain/mystery/`):
 - 주 = 서비스 시간대(Asia/Seoul) 월요일 0시 ~ 다음 월요일 0시 직전(`MysteryWeek.weekStartOf`, 시계 = Clock 빈의 zone). 전체 사용자 공통 한 곳.

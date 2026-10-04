@@ -13,5 +13,9 @@ public enum ErrorKind {
     /** 중복·상태 충돌 → 409 */
     CONFLICT,
     /** 게임 규칙 위반(미래 날짜, 하루 상한 등) → 422 */
-    RULE_VIOLATION
+    RULE_VIOLATION,
+    /** 요청 본문이 상한을 넘음(10단계 화면 이벤트 묶음) → 413 */
+    PAYLOAD_TOO_LARGE,
+    /** 짧은 시간에 요청이 너무 많음(10단계 화면 이벤트 수집 레이트 리밋) → 429 */
+    TOO_MANY_REQUESTS
 }

@@ -31,13 +31,14 @@ import org.junit.jupiter.params.provider.EnumSource;
  * <p>
  * 규칙은 ArchUnit 의 기본 설정(빈 대상이면 실패 — failOnEmptyShould)으로 검사한다. 패키지 오타가 조용히 통과하지 않게
  * allowEmptyShould(true)는 쓰지 않는다. 7단계: 보고서가 규칙 문장으로 읽히도록 @ArchTest 필드 대신 JUnit @Nested·@DisplayName 으로 묶었다
- * (규칙 38개는 그대로 — 컨텍스트별 규칙은 컨텍스트마다 한 건).
+ * (규칙 38개는 그대로 — 컨텍스트별 규칙은 컨텍스트마다 한 건). 10단계: 분석(analytics) 컨텍스트 추가 — 관찰자라 아무도 참조하지 않고,
+ * 분석은 탐험·진행의 공개 이벤트만 본다.
  */
 @DisplayName("모듈 경계")
 class ArchitectureTest {
 
     private static final String ROOT = "com.kobi.territory.";
-    private static final String[] CONTEXTS = {"catalog", "exploration", "progression", "wardrobe", "social", "sharing"};
+    private static final String[] CONTEXTS = {"catalog", "exploration", "progression", "wardrobe", "social", "sharing", "analytics"};
 
     /** 운영 코드만(테스트 픽스처 제외) 한 번 읽어 모든 규칙이 함께 쓴다. */
     private static final JavaClasses PRODUCTION = new ClassFileImporter()
@@ -51,7 +52,8 @@ class ArchitectureTest {
         PROGRESSION("progression", "진행"),
         WARDROBE("wardrobe", "꾸미기"),
         SOCIAL("social", "소셜"),
-        SHARING("sharing", "공유");
+        SHARING("sharing", "공유"),
+        ANALYTICS("analytics", "분석");
 
         final String pkg;
         private final String label;
@@ -97,7 +99,7 @@ class ArchitectureTest {
                 .should().dependOnClassesThat()
                 .resideInAnyPackage("org.springframework.web..", "jakarta.persistence..", "org.springframework.data..",
                                     ROOT + "catalog..", ROOT + "exploration..", ROOT + "progression..",
-                                    ROOT + "wardrobe..", ROOT + "social..", ROOT + "sharing..")
+                                    ROOT + "wardrobe..", ROOT + "social..", ROOT + "sharing..", ROOT + "analytics..")
                 .check(PRODUCTION);
         }
     }
@@ -118,11 +120,21 @@ class ArchitectureTest {
     @DisplayName("공개 계약은 자기 내부를 드러내지 않는다")
     class PublicContractStandalone {
 
+        /** 분석은 공개 이벤트·조회 계약이 없어(관찰자) 대상이 비므로 뺀다 — 대신 아래 "분석의 공개 창구는 화면뿐"이 지킨다. */
         @ParameterizedTest(name = "{0}의 공개 이벤트·조회 계약은 자기 도메인·유스케이스·저장소·화면 계약을 모른다")
-        @EnumSource(Context.class)
+        @EnumSource(value = Context.class, mode = EnumSource.Mode.EXCLUDE, names = "ANALYTICS")
         @DisplayName("공개 이벤트·조회 계약은 자기 내부를 모른다")
         void contractIsStandalone(Context context) {
             publicContractStandalone(ROOT, context.pkg).check(PRODUCTION);
+        }
+
+        @Test
+        @DisplayName("분석은 공개 이벤트도 조회 계약도 내놓지 않는다 — 공개 창구는 화면(수집·지표)뿐이다")
+        void analyticsPublishesNothing() {
+            classes().that().resideInAPackage(ROOT + "analytics.api..").and().doNotHaveSimpleName("package-info")
+                .should().resideInAPackage(ROOT + "analytics.api.web..")
+                .as("analytics.api 아래에는 web 만 둔다")
+                .check(PRODUCTION);
         }
 
         @ParameterizedTest(name = "{0}의 공개 창구에는 이벤트·조회·화면 세 갈래만 둔다")
@@ -179,6 +191,31 @@ class ArchitectureTest {
         @DisplayName("소셜은 카탈로그·꾸미기·공유를 모른다")
         void socialMatrix() {
             forbid("social", "catalog", "wardrobe", "sharing").check(PRODUCTION);
+        }
+
+        /** 10단계: 분석은 관찰자 — 게임 컨텍스트는 분석을 모른다(분석이 멈추거나 빠져도 게임 규칙은 그대로). */
+        @ParameterizedTest(name = "{0}은 분석을 모른다")
+        @EnumSource(value = Context.class, mode = EnumSource.Mode.EXCLUDE, names = "ANALYTICS")
+        @DisplayName("어떤 게임 컨텍스트도 분석을 모른다 — 분석은 관찰자다")
+        void nobodyKnowsAnalytics(Context context) {
+            forbid(context.pkg, "analytics").check(PRODUCTION);
+        }
+
+        /**
+         * 분석(§1 analytics): 프로젝트 안에서는 자기 자신·공유 커널·탐험과 진행의 공개 이벤트(api.event)만 참조한다(허용 목록 — QA P3-6).
+         * 카탈로그·꾸미기·소셜·공유는 물론 탐험·진행의 조회 계약(api.query)·화면 계약·내부도 모른다.
+         */
+        @Test
+        @DisplayName("분석은 공유 커널과 탐험·진행이 내놓은 사실(공개 이벤트)만 안다")
+        void analyticsKnowsOnlyPublishedFacts() {
+            DescribedPredicate<JavaClass> outsideAllowed = JavaClass.Predicates.resideInAPackage("com.kobi.territory..")
+                .and(DescribedPredicate.not(JavaClass.Predicates.resideInAnyPackage(ROOT + "analytics..", ROOT + "common..",
+                    ROOT + "exploration.api.event..", ROOT + "progression.api.event..")))
+                .as("analytics·common·exploration.api.event·progression.api.event 밖의 프로젝트 클래스");
+            noClasses().that().resideInAPackage(ROOT + "analytics..")
+                .should().dependOnClassesThat(outsideAllowed)
+                .as("analytics 는 자기 자신·common·exploration.api.event·progression.api.event 만 참조한다")
+                .check(PRODUCTION);
         }
 
         /**

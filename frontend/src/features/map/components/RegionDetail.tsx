@@ -12,6 +12,7 @@ import { useMyTerritory } from '../../../shared/queries/territory';
 import { useMapActions } from '../queries';
 import { RevisitStamp } from './RevisitStamp';
 import { WishToggle } from './WishToggle';
+import { track } from '../../../api/analytics';
 
 const EMPTY_HINT = '지도에서 지역을 선택하면 방문 날짜와 한 줄 메모를 남길 수 있어요.';
 
@@ -82,7 +83,10 @@ export function RegionDetail() {
             </div>
             <div className="row">
               <button className="btn primary" id="d-save" onClick={() => void save()}>기록 저장</button>
-              <button className="btn" id="d-card" onClick={() => showRecentCard(selected)}>여행 카드</button>
+              <button className="btn" id="d-card" onClick={() => {
+                track('share_click', { target: 'travel' });
+                showRecentCard(selected);
+              }}>여행 카드</button>
               <button className="btn danger" id="d-remove" onClick={() => void cancel(selected)}>영토에서 제거</button>
             </div>
           </>

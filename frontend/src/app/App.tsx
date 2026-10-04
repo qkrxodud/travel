@@ -12,12 +12,14 @@ import { ToastHost } from '../shared/ui/ToastHost';
 import { Header } from './Header';
 import { SvgDefs } from './SvgDefs';
 import { TabBar } from './TabBar';
+import { useAnalytics } from './useAnalytics';
 import { useAnnouncements } from './useAnnouncements';
 import { useDocumentFlags } from './useDocumentFlags';
 import { useIdentityReset, useLoginNotice, useProfileJoin, useTerritoryFallback } from './useSessionEffects';
 
 /** 앱 셸: 헤더 · 요약 · 탭 바 · 탭 6개 · 토스트 · 모달 3개(카드·지도·체크인). 탭은 모두 그려 두고 hidden 으로 전환한다. */
 export function App() {
+  useAnalytics();
   useIdentityReset();
   useTerritoryFallback();
   useLoginNotice();

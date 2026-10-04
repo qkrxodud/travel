@@ -70,7 +70,7 @@ final class ProfilePage {
         html.append(mapsSection(handle, profile.joinableMaps()));
 
         html.append("<p class=\"note\">메모·사진은 공개되지 않아요. 날짜는 월 단위로만 보여요.</p>")
-            .append("<p><a class=\"btn\" href=\"/\">나도 내 영토 칠하기</a></p>")
+            .append("<p><a class=\"btn\" href=\"/?from=profile\">나도 내 영토 칠하기</a></p>")
             .append("</main></body></html>");
         return html.toString();
     }
@@ -102,7 +102,8 @@ final class ProfilePage {
                 section.append("<span class=\"full\">가득 찼어요</span>");
             } else {
                 section.append("<a class=\"btn primary\" data-join=\"").append(escape(map.mapId())).append("\" href=\"/?joinProfile=")
-                    .append(urlPart(handle)).append("&amp;map=").append(urlPart(map.mapId())).append("\">이 지도에 합류</a>");
+                    .append(urlPart(handle)).append("&amp;map=").append(urlPart(map.mapId())).append("&amp;from=profile")
+                    .append("\">이 지도에 합류</a>");
             }
             section.append("</li>");
         });
