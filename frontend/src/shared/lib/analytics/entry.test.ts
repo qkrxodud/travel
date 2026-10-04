@@ -2,7 +2,7 @@
  * 첫 화면이 어디서 들어왔는지 — 카드·프로필 유입은 바이럴(K 계수) 근거라 갈래만 정확히 고르고, 주소의 개인 값은 쓰지 않는다.
  */
 import { describe, expect, it } from 'vitest';
-import { entryPoint, withoutEntryMark } from './entry';
+import { entryPoint, pushOpenKind, withoutEntryMark } from './entry';
 
 const APP = 'https://territory.example/';
 
@@ -53,5 +53,25 @@ describe('갈래 표시 지우기', () => {
 
   it('표시가 없으면 바꾸지 않는다', () => {
     expect(withoutEntryMark(APP + '#map')).toBeNull();
+  });
+});
+
+describe('알림을 눌러 열었을 때', () => {
+  it('알림 주소로 열리면 알림 유입이고, 어떤 알림이었는지 안다', () => {
+    expect(entryPoint(APP + '?from=push&push=mystery#map', '')).toBe('push');
+    expect(pushOpenKind(APP + '?from=push&push=mystery#map')).toBe('mystery');
+    expect(pushOpenKind(APP + '?from=push&push=season#sets')).toBe('season');
+    expect(pushOpenKind(APP + '?from=push&push=streak#map')).toBe('streak');
+  });
+
+  it('모르는 알림 종류이거나 알림 유입이 아니면 알림 열기로 세지 않는다', () => {
+    expect(pushOpenKind(APP + '?from=push&push=lottery')).toBeNull();
+    expect(pushOpenKind(APP + '?from=card&push=mystery')).toBeNull();
+    expect(pushOpenKind(APP + '#map')).toBeNull();
+  });
+
+  it('주소에서 알림 표시 두 개를 지우고 열 탭은 그대로 둔다', () => {
+    expect(withoutEntryMark(APP + '?from=push&push=mystery#map')).toBe('/#map');
+    expect(withoutEntryMark(APP + '?push=season#sets')).toBe('/#sets');
   });
 });

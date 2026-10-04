@@ -3,6 +3,8 @@ package com.kobi.territory.analytics.domain.ratelimit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -76,6 +78,39 @@ class TrustedProxiesTest {
         void invalid() {
             assertThatThrownBy(() -> TrustedProxies.of(List.of("cloudflared"))).isInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> TrustedProxies.of(List.of("10.0.0.0/40"))).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("프록시를 붙였는데 믿는 프록시를 정하지 않았을 때")
+    class Misconfigured {
+
+        private static final Instant NOW = Instant.parse("2026-10-05T00:00:00Z");
+
+        @Test
+        @DisplayName("같은 호스트·내부망 주소에서 프록시 헤더가 오면 설정을 의심한다")
+        void suspectsMissingSetting() {
+            assertThat(TrustedProxies.none().ignoresForwardingFrom(new ClientOrigin("172.18.0.5", "198.51.100.7", null, "KR"))).isTrue();
+            assertThat(TrustedProxies.none().ignoresForwardingFrom(new ClientOrigin("127.0.0.1", null, "198.51.100.7", null))).isTrue();
+        }
+
+        @Test
+        @DisplayName("믿는 프록시를 거쳤거나, 바깥 주소가 헤더를 보냈거나, 헤더가 없으면 의심하지 않는다")
+        void noSuspicion() {
+            assertThat(TUNNEL.ignoresForwardingFrom(new ClientOrigin("172.18.0.5", "198.51.100.7", null, null))).isFalse();
+            assertThat(TrustedProxies.none().ignoresForwardingFrom(new ClientOrigin("203.0.113.9", "198.51.100.7", null, null))).isFalse();
+            assertThat(TrustedProxies.none().ignoresForwardingFrom(ClientOrigin.direct("172.18.0.5"))).isFalse();
+        }
+
+        @Test
+        @DisplayName("경고는 한 시간에 한 번만 한다 — 같은 경고로 로그를 채우지 않는다")
+        void warnsOncePerInterval() {
+            ProxySetupWarning warning = new ProxySetupWarning(TrustedProxies.none(), Duration.ofHours(1));
+            ClientOrigin viaProxy = new ClientOrigin("172.18.0.5", "198.51.100.7", null, null);
+
+            assertThat(warning.shouldWarn(viaProxy, NOW)).isTrue();
+            assertThat(warning.shouldWarn(viaProxy, NOW.plus(Duration.ofMinutes(59)))).isFalse();
+            assertThat(warning.shouldWarn(viaProxy, NOW.plus(Duration.ofMinutes(60)))).isTrue();
         }
     }
 }

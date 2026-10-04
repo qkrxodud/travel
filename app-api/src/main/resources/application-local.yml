@@ -30,6 +30,20 @@ territory:
         # 로컬·E2E·테스트는 한 주소(127.0.0.1)에서 여러 방문을 흉내 내므로 주소 버킷을 넉넉히(방문 버킷은 운영과 같다)
         address-burst: 100000
         address-per-minute: 100000
+  push:
+    # 웹 푸시 VAPID 시험용 키(12단계) — 로컬·E2E 전용(공개해도 되는 값). 운영은 TERRITORY_VAPID_*(application-prod.yml, 이 키면 기동 실패).
+    vapid:
+      public-key: BL4nehRk6sf8mdeCUNdZYgFJV8YQKhg_DBB2UPhEBtJhpCGph6jaB7u4cWesO4IFwVwnsate9RFv1cnqDuuXjgU
+      private-key: _rA6y0IIhChRfj6xo4JxQ9rYj8bkwc2pIuzrjvKfyY8
+      subject: mailto:dev@territory.local
+    # 개발용 가짜 푸시 서비스(POST /dev/push/inbox/{box})를 구독 주소로 쓸 수 있게
+    allow-localhost: true
+    dispatch:
+      # 로컬은 계획 직후 바로 보이도록 짧게
+      delay-ms: 2000
+      initial-delay-ms: 3000
+      max-per-second: 200
+      send-timeout: 3s
   dev:
     # /dev/**(reset·seed·login 등) 켜기 — 이 파일에만 둔다. local 프로파일 + 이 값이 모두 있어야 빈이 생긴다(QA P3-11).
     enabled: true

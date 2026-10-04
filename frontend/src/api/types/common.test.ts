@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { SERVER_ERROR_CODES } from './common';
 
 const ROOT = resolve(__dirname, '../../../..');
-const MODULES = ['common', 'catalog', 'exploration', 'progression', 'wardrobe', 'sharing', 'social', 'account', 'analytics', 'app-api'];
+const MODULES = ['common', 'catalog', 'exploration', 'progression', 'wardrobe', 'sharing', 'social', 'account', 'analytics', 'notification', 'app-api'];
 
 function javaFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];

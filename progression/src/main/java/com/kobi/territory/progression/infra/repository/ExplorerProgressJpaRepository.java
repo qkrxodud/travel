@@ -2,6 +2,8 @@ package com.kobi.territory.progression.infra.repository;
 
 import com.kobi.territory.progression.infra.entity.ExplorerProgressJpaEntity;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -18,4 +20,7 @@ interface ExplorerProgressJpaRepository extends JpaRepository<ExplorerProgressJp
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select progress from ExplorerProgressJpaEntity progress where progress.explorerId = :explorerId")
     Optional<ExplorerProgressJpaEntity> lockById(@Param("explorerId") String explorerId);
+
+    /** 여러 탐험가의 진행 루트 행(12단계 — 연속 탐험 상태 읽기). */
+    List<ExplorerProgressJpaEntity> findByExplorerIdIn(Collection<String> explorerIds);
 }

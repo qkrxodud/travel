@@ -48,11 +48,44 @@
 - **레이트 리밋과 요청 주소**: 방문 ID 마다 몰아서 20번·분당 30번, 요청 주소마다 몰아서 60번·분당 120번(인스턴스 메모리). 요청 주소는 **실제 접속 주소**다 — 클라이언트가 보낸 `X-Forwarded-For`·`CF-Connecting-IP` 는 믿지 않는다(바꿔 보내 상한을 피할 수 있어서, 10단계 QA P2-2). 믿는 프록시 `TERRITORY_TRUSTED_PROXIES`(CIDR, 쉼표, 기본 비어 있음)에서 온 요청만 `CF-Connecting-IP` → 없으면 `X-Forwarded-For` 를 오른쪽부터 보며 믿는 프록시를 건너뛴 첫 주소를 쓴다. 나라 헤더 `CF-IPCountry` 도 믿는 프록시를 거쳤을 때만 쓴다.
   - **Cloudflare Tunnel 을 붙일 때**: `cloudflared` 를 compose 의 같은 네트워크에 서비스로 두고(외부 포트 없음), 그 네트워크 대역을 믿는다 — 예: compose 네트워크를 `networks: default: ipam: config: [{subnet: 172.30.0.0/24}]` 로 고정하고 `.env` 에 `TERRITORY_TRUSTED_PROXIES=172.30.0.0/24`. 이때 호스트의 `127.0.0.1:18080` 으로 직접 들어오는 요청은 도커 게이트웨이 주소(같은 대역의 .1)로 보이므로, 대역 대신 cloudflared 컨테이너 주소 하나(`ipv4_address` 로 고정, 예 `172.30.0.10/32`)만 믿는 편이 더 좁다. Cloudflare 가 아닌 리버스 프록시(nginx 등)를 쓰면 그 프록시 주소를 넣고 프록시가 `X-Forwarded-For` 에 접속 주소를 덧붙이게 한다.
   - **여러 대로 늘리면** 인스턴스마다 따로 세어 상한이 대수만큼 커진다 — 그때는 공유 저장소(Redis 등)로 옮기거나 앞단 프록시의 요청 수 제한을 함께 쓴다.
-- **운영 비밀값 강도**: prod 프로파일은 `TERRITORY_ADMIN_TOKEN`·`TERRITORY_MYSTERY_SALT`·`TERRITORY_ANALYTICS_SALT` 가 비었거나 16자 미만이거나 `change-me`·`local-`·`example` 같은 자리표시자를 담으면 기동하지 않는다(`ProductionSecrets` — 어느 값인지만 알리고 값은 로그에 남기지 않는다). 랜덤 값: `openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-40`.
+- **운영 비밀값 강도**: prod 프로파일은 `TERRITORY_ADMIN_TOKEN`·`TERRITORY_MYSTERY_SALT`·`TERRITORY_ANALYTICS_SALT` 가 비었거나 16자 미만이거나 `change-me`·`local-`·`example` 같은 자리표시자를 담으면 기동하지 않는다(`ProductionSecrets` — 어느 값인지만 알리고 값은 로그에 남기지 않는다). 12단계부터 **분석 비밀값이 미스터리 비밀값과 같아도 기동하지 않는다**(10단계 QA r2 P3-a — 분석 값은 바꾸면 코호트가 끊기므로, 같다면 미스터리 값을 바꾼다. 미스터리 값을 바꾸면 아직 기록되지 않은 주부터 다른 지역이 된다). 랜덤 값: `openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-40`.
+- **지표 응답의 신뢰도 표시(12단계 추가, 10단계 QA r2 P3-b·P3-c)**: `pendingCohortDays` — 배치가 아직 퍼널·리텐션을 계산하지 않은 코호트 날(원본이 남아 있어 배치로 채울 수 있다, 화면은 표에 "배치 전" 줄). `daily[].partialWindow` — 그날 하루 지표를 계산할 때 30일 구간(MAU·K 계수) 앞부분 원본이 이미 보관 기간을 지나 지워졌다(61일보다 오래된 빈 날을 늦게 채운 경우 — 값이 작게 나오므로 화면은 "신뢰도 낮음"). 배치가 매일 돌면 생기지 않는다.
+- **믿는 프록시를 빠뜨렸을 때의 경고(12단계 추가, 10단계 QA r2 P3-d)**: 사설·루프백 주소(같은 호스트·compose 네트워크의 프록시로 보임)에서 프록시 헤더(`CF-Connecting-IP`·`X-Forwarded-For`)가 왔는데 그 주소를 믿지 않으면 WARN `분석 수집: 프록시 헤더 … 믿는 프록시가 아니다` 를 1시간에 한 번 남긴다. 이 로그가 보이면 `TERRITORY_TRUSTED_PROXIES` 를 아래 배포 체크리스트대로 맞춘다 — 그대로 두면 모든 방문자가 프록시 주소 하나로 세져 사용자가 늘 때 수집이 조용히 429 로 버려진다.
 - **CSRF**: `POST /events` 는 위조 방지 토큰 검사에서 빠진다(페이지를 닫을 때 `navigator.sendBeacon` 은 헤더를 못 붙인다). `application/json` 본문만 받아 다른 사이트 폼으로는 보낼 수 없고, 위조해도 분석 줄 하나가 늘 뿐 게임 상태는 바뀌지 않는다.
 - **봇**: 링크 미리보기(카카오톡·페이스북·슬랙 등)·크롤러(다음 `Daumoa` 등)·curl 은 User-Agent 로 거칠게 가른다 — 화면 이벤트는 버리고, 공개 카드 열람은 `botViews` 로 따로 센다. 다음 앱 안의 브라우저(`DaumApps`)는 사람으로 센다.
 - **보호권 사용·지급은 아직 안 센다** — 진행 컨텍스트에 공개 이벤트가 없다(추가되면 분석 구독자에 한 줄 더한다).
 - 배포 전 이벤트(분석을 켜기 전 가입·체크인)는 소급하지 않는다 — 그 탐험가는 가입일을 모르는 여정으로 시작해 리텐션 코호트·첫 체크인 퍼널에 들어가지 않는다.
+
+## 12단계 웹 푸시 알림(PWA)
+
+- **VAPID 키(필수)** — 서버가 브라우저 푸시 서비스(FCM·Mozilla·Apple·Windows)에 "구독을 만든 그 서버"임을 증명하는 P-256 키 쌍. `.env` 의 `TERRITORY_VAPID_PUBLIC_KEY`(비압축 점 65바이트 base64url)·`TERRITORY_VAPID_PRIVATE_KEY`(32바이트 base64url)·`TERRITORY_VAPID_SUBJECT`(`mailto:운영자@도메인` 또는 `https://도메인` — 푸시 서비스가 문제 있을 때 연락하는 곳). 없으면 compose 가 멈추고, prod 는 형식이 틀리거나 **한 쌍이 아니거나**(기동할 때 서명 → 검증) 로컬 시험용 키·예시 주소면 기동하지 않는다(값은 로그에 남기지 않는다). 만드는 법(macOS LibreSSL·OpenSSL 모두):
+
+  ```bash
+  openssl ecparam -name prime256v1 -genkey -noout -out vapid.pem          # 이 파일은 커밋하지 말고 안전하게 보관
+  echo "TERRITORY_VAPID_PRIVATE_KEY=$(openssl ec -in vapid.pem -outform DER 2>/dev/null | tail -c +8 | head -c 32 | base64 | tr '/+' '_-' | tr -d '=\n')"
+  echo "TERRITORY_VAPID_PUBLIC_KEY=$(openssl ec -in vapid.pem -pubout -outform DER 2>/dev/null | tail -c 65 | base64 | tr '/+' '_-' | tr -d '=\n')"
+  ```
+  (Node 가 있으면 `npx web-push generate-vapid-keys` 도 같은 형식.) **한 번 정하면 바꾸지 않는다** — 바꾸면 모든 브라우저 구독이 이전 공개 키에 묶여 있어 보내기가 거절(403)되고, 사용자가 앱을 다시 열어 구독을 새로 보낼 때까지 알림이 끊긴다. local·E2E 는 `application-local.yml` 의 시험용 키(공개된 값)를 쓴다.
+- **HTTPS 필수**: 서비스워커·푸시 구독은 보안 출처에서만 된다 — 로컬은 `http://localhost` 예외, 그 밖에는 Cloudflare Tunnel(또는 TLS 리버스 프록시) 뒤의 `https://` 도메인이어야 한다(`TERRITORY_PUBLIC_BASE_URL` 도 https). iOS Safari 는 홈 화면에 추가한(설치한) PWA 에서만 웹 푸시를 받는다.
+- **구독 주소 허용 목록(SSRF 방지)**: 서버가 구독 주소로 직접 POST 하므로 알려진 푸시 서비스 호스트만 받는다(`territory.push.allowed-hosts` — `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `*.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`, https 만). 다른 브라우저가 거절되면(400 `PUSH_ENDPOINT_NOT_ALLOWED`) 그 호스트를 확인해 이 설정에 더한다. 리디렉션은 따라가지 않는다. local 만 `allow-localhost` 로 `localhost`·`127.0.0.1`(http 포함 — 개발용 가짜 푸시 서비스).
+- **알림 3종(cron, 서울 시간, `-` 면 그 알림 끔)**: 계절 테마 시작일 `territory.push.schedule.season-cron`(기본 매일 08:30, 시작일에만) · 이번 주 미스터리 `mystery-cron`(월 09:00, 지역 이름은 감춤) · 스트릭 지키기 `streak-cron`(매일 19:00, 그 달 마지막 날 − `streak-days-before-month-end`(3)일에만 — 지난달까지 이어 왔는데 이번 달 새 지역이 없는 사람, 보호권 수 안내). 같은 날 겹치면 먼저 도는 알림이 이긴다(계절 → 미스터리 → 스트릭).
+- **규칙**: 한 사람 **하루(서울 날짜) 최대 `daily-limit`(1)개** — 발송 계획은 받는 사람 루트 잠금 뒤 그날 기록을 세고(MySQL 동시성 테스트), 보내지 못하고 닫힌 알림(만료·실패·취소)은 세지 않는다. **조용한 시간 22:00~08:00**(`quiet-hours`) 에는 보내지 않고 08:00 으로 미룬다. 기기가 없거나(동의 안 함·모두 해지) 그 종류를 끈 사람에게는 계획하지 않고, 보내기 직전에도 다시 본다. 멱등 열쇠 = 탐험가·종류·기간(UNIQUE) — 스케줄이 두 번 돌거나 재시작해도 한 번.
+- **발송·재시도·만료**: 발송기(`territory.push.dispatch.delay-ms`, 기본 30초)가 보낼 때가 된 기록을 100개씩 잡아 기기마다 보낸다(초당 `max-per-second` 20, 요청당 `send-timeout` 10초, TTL 12시간). 응답 404·410 은 그 기기를 지운다(다시 구독하면 다시 생긴다). 429·5xx·연결 실패는 5분 → 10분 → 20분 … 최대 1시간(Retry-After 가 더 길면 그만큼)으로 4번까지 — **그날 안·조용한 시간 전까지만**, 넘으면 만료(EXPIRED, 다음 날 늦게 보내지 않는다). 400·401·403·413 은 다시 보내지 않는다(403 이 많으면 VAPID 키가 바뀐 것). 한 기기라도 받으면 SENT(다른 기기의 일시 실패는 다시 보내지 않음).
+- **대량 발송·단일 인스턴스 가정**: 받을 사람을 500명씩 불러와 한 사람씩 짧은 트랜잭션으로 계획하고, 속도 제한은 이 인스턴스 안에서만 지킨다(1만 명 × 1기기 ≈ 초당 20건으로 약 8분 — 조용한 시간 전에 끝나도록 cron 을 늦은 밤에 두지 않는다). 발송기는 기록을 낙관적 잠금으로 잡아 같은 기록을 두 발송기가 동시에 보내지 않지만, 보내는 중에 죽은 기록은 `claim-timeout`(10분) 뒤 다시 보낸다(최소 1회 — 기기에서는 같은 tag 라 하나로 겹친다). 여러 대로 늘리면 속도 제한이 대수만큼 커진다.
+- **계정 병합**: 익명으로 알림을 켠 브라우저가 로그인으로 계정에 병합되면 그 기기는 계정 탐험가로 옮겨 간다(구독자 `notification.recipient`, 기기 수 상한 5 — 넘으면 오래된 기기부터). 같은 브라우저를 다른 탐험가가 구독하면 그 탐험가 것이 된다.
+- **분석**: 서버가 보낸 알림은 `push_sent`(kind·기기 수), 화면은 알림을 눌러 열면 `push_open`(kind)·`app_open(entry=push)` 를 보낸다(클릭 경로에 `?from=push&push=종류`). 동의율은 `push_prompt`.
+- **local 확인**: `POST /dev/push/send {"kind":"mystery"|"streak"|"season","force":true}`(기본 force — 날짜 조건·조용한 시간 건너뜀, `force:false` 면 `/dev/clock` 으로 그날로 밀어서 스케줄과 같게), `GET /dev/push/deliveries`(내 발송 기록), 가짜 푸시 서비스 `POST·GET /dev/push/inbox/{상자}`(구독 주소 `http://localhost:포트/dev/push/inbox/상자`, `gone…` 410·`busy…` 429·`reject…` 403). 실제 브라우저 수신은 화면 쪽 E2E.
+
+## 배포 체크리스트(12단계 정리)
+
+배포·업데이트 전에 확인한다(위 단계별 절의 요약).
+
+1. `.env` 에 필수 값: `DB_*`·`MYSQL_ROOT_PASSWORD`, `TERRITORY_ADMIN_TOKEN`·`TERRITORY_MYSTERY_SALT`·`TERRITORY_ANALYTICS_SALT`(서로 다른 16자 이상 랜덤), `TERRITORY_VAPID_PUBLIC_KEY`·`TERRITORY_VAPID_PRIVATE_KEY`·`TERRITORY_VAPID_SUBJECT`(위 12단계), `TERRITORY_PUBLIC_BASE_URL`(도메인을 붙이면 https).
+2. 운영 프로파일: 컨테이너는 `SPRING_PROFILES_ACTIVE=prod` 고정 — 기동 뒤 `/dev/login` 이 404 인지 본다(N4).
+3. **앞단 프록시(Cloudflare Tunnel·nginx)를 붙였다면 `TERRITORY_TRUSTED_PROXIES` 를 그 프록시 주소로 반드시 정한다**(10단계 절의 예시 — cloudflared 컨테이너 주소 하나 `/32` 권장). 비워 두면 모든 방문자가 프록시 주소 하나로 세져 분석 수집이 429 로 버려진다. 기동 뒤 로그에 `분석 수집: 프록시 헤더 … 믿는 프록시가 아니다` WARN 이 없어야 한다. 프록시 없이 루프백 포트로만 쓰면 비워 둔다.
+4. 웹 푸시는 https 출처에서만 — Tunnel 도메인으로 열어 알림 켜기 → `GET /push/preferences` 의 `devices` 가 1 이상인지 본다.
+5. 업데이트 직전 백업(`scripts/backup.sh`)과 롤백 이미지 태그(아래 "명령").
+6. 새 구독 타입이 생긴 단계면 배포 직후 `POST /admin/rebuild/feed` 한 번(5·9단계 절).
 
 ## Docker Compose 로컬 운영
 
@@ -73,7 +106,9 @@
 | `TERRITORY_ADMIN_TOKEN` | `/admin/**` 의 `X-Admin-Token`. 강한 랜덤 값(16자 이상, 자리표시자 금지 — 10단계부터 prod 기동 검사) |
 | `TERRITORY_MYSTERY_SALT` | 이번 주 미스터리 지역 주차 시드에 섞는 서버 비밀값(8단계, 필수 — 없으면 기동 실패). 강한 랜덤 값. 바꾸면 아직 기록되지 않은 주부터 다른 지역이 되고, 이미 기록된 주(`mystery_week`)는 그대로 |
 | `TERRITORY_ANALYTICS_SALT` | 분석 저장소의 탐험가 해시에 섞는 서버 비밀값(10단계, 필수 — 없으면 기동 실패). 강한 랜덤 값, 미스터리 비밀값과 다르게. **바꾸지 않는다**(바꾸면 코호트·리텐션이 끊긴다) |
-| `TERRITORY_TRUSTED_PROXIES` | 선택(10단계). 분석 레이트 리밋이 믿는 프록시 CIDR(쉼표). 비우면 아무도 믿지 않음 — Cloudflare Tunnel 을 붙일 때만(위 10단계 절) |
+| `TERRITORY_VAPID_PUBLIC_KEY` / `TERRITORY_VAPID_PRIVATE_KEY` | 웹 푸시 VAPID 키 쌍(12단계, 필수 — 만드는 법은 위 12단계 절). **바꾸지 않는다**(바꾸면 모든 구독 무효). 로컬 시험용 키면 prod 기동 실패 |
+| `TERRITORY_VAPID_SUBJECT` | 웹 푸시 연락처 `mailto:…` 또는 `https://…`(12단계, 필수). 예시 주소면 prod 기동 실패 |
+| `TERRITORY_TRUSTED_PROXIES` | 선택(10단계). 분석 레이트 리밋이 믿는 프록시 CIDR(쉼표). 비우면 아무도 믿지 않음 — **Cloudflare Tunnel·리버스 프록시를 붙였다면 반드시 그 주소로**(위 10단계 절·배포 체크리스트 3) |
 | `TERRITORY_PUBLIC_BASE_URL` | 공개 기준 주소(og:image·og:url·OAuth redirect_uri). 로컬은 `http://localhost:18080` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 선택. 비우면 구글 로그인만 비활성(익명 탐험 정상) |
 

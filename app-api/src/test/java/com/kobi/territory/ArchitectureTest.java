@@ -32,13 +32,15 @@ import org.junit.jupiter.params.provider.EnumSource;
  * 규칙은 ArchUnit 의 기본 설정(빈 대상이면 실패 — failOnEmptyShould)으로 검사한다. 패키지 오타가 조용히 통과하지 않게
  * allowEmptyShould(true)는 쓰지 않는다. 7단계: 보고서가 규칙 문장으로 읽히도록 @ArchTest 필드 대신 JUnit @Nested·@DisplayName 으로 묶었다
  * (규칙 38개는 그대로 — 컨텍스트별 규칙은 컨텍스트마다 한 건). 10단계: 분석(analytics) 컨텍스트 추가 — 관찰자라 아무도 참조하지 않고,
- * 분석은 탐험·진행의 공개 이벤트만 본다.
+ * 분석은 탐험·진행의 공개 이벤트만 본다. 12단계: 알림(notification) 컨텍스트 추가 — 게임 컨텍스트는 알림을 모르고, 알림은 카탈로그·진행의
+ * 조회 계약과 탐험의 공개 이벤트만 본다. 분석은 알림의 공개 이벤트(PushSent)를 관찰한다.
  */
 @DisplayName("모듈 경계")
 class ArchitectureTest {
 
     private static final String ROOT = "com.kobi.territory.";
-    private static final String[] CONTEXTS = {"catalog", "exploration", "progression", "wardrobe", "social", "sharing", "analytics"};
+    private static final String[] CONTEXTS = {"catalog", "exploration", "progression", "wardrobe", "social", "sharing", "analytics",
+        "notification"};
 
     /** 운영 코드만(테스트 픽스처 제외) 한 번 읽어 모든 규칙이 함께 쓴다. */
     private static final JavaClasses PRODUCTION = new ClassFileImporter()
@@ -53,7 +55,8 @@ class ArchitectureTest {
         WARDROBE("wardrobe", "꾸미기"),
         SOCIAL("social", "소셜"),
         SHARING("sharing", "공유"),
-        ANALYTICS("analytics", "분석");
+        ANALYTICS("analytics", "분석"),
+        NOTIFICATION("notification", "알림");
 
         final String pkg;
         private final String label;
@@ -99,7 +102,8 @@ class ArchitectureTest {
                 .should().dependOnClassesThat()
                 .resideInAnyPackage("org.springframework.web..", "jakarta.persistence..", "org.springframework.data..",
                                     ROOT + "catalog..", ROOT + "exploration..", ROOT + "progression..",
-                                    ROOT + "wardrobe..", ROOT + "social..", ROOT + "sharing..", ROOT + "analytics..")
+                                    ROOT + "wardrobe..", ROOT + "social..", ROOT + "sharing..", ROOT + "analytics..",
+                                    ROOT + "notification..")
                 .check(PRODUCTION);
         }
     }
@@ -202,19 +206,44 @@ class ArchitectureTest {
         }
 
         /**
-         * 분석(§1 analytics): 프로젝트 안에서는 자기 자신·공유 커널·탐험과 진행의 공개 이벤트(api.event)만 참조한다(허용 목록 — QA P3-6).
-         * 카탈로그·꾸미기·소셜·공유는 물론 탐험·진행의 조회 계약(api.query)·화면 계약·내부도 모른다.
+         * 분석(§1 analytics): 프로젝트 안에서는 자기 자신·공유 커널·탐험과 진행(12단계: 알림도)의 공개 이벤트(api.event)만 참조한다(허용 목록 —
+         * QA P3-6). 카탈로그·꾸미기·소셜·공유는 물론 탐험·진행의 조회 계약(api.query)·화면 계약·내부도 모른다.
          */
         @Test
-        @DisplayName("분석은 공유 커널과 탐험·진행이 내놓은 사실(공개 이벤트)만 안다")
+        @DisplayName("분석은 공유 커널과 탐험·진행·알림이 내놓은 사실(공개 이벤트)만 안다")
         void analyticsKnowsOnlyPublishedFacts() {
             DescribedPredicate<JavaClass> outsideAllowed = JavaClass.Predicates.resideInAPackage("com.kobi.territory..")
                 .and(DescribedPredicate.not(JavaClass.Predicates.resideInAnyPackage(ROOT + "analytics..", ROOT + "common..",
-                    ROOT + "exploration.api.event..", ROOT + "progression.api.event..")))
-                .as("analytics·common·exploration.api.event·progression.api.event 밖의 프로젝트 클래스");
+                    ROOT + "exploration.api.event..", ROOT + "progression.api.event..", ROOT + "notification.api.event..")))
+                .as("analytics·common·exploration.api.event·progression.api.event·notification.api.event 밖의 프로젝트 클래스");
             noClasses().that().resideInAPackage(ROOT + "analytics..")
                 .should().dependOnClassesThat(outsideAllowed)
-                .as("analytics 는 자기 자신·common·exploration.api.event·progression.api.event 만 참조한다")
+                .as("analytics 는 자기 자신·common·exploration·progression·notification 의 api.event 만 참조한다")
+                .check(PRODUCTION);
+        }
+
+        /** 12단계: 알림은 게임 규칙을 바꾸지 않는다 — 게임 컨텍스트는 알림을 모른다(알림이 멈추거나 빠져도 게임은 그대로). */
+        @ParameterizedTest(name = "{0}은 알림을 모른다")
+        @EnumSource(value = Context.class, mode = EnumSource.Mode.EXCLUDE, names = {"ANALYTICS", "NOTIFICATION"})
+        @DisplayName("어떤 게임 컨텍스트도 알림을 모른다")
+        void nobodyKnowsNotification(Context context) {
+            forbid(context.pkg, "notification").check(PRODUCTION);
+        }
+
+        /**
+         * 알림(§1 notification, 12단계): 자기 자신·공유 커널·카탈로그의 조회 계약(이번 주 미스터리·계절 정의)·진행의 조회 계약(스트릭)·탐험의 공개
+         * 이벤트(계정 병합)만 참조한다(허용 목록). 꾸미기·소셜·공유·분석과 다른 컨텍스트의 내부는 모른다.
+         */
+        @Test
+        @DisplayName("알림은 카탈로그·진행의 조회 계약과 탐험의 공개 이벤트만 안다")
+        void notificationKnowsOnlyContracts() {
+            DescribedPredicate<JavaClass> outsideAllowed = JavaClass.Predicates.resideInAPackage("com.kobi.territory..")
+                .and(DescribedPredicate.not(JavaClass.Predicates.resideInAnyPackage(ROOT + "notification..", ROOT + "common..",
+                    ROOT + "catalog.api.query..", ROOT + "progression.api.query..", ROOT + "exploration.api.event..")))
+                .as("notification·common·catalog.api.query·progression.api.query·exploration.api.event 밖의 프로젝트 클래스");
+            noClasses().that().resideInAPackage(ROOT + "notification..")
+                .should().dependOnClassesThat(outsideAllowed)
+                .as("notification 은 자기 자신·common·catalog.api.query·progression.api.query·exploration.api.event 만 참조한다")
                 .check(PRODUCTION);
         }
 

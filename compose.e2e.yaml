@@ -26,6 +26,10 @@ services:
       TERRITORY_MYSTERY_SALT: local-mystery-salt
       # 분석 탐험가 해시 비밀값 — local 프로파일 기본값과 같게(운영 .env 값이 덮지 않게 명시)
       TERRITORY_ANALYTICS_SALT: local-analytics-salt
+      # 웹 푸시 VAPID — local 프로파일의 시험용 키를 쓴다(이 값들은 local 에서 읽지 않지만 운영 .env 값이 섞이지 않게 명시)
+      TERRITORY_VAPID_PUBLIC_KEY: BL4nehRk6sf8mdeCUNdZYgFJV8YQKhg_DBB2UPhEBtJhpCGph6jaB7u4cWesO4IFwVwnsate9RFv1cnqDuuXjgU
+      TERRITORY_VAPID_PRIVATE_KEY: _rA6y0IIhChRfj6xo4JxQ9rYj8bkwc2pIuzrjvKfyY8
+      TERRITORY_VAPID_SUBJECT: mailto:dev@territory.local
       # og:image 등 절대 주소 — 호스트에서 보이는 E2E 주소
       TERRITORY_PUBLIC_BASE_URL: http://localhost:18090
       GOOGLE_CLIENT_ID: ""

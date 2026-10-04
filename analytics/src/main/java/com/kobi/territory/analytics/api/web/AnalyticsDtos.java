@@ -74,14 +74,15 @@ public final class AnalyticsDtos {
     // ---- GET /admin/metrics ----
 
     public record MetricsResponse(Instant generatedAt, String timeZone, LocalDate from, LocalDate to, Instant lastBatchAt,
-                                  List<LocalDate> missingDays, List<LocalDate> expiredDays, TodayView today, List<DailyView> daily, List<FunnelView> funnel,
+                                  List<LocalDate> missingDays, List<LocalDate> expiredDays, List<LocalDate> pendingCohortDays,
+                                  TodayView today, List<DailyView> daily, List<FunnelView> funnel,
                                   List<RetentionView> retention, KFactorView kFactor, FeatureUsageView featureUsage,
                                   TopErrorsView topErrors) {
 
         static MetricsResponse from(MetricsReport report, String timeZone, int topErrorCodes) {
             DailySnapshot today = report.today();
             return new MetricsResponse(report.generatedAt(), timeZone, report.range().from(), report.range().to(), report.lastBatchAt(),
-                report.missingDays(), report.expiredDays(), TodayView.from(today),
+                report.missingDays(), report.expiredDays(), report.pendingCohortDays(), TodayView.from(today),
                 report.daily().stream().map(snapshot -> DailyView.from(snapshot, today.day())).toList(),
                 report.cohorts().stream().map(FunnelView::from).toList(),
                 report.cohorts().stream().map(RetentionView::from).toList(),
@@ -98,11 +99,11 @@ public final class AnalyticsDtos {
     }
 
     public record DailyView(LocalDate day, int newVisitors, int newExplorers, int dau, int wau, int mau, int profileViews,
-                            int cardViews, int botViews, Double kFactor, boolean live) {
+                            int cardViews, int botViews, Double kFactor, boolean live, boolean partialWindow) {
         static DailyView from(DailySnapshot snapshot, LocalDate today) {
             return new DailyView(snapshot.day(), snapshot.newVisitors(), snapshot.newExplorers(), snapshot.dau(), snapshot.wau(),
                 snapshot.mau(), snapshot.pageViews().profileViews(), snapshot.pageViews().cardViews(), snapshot.pageViews().botViews(),
-                snapshot.kFactor().value(), snapshot.day().equals(today));
+                snapshot.kFactor().value(), snapshot.day().equals(today), snapshot.partialWindow());
         }
     }
 

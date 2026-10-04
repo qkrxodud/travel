@@ -31,3 +31,10 @@ territory:
     # 분석 탐험가 해시에 섞는 서버 비밀값(10단계) — 환경변수 필수(없으면 기동 실패). 바꾸면 그때부터 같은 탐험가를 다른 사람으로 센다
     # (코호트·리텐션이 끊긴다) — 한 번 정하면 바꾸지 않는다.
     salt: ${TERRITORY_ANALYTICS_SALT}
+  push:
+    # 웹 푸시 VAPID 키(12단계) — 환경변수 필수(없으면 기동 실패). 공개 키 65바이트·개인 키 32바이트 base64url, subject 는 mailto: 또는 https://.
+    # 형식이 틀리거나 한 쌍이 아니거나 로컬 시험용 키면 기동하지 않는다. 바꾸면 기존 구독이 모두 무효(브라우저가 다시 구독해야 함) — 한 번 정하면 그대로.
+    vapid:
+      public-key: ${TERRITORY_VAPID_PUBLIC_KEY}
+      private-key: ${TERRITORY_VAPID_PRIVATE_KEY}
+      subject: ${TERRITORY_VAPID_SUBJECT}

@@ -89,10 +89,17 @@ describe('익명 방문 ID', () => {
 });
 
 describe('허용된 이벤트만', () => {
-  it('계약의 화면 이벤트 열 가지만 안다', () => {
+  it('계약의 화면 이벤트 열한 가지만 안다', () => {
     expect([...CLIENT_EVENT_NAMES].sort()).toEqual([
-      'app_open', 'checkin_cancel', 'checkin_open', 'checkin_save', 'error_toast', 'link_copy', 'onboarding_step', 'push_prompt', 'share_click', 'tab_view',
+      'app_open', 'checkin_cancel', 'checkin_open', 'checkin_save', 'error_toast', 'link_copy', 'onboarding_step', 'push_open', 'push_prompt', 'share_click', 'tab_view',
     ]);
+  });
+
+  it('알림을 눌러 연 것은 알림 종류만 싣는다', () => {
+    expect(sanitizeProps('app_open', { entry: 'push' })).toEqual({ entry: 'push' });
+    expect(sanitizeProps('push_open', { kind: 'mystery' })).toEqual({ kind: 'mystery' });
+    expect(sanitizeProps('push_open', { kind: 'lottery' })).toBeNull();
+    expect(sanitizeProps('push_open', {})).toBeNull();
   });
 
   it('가입·체크인처럼 서버가 아는 사실이나 모르는 이름은 보내지 않는다', () => {

@@ -5,10 +5,13 @@
 
 // ---- 화면 이벤트(§1-1) ----
 
-export type EntryPoint = 'direct' | 'invite' | 'profile' | 'card' | 'other';
+/** push = 알림을 눌러 열었다(12단계) */
+export type EntryPoint = 'direct' | 'invite' | 'profile' | 'card' | 'other' | 'push';
 export type AnalyticsTab = 'map' | 'bag' | 'sets' | 'quests' | 'rank' | 'profile';
 export type OnboardingAction = 'view' | 'done' | 'skip';
 export type PushPromptResult = 'shown' | 'granted' | 'denied' | 'dismissed';
+/** 알림 종류(12단계 — notification 컨텍스트 NotificationKind) */
+export type PushKind = 'mystery' | 'streak' | 'season';
 
 /** 이벤트 이름 → 필드. 여기 없는 이름·필드는 보내지 않는다(서버도 거절한다). */
 export interface ClientEventProps {
@@ -23,6 +26,8 @@ export interface ClientEventProps {
   link_copy: { target: string };
   onboarding_step: { step: number; action: OnboardingAction };
   push_prompt: { result: PushPromptResult };
+  /** 알림을 눌러 열었다(12단계) */
+  push_open: { kind: PushKind };
   /** code: 서버 오류 코드 형식([A-Z][A-Z0-9_]{1,63}) — 문장 금지 */
   error_toast: { code: string };
 }
@@ -79,6 +84,8 @@ export interface DailyView {
   botViews: number;
   kFactor: number | null;
   live: boolean;
+  /** 그날 30일 구간(MAU·K 계수) 앞부분 원본이 이미 지워진 채 계산했다 — 신뢰도 낮음(오늘은 늘 false, 12단계) */
+  partialWindow: boolean;
 }
 
 export interface FunnelView {
@@ -149,6 +156,8 @@ export interface MetricsResponse {
   missingDays: string[];
   /** 계산한 적 없고 원본 보관 기간도 지나 다시 셀 수 없는 날(빈 날이 아니다) */
   expiredDays: string[];
+  /** 배치가 아직 퍼널·리텐션을 계산하지 않은 코호트 날(원본이 남아 배치로 채울 수 있다, 12단계) */
+  pendingCohortDays: string[];
   today: TodayView;
   daily: DailyView[];
   funnel: FunnelView[];

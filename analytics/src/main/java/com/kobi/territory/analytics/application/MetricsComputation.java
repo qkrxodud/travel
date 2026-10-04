@@ -32,7 +32,8 @@ class MetricsComputation {
         this.policy = settings.metricsPolicy();
     }
 
-    DailySnapshot daily(LocalDate day, Instant computedAt) {
+    /** today = 계산하는 날(배치는 오늘, 실시간은 그날) — 구간 앞부분 원본이 지워졌는지 판단에 쓴다. */
+    DailySnapshot daily(LocalDate day, LocalDate today, Instant computedAt) {
         DayRange featureRange = policy.featureRange(day);
         DayRange kRange = policy.kRange(day);
         KFactor kFactor = new KFactor(kRange, reader.invitedNewExplorers(kRange), reader.cardNewExplorers(kRange),
@@ -40,7 +41,7 @@ class MetricsComputation {
         return new DailySnapshot(day, reader.newVisitors(day), reader.newExplorers(day), reader.activeActors(DayRange.single(day)),
             reader.activeActors(policy.weekEnding(day)), reader.activeActors(policy.monthEnding(day)), reader.pageViews(day), kFactor,
             FeatureUsage.of(featureRange, reader.activeActors(featureRange), features, reader.featureUsers(featureRange, features)),
-            ErrorTally.of(featureRange, reader.errorCounts(featureRange)), computedAt);
+            ErrorTally.of(featureRange, reader.errorCounts(featureRange)), computedAt, policy.windowTruncated(day, today));
     }
 
     CohortSnapshot cohort(LocalDate cohortDay, LocalDate today, Instant computedAt) {

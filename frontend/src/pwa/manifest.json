@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "나의 영토",
+  "short_name": "나의 영토",
+  "description": "다녀온 시·군·구를 칠하고 그곳 특산물로 캐릭터를 꾸미는 여행 지도",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0f8f7e",
+  "background_color": "#eef1f4",
+  "categories": ["travel", "games"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -2,8 +2,10 @@ import type { FunnelView } from '../../../api/types/analytics';
 import { expiredCohortNote, funnelRows } from '../model/metrics';
 
 /** 퍼널(코호트 = 그날 처음 본 방문): 첫 화면 → 7일 안 첫 체크인 → 그 뒤 7일 안 재방문 */
-export function FunnelTable({ funnel, today, expiredDays }: { funnel: readonly FunnelView[]; today: string; expiredDays: readonly string[] }) {
-  const rows = funnelRows(funnel, today);
+export function FunnelTable({ funnel, today, expiredDays, pendingCohortDays }: {
+  funnel: readonly FunnelView[]; today: string; expiredDays: readonly string[]; pendingCohortDays: readonly string[];
+}) {
+  const rows = funnelRows(funnel, today, pendingCohortDays);
   const expired = expiredCohortNote(expiredDays);
   return (
     <div className="card" id="admin-funnel">
@@ -15,7 +17,12 @@ export function FunnelTable({ funnel, today, expiredDays }: { funnel: readonly F
             <tr><th>첫 화면 날</th><th>첫 화면</th><th>첫 체크인</th><th>전환</th><th>7일 내 재방문</th><th>전환</th><th>전체</th><th>상태</th></tr>
           </thead>
           <tbody>
-            {rows.map(row => (
+            {rows.map(row => row.pending ? (
+              <tr key={row.cohortDay} data-cohort-day={row.cohortDay} data-status="pending" data-days={row.pending.days} className="gap missing">
+                <th scope="row">{row.cohortDay}</th>
+                <td colSpan={7} className="gap-note">{row.pending.text}</td>
+              </tr>
+            ) : (
               <tr key={row.cohortDay} data-cohort-day={row.cohortDay} data-settled={row.settled} className={row.today ? 'today' : undefined}>
                 <th scope="row">{row.cohortDay}{row.today ? ' (오늘)' : ''}</th>
                 <td data-funnel="first-screen">{row.firstScreen}</td>

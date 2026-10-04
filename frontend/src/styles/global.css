@@ -521,3 +521,19 @@ input[type=date],input[type=text]{flex:1 1 120px;min-width:0;border:1px solid va
 .admin-table tr.gap th[scope=row],.admin-table td.gap-note{color:var(--muted)}
 .admin-table td.gap-note{text-align:left;background:repeating-linear-gradient(45deg,transparent 0 4px,var(--line) 4px 5px)}
 .gap-caption{margin:0 0 6px}
+
+/* PWA(12단계): 알림 질문·설치 권유 카드(지도 탭 오른쪽 칸), 알림 설정(프로필 탭), 새 버전 안내(화면 위) */
+.card.push-ask,.card.install-ask{border-color:var(--accent);background:linear-gradient(180deg,var(--accent-soft),var(--panel) 70%)}
+.card.push-ask h2,.card.install-ask h2{margin-bottom:4px}
+.card.push-ask .note,.card.install-ask .note{display:block;margin:0}
+.push-settings .note{display:block;margin:6px 0 0}
+.push-kinds{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.push-kinds label{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.push-kinds input{margin-top:3px;accent-color:var(--accent);width:16px;height:16px;flex:none}
+.push-kinds b{display:block;font-weight:500}
+.push-kinds small{display:block;font-size:11px;color:var(--muted)}
+.update-bar{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:31;display:flex;gap:12px;align-items:center;background:var(--fg);color:var(--bg);border-radius:999px;padding:8px 10px 8px 18px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100vw - 32px)}
+.update-bar span{font-weight:500;font-size:13px}
+/* 관리자: 30일 구간이 잘린 채 계산한 날(12단계) */
+.admin-notice.partial{margin:0}
+.admin-table .tag.low-confidence{border-color:var(--gold);color:var(--gold);white-space:nowrap}

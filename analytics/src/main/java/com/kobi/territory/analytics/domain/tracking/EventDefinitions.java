@@ -29,6 +29,8 @@ public final class EventDefinitions {
     public static final String ONBOARDING_STEP = "onboarding_step";
     public static final String PUSH_PROMPT = "push_prompt";
     public static final String ERROR_TOAST = "error_toast";
+    /** 12단계: 알림을 눌러 앱이 열렸다(화면이 열린 주소의 push=종류 로 보낸다). */
+    public static final String PUSH_OPEN = "push_open";
 
     // ---- 서버 사실(공개 이벤트 구독) ----
     public static final String EXPLORER_CREATED = "explorer_created";
@@ -45,6 +47,8 @@ public final class EventDefinitions {
     public static final String MYSTERY_FOUND = "mystery_found";
     public static final String REVISIT_STAMPED = "revisit_stamped";
     public static final String WISH_FULFILLED = "wish_fulfilled";
+    /** 12단계: 알림을 한 사람의 기기에 보냈다(알림 컨텍스트의 PushSent). */
+    public static final String PUSH_SENT = "push_sent";
 
     // ---- 공개 페이지 요청(요청 필터) ----
     public static final String PROFILE_VIEW = "profile_view";
@@ -52,7 +56,7 @@ public final class EventDefinitions {
     public static final String COMPARE_CARD_VIEW = "compare_card_view";
 
     private static final EventDefinitions STANDARD = new EventDefinitions(List.of(
-        client(APP_OPEN, "entry", false, requiredOneOf("entry", "direct", "invite", "profile", "card", "other")),
+        client(APP_OPEN, "entry", false, requiredOneOf("entry", "direct", "invite", "profile", "card", "push", "other")),
         client(TAB_VIEW, "tab", true, requiredOneOf("tab", "map", "bag", "sets", "quests", "rank", "profile")),
         client(CHECKIN_OPEN, null, true),
         client(CHECKIN_SAVE, null, false),
@@ -63,6 +67,7 @@ public final class EventDefinitions {
             optionalOneOf("action", "view", "done", "skip")),
         client(PUSH_PROMPT, "result", false, requiredOneOf("result", "shown", "granted", "denied", "dismissed")),
         client(ERROR_TOAST, "code", false, required("code", FieldType.ERROR_CODE)),
+        client(PUSH_OPEN, "kind", false, requiredOneOf("kind", "mystery", "streak", "season")),
 
         server(EXPLORER_CREATED, null, false),
         server(CHECK_IN, "rarity", true, requiredOneOf("rarity", "common", "rare", "legend"),
@@ -80,6 +85,7 @@ public final class EventDefinitions {
         server(MYSTERY_FOUND, null, false),
         server(REVISIT_STAMPED, null, true),
         server(WISH_FULFILLED, null, true),
+        server(PUSH_SENT, "kind", false, requiredOneOf("kind", "mystery", "streak", "season"), optional("devices", FieldType.SMALL_NUMBER)),
 
         new EventDefinition(PROFILE_VIEW, EventSource.REQUEST, List.of(), null, false),
         new EventDefinition(CARD_VIEW, EventSource.REQUEST, List.of(required("kind", FieldType.TOKEN)), "kind", false),

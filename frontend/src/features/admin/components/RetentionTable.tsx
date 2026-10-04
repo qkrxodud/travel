@@ -14,8 +14,10 @@ function Cell({ cell, day }: { cell: RetentionCell; day: string }) {
 }
 
 /** 코호트 리텐션(그날 가입한 탐험가가 N 일째 그 하루에 활동) — 아직 셀 수 없는 칸은 빈칸 */
-export function RetentionTable({ retention, expiredDays }: { retention: readonly RetentionView[]; expiredDays: readonly string[] }) {
-  const rows = retentionRows(retention);
+export function RetentionTable({ retention, expiredDays, pendingCohortDays }: {
+  retention: readonly RetentionView[]; expiredDays: readonly string[]; pendingCohortDays: readonly string[];
+}) {
+  const rows = retentionRows(retention, pendingCohortDays);
   const expired = expiredCohortNote(expiredDays);
   return (
     <div className="card" id="admin-retention">
@@ -26,7 +28,12 @@ export function RetentionTable({ retention, expiredDays }: { retention: readonly
           <table className="admin-table">
             <thead><tr><th>가입일</th><th>가입</th>{DAYS.map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead>
             <tbody>
-              {rows.map(row => (
+              {rows.map(row => row.pending ? (
+                <tr key={row.cohortDay} data-cohort-day={row.cohortDay} data-status="pending" data-days={row.pending.days} className="gap missing">
+                  <th scope="row">{row.cohortDay}</th>
+                  <td colSpan={4} className="gap-note">{row.pending.text}</td>
+                </tr>
+              ) : (
                 <tr key={row.cohortDay} data-cohort-day={row.cohortDay}>
                   <th scope="row">{row.cohortDay}</th>
                   <td data-retention="new">{row.newExplorers}</td>

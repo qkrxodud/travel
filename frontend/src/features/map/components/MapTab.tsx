@@ -24,8 +24,11 @@ import { SampleNote } from './SampleNote';
 
 const EMPTY = new Set<string>();
 
-/** 지도 탭: 왼쪽 지도, 오른쪽 기록 칸. 지도 카드(공유 지도)는 sharedMap 기능이 그려 slot 으로 넣는다. */
-export function MapTab({ mapCard }: { mapCard: ReactNode }) {
+/**
+ * 지도 탭: 왼쪽 지도, 오른쪽 기록 칸. 지도 카드(공유 지도)는 sharedMap 기능이, 안내 카드(알림 받을래요?·홈 화면 설치)는 pwa 기능이
+ * 그려 slot 으로 넣는다.
+ */
+export function MapTab({ mapCard, notices }: { mapCard: ReactNode; notices?: ReactNode }) {
   const tab = useUiStore(state => state.tab);
   const selected = useUiStore(state => state.selected);
   const highlight = useUiStore(state => state.highlight);
@@ -86,6 +89,7 @@ export function MapTab({ mapCard }: { mapCard: ReactNode }) {
         <div className="maplegend"><span>미탐험</span><span className="a">내 영토</span><span className="l">전설 풍경 지역</span><span className="q">❓ 이번 주 미스터리</span><span className="c">정복한 시·도</span><span className="w">📍 가고 싶은 곳</span></div>
       </MapView>
       <aside className="side">
+        {notices}
         {mapCard}
         <MysteryCard />
         <RegionDetail />

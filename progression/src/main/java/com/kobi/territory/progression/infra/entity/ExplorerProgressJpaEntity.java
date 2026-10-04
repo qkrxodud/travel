@@ -3,6 +3,7 @@ package com.kobi.territory.progression.infra.entity;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.progression.domain.progress.ExplorerProgress;
 import com.kobi.territory.progression.domain.progress.Streak;
+import com.kobi.territory.progression.domain.progress.StreakStanding;
 import com.kobi.territory.progression.domain.progress.StreakFreezes;
 import com.kobi.territory.progression.domain.progress.XpLedger;
 import jakarta.persistence.Column;
@@ -74,6 +75,12 @@ public class ExplorerProgressJpaEntity {
     }
 
     /** 루트 + 자식 행으로 애그리거트를 복원한다. */
+    /** 연속 탐험 상태만(12단계 — 애그리거트를 통째로 복원하지 않는 읽기). freezesHeld 는 보호권 장부 합계. */
+    public StreakStanding toStreakStanding(int freezesHeld) {
+        return new StreakStanding(ExplorerId.of(explorerId),
+            streakMonths == 0 ? Streak.NONE : Streak.of(streakMonths, YearMonth.parse(streakLastMonth)), freezesHeld);
+    }
+
     public ExplorerProgress toDomain(List<XpLedgerJpaEntity> ledgerRows, List<ExplorerRegionJpaEntity> regionRows,
                                      List<ExplorerRegionMarkJpaEntity> markRows, List<BadgeEarnedJpaEntity> badgeRows,
                                      List<TitleEarnedJpaEntity> titleRows, List<StreakFreezeJpaEntity> freezeRows) {

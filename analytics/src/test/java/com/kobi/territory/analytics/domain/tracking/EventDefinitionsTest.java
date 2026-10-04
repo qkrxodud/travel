@@ -102,6 +102,41 @@ class EventDefinitionsTest {
     }
 
     @Nested
+    @DisplayName("알림")
+    class Notifications {
+
+        @Test
+        @DisplayName("알림을 눌러 열었다는 화면 이벤트는 알림 종류를 갈래로 적는다")
+        void pushOpen() {
+            TrackedEvent event = 읽는다(화면(EventDefinitions.PUSH_OPEN, "kind", "streak"));
+
+            assertThat(event.label()).isEqualTo("streak");
+        }
+
+        @Test
+        @DisplayName("모르는 알림 종류로 열었다는 이벤트는 받지 않는다")
+        void unknownPushKind() {
+            assertThat(거절_이유(화면(EventDefinitions.PUSH_OPEN, "kind", "promo"))).isEqualTo(RejectionReason.INVALID_FIELD);
+        }
+
+        @Test
+        @DisplayName("알림으로 들어온 첫 화면은 들어온 길을 알림으로 적는다")
+        void appOpenFromPush() {
+            assertThat(읽는다(화면(EventDefinitions.APP_OPEN, "entry", "push")).label()).isEqualTo("push");
+        }
+
+        @Test
+        @DisplayName("알림을 보냈다는 사실은 서버만 적는다 — 화면이 보내면 받지 않는다")
+        void pushSentIsServerFact() {
+            ServerFact fact = new ServerFact(EventDefinitions.PUSH_SENT, EXPLORER_ID, NOW, Map.of("kind", "mystery", "devices", 2),
+                "PushSent|…");
+
+            assertThat(definitions.require(fact.name()).server(fact, EXPLORER, "지문", INGEST).label()).isEqualTo("mystery");
+            assertThat(거절_이유(화면(EventDefinitions.PUSH_SENT, "kind", "mystery"))).isEqualTo(RejectionReason.SERVER_ONLY_EVENT);
+        }
+    }
+
+    @Nested
     @DisplayName("개인정보")
     class PersonalData {
 
@@ -165,10 +200,10 @@ class EventDefinitionsTest {
         }
 
         @Test
-        @DisplayName("화면 이벤트 열 가지, 서버 사실 열네 가지, 공개 페이지 열람 세 가지를 받는다")
+        @DisplayName("화면 이벤트 열한 가지, 서버 사실 열다섯 가지, 공개 페이지 열람 세 가지를 받는다")
         void sizes() {
-            assertThat(definitions.from(EventSource.CLIENT)).hasSize(10);
-            assertThat(definitions.from(EventSource.SERVER)).hasSize(14);
+            assertThat(definitions.from(EventSource.CLIENT)).hasSize(11);
+            assertThat(definitions.from(EventSource.SERVER)).hasSize(15);
             assertThat(definitions.from(EventSource.REQUEST)).hasSize(3);
         }
     }

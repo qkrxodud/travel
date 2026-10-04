@@ -59,6 +59,15 @@ public record MetricsPolicy(int retentionDays, int recomputeDays, int dailyRecom
         return pending(today, dailyRecomputeDays, computed);
     }
 
+    /**
+     * 그날 하루 지표의 30일 구간(MAU·K 계수 — 더 긴 쪽)의 앞부분 원본이 today 기준 이미 보관 기간을 지나 지워졌는지(10단계 QA r2 P3-c). 오래된
+     * 빈 날을 늦게 채우면 참이고, 그 값은 작게 나온다 — 화면이 "신뢰도 낮음"으로 표시한다.
+     */
+    public boolean windowTruncated(LocalDate day, LocalDate today) {
+        LocalDate windowStart = monthEnding(day).from().isBefore(kRange(day).from()) ? monthEnding(day).from() : kRange(day).from();
+        return windowStart.isBefore(purgeBefore(today));
+    }
+
     /** 원본이 남아 있어 계산할 수 있는 지난 날 구간: 보관 기간의 첫날 ~ 어제. */
     public DayRange backfillRange(LocalDate today) {
         return new DayRange(purgeBefore(today), today.minusDays(1));

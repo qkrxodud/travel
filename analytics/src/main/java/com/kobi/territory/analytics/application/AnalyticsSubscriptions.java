@@ -12,6 +12,7 @@ import com.kobi.territory.exploration.api.event.RegionVisited;
 import com.kobi.territory.exploration.api.event.RevisitStamped;
 import com.kobi.territory.exploration.api.event.VisitCancelled;
 import com.kobi.territory.exploration.api.event.WishFulfilled;
+import com.kobi.territory.notification.api.event.PushSent;
 import com.kobi.territory.progression.api.event.MysteryBonusEarned;
 import com.kobi.territory.progression.api.event.ProvinceConquered;
 import com.kobi.territory.progression.api.event.QuestCompleted;
@@ -26,6 +27,8 @@ import org.springframework.context.annotation.Configuration;
  * 분석의 outbox 구독 — 소비 대상 하나(원본 이벤트 기록 + 탐험가 여정)에 구독자 하나 {@code analytics.events}. id 는
  * outbox_delivery.subscriber 키라 바꾸지 않는다. 다른 컨텍스트의 공개 이벤트를 분석 사실({@link ServerFact})로 옮기기만 한다 —
  * 게임 규칙은 건드리지 않고 아무것도 내보내지 않는다(관찰자). 탐험가 id 는 적을 때 해시로 바뀌고, handle·메모 같은 값은 옮기지 않는다.
+ * <p>
+ * 12단계: 알림 컨텍스트의 PushSent(알림 발송)도 받는다 — 화면이 보내는 push_open(알림 눌러 열기)과 함께 클릭률.
  * <p>
  * 보호권(연속 탐험 동결) 사용·지급은 공개 이벤트가 없어 아직 받지 않는다(진행 컨텍스트에 이벤트가 생기면 여기에 더한다).
  */
@@ -74,6 +77,8 @@ public class AnalyticsSubscriptions {
                 Map.of())))
             .on(WishFulfilled.class, event -> recorder.record(fact(EventDefinitions.WISH_FULFILLED, event.explorerId(), event,
                 Map.of())))
+            .on(PushSent.class, event -> recorder.record(fact(EventDefinitions.PUSH_SENT, event.explorerId(), event,
+                fields("kind", event.kind(), "devices", event.devices()))))
             .build();
     }
 

@@ -1,5 +1,5 @@
 import type { MetricsResponse } from '../../../api/types/analytics';
-import { activityTrend, dayEntries, expiredDaysText, newcomerTrend } from '../model/metrics';
+import { activityTrend, dayEntries, expiredDaysText, newcomerTrend, partialWindowText } from '../model/metrics';
 import { BatchNotice } from './BatchNotice';
 import { DailyTable } from './DailyTable';
 import { FeatureUsageCard } from './FeatureUsageCard';
@@ -13,6 +13,7 @@ import { TrendChart } from './TrendChart';
 export function MetricsDashboard({ metrics, adminToken }: { metrics: MetricsResponse; adminToken: string }) {
   const entries = dayEntries(metrics);
   const expired = expiredDaysText(metrics.expiredDays);
+  const partial = partialWindowText(metrics.daily);
   return (
     <div className="admin-body" id="admin-metrics" data-from={metrics.from} data-to={metrics.to}>
       <p className="note" id="admin-range">
@@ -20,6 +21,7 @@ export function MetricsDashboard({ metrics, adminToken }: { metrics: MetricsResp
       </p>
       <BatchNotice missingDays={metrics.missingDays} adminToken={adminToken} />
       {expired ? <p className="admin-notice expired" id="admin-expired" data-days={metrics.expiredDays.length}>{expired}</p> : null}
+      {partial ? <p className="admin-notice partial" id="admin-partial">{partial}</p> : null}
       <HeadlineStats metrics={metrics} />
       <div className="admin-grid">
         <div className="card">
@@ -32,8 +34,8 @@ export function MetricsDashboard({ metrics, adminToken }: { metrics: MetricsResp
         </div>
       </div>
       <DailyTable entries={entries} />
-      <FunnelTable funnel={metrics.funnel} today={metrics.to} expiredDays={metrics.expiredDays} />
-      <RetentionTable retention={metrics.retention} expiredDays={metrics.expiredDays} />
+      <FunnelTable funnel={metrics.funnel} today={metrics.to} expiredDays={metrics.expiredDays} pendingCohortDays={metrics.pendingCohortDays} />
+      <RetentionTable retention={metrics.retention} expiredDays={metrics.expiredDays} pendingCohortDays={metrics.pendingCohortDays} />
       <div className="admin-grid">
         <FeatureUsageCard usage={metrics.featureUsage} />
         <TopErrorsCard errors={metrics.topErrors} kFactor={metrics.kFactor} />

@@ -1,0 +1,13 @@
+dependencies {
+    api project(':common')
+    // 12단계: 알림(웹 푸시). 카탈로그(이번 주 미스터리·계절 정의 api.query), 진행(스트릭 조회 api.query), 탐험(계정 병합 api.event)만 본다.
+    // 다른 패키지(domain·application·infra·api.web) 참조는 ArchUnit 이 막는다. 아무 게임 컨텍스트도 notification 을 참조하지 않는다
+    // (분석만 공개 이벤트 PushSent 를 관찰).
+    implementation project(':catalog')
+    implementation project(':exploration')
+    implementation project(':progression')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+}

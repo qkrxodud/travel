@@ -54,6 +54,27 @@ public final class TrustedProxies {
         return socket;
     }
 
+    /**
+     * 앞단 프록시가 붙어 있는데 믿는 프록시 설정이 비었거나 맞지 않아 보이는지(10단계 QA r2 P3-d) — 실제 접속 주소가 사설·루프백 주소(같은
+     * 호스트·compose 네트워크의 프록시로 보임)이고 믿지 않는 주소인데 프록시 헤더(CF-Connecting-IP·X-Forwarded-For)가 왔다. 이대로면 모든 방문자가
+     * 프록시 주소 하나로 세져 주소 버킷 하나를 나눠 쓰고, 사용자가 늘면 수집이 조용히 429 로 버려진다.
+     */
+    public boolean ignoresForwardingFrom(ClientOrigin origin) {
+        if (origin.cloudflareIp() == null && origin.forwardedFor() == null) return false;
+        if (trusts(origin.socketAddress())) return false;
+        return literal(origin.socketAddress()).map(TrustedProxies::privateOrLoopback).orElse(false);
+    }
+
+    private static boolean privateOrLoopback(byte[] address) {
+        try {
+            InetAddress parsed = InetAddress.getByAddress(address);
+            if (parsed.isLoopbackAddress() || parsed.isSiteLocalAddress() || parsed.isLinkLocalAddress()) return true;
+            return address.length == 16 && (address[0] & 0xFE) == 0xFC;  // IPv6 고유 로컬(fc00::/7)
+        } catch (UnknownHostException impossible) {
+            return false;
+        }
+    }
+
     /** 믿는 프록시를 거친 요청이면 나라 헤더, 아니면 없음. */
     public String countryHeader(ClientOrigin origin) {
         return trusts(origin.socketAddress()) ? origin.countryHeader() : null;

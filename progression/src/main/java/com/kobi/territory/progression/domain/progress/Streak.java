@@ -70,6 +70,19 @@ public final class Streak {
         return (int) lastMonth.until(current, ChronoUnit.MONTHS) - 1;
     }
 
+    /**
+     * 이번 달을 놓치면 끊길 수 있는 연속인지(12단계 스트릭 지키기 알림) — 아직 이번 달에 칠하지 않았고, 지금 칠하면 이어지는(보호권으로 빈 달을
+     * 메울 수 있는) 연속이 있다.
+     */
+    public boolean atRiskIn(YearMonth current, int freezesHeld) {
+        return !activeIn(current) && asOf(current, freezesHeld) > 0;
+    }
+
+    /** 이번 달을 놓치고 다음 달에 칠하면 메워야 할 빈 달 수(= 그때 필요한 보호권 수, 12단계). */
+    public int freezesNeededIfMissed(YearMonth current) {
+        return emptyMonthsBefore(current.plusMonths(1));
+    }
+
     /** 이번 달에 이미 체크인했는지. */
     public boolean activeIn(YearMonth current) {
         return current.equals(lastMonth);

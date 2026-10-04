@@ -84,4 +84,10 @@ export default tseslint.config(
     files: ['src/api/**/*.ts', 'src/**/*.test.{ts,tsx}'],
     rules: { 'no-restricted-globals': 'off', 'no-restricted-properties': 'off' },
   },
+  {
+    // 서비스워커(12단계)는 앱 화면이 아니라 브라우저 안의 별도 실행 환경 — 정적 자산 캐시를 위해 fetch 를 직접 쓴다(API 는 손대지 않는다)
+    files: ['src/sw/serviceWorker.ts'],
+    languageOptions: { globals: globals.serviceworker },
+    rules: { 'no-restricted-globals': 'off' },
+  },
 );

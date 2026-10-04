@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.kobi.territory.catalog.api.query.MysteryRegionQuery;
 import com.kobi.territory.catalog.application.MysteryService;
 import com.kobi.territory.analytics.application.AnalyticsSettings;
+import com.kobi.territory.notification.application.NotificationSettings;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +24,10 @@ import org.springframework.test.context.ActiveProfiles;
     "TERRITORY_ADMIN_TOKEN=prod-profile-test-token",
     "TERRITORY_PUBLIC_BASE_URL=https://territory.example",
     "TERRITORY_MYSTERY_SALT=prod-profile-test-salt",
-    "TERRITORY_ANALYTICS_SALT=prod-profile-analytics-salt"
+    "TERRITORY_ANALYTICS_SALT=prod-profile-analytics-salt",
+    "TERRITORY_VAPID_PUBLIC_KEY=BNoEP1KvTNzkBGDtFibjjOpjPx5Xag9hGB_6Dem9BOt9y7pHK0r0D9nbiu6zmcxFbwL-McWBzcVM_T8gvsoTuXs",
+    "TERRITORY_VAPID_PRIVATE_KEY=xP8kqb6BYi0gHJwm4eHRQYzPyQO-LzgG88qv8adfNq4",
+    "TERRITORY_VAPID_SUBJECT=mailto:ops@territory.kr"
 })
 @ActiveProfiles("prod")
 @DisplayName("운영 환경")
@@ -53,5 +57,14 @@ class DevControllerProdProfileTest {
         assertThat(context.getBeansOfType(AnalyticsDevController.class)).isEmpty();
         assertThat(context.getBean(AnalyticsSettings.class).salt()).isEqualTo("prod-profile-analytics-salt");
         assertThat(context.getBean(AnalyticsSettings.class).liveCacheTtl()).isPositive();
+    }
+
+    @Test
+    @DisplayName("웹 푸시 개발 도구가 없고, 알림 서버 키는 환경변수에서 오며 개발용 주소는 받지 않는다")
+    void pushFromEnvironment() {
+        assertThat(context.getBeansOfType(PushDevController.class)).isEmpty();
+        NotificationSettings settings = context.getBean(NotificationSettings.class);
+        assertThat(settings.vapid().publicKey()).startsWith("BNoEP1Kv");
+        assertThat(settings.devicePolicy().endpointRules().allowLocalhost()).isFalse();
     }
 }

@@ -15,7 +15,7 @@ public final class DailyMetricRow {
 
     public static final String INSERT = "INSERT INTO analytics_daily (metric_day, new_visitors, new_explorers, dau, wau, mau, "
         + "profile_views, card_views, bot_views, k_from, k_to, k_invited_new, k_card_new, k_viral_new, k_active_explorers, "
-        + "feature_from, feature_to, feature_active_users, computed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        + "feature_from, feature_to, feature_active_users, computed_at, partial_window) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     public static final String SELECT_RANGE = "SELECT * FROM analytics_daily WHERE metric_day BETWEEN ? AND ? ORDER BY metric_day";
     public static final String SELECT_DAYS = "SELECT metric_day FROM analytics_daily WHERE metric_day BETWEEN ? AND ?";
     public static final String DELETE = "DELETE FROM analytics_daily WHERE metric_day = ?";
@@ -32,7 +32,7 @@ public final class DailyMetricRow {
             views.profileViews(), views.cardViews(), views.botViews(),
             kFactor.range().from(), kFactor.range().to(), kFactor.invitedNewExplorers(), kFactor.cardNewExplorers(),
             kFactor.viralNewExplorers(), kFactor.activeExplorers(),
-            usage.range().from(), usage.range().to(), usage.activeUsers(), SqlTimes.utc(snapshot.computedAt())
+            usage.range().from(), usage.range().to(), usage.activeUsers(), SqlTimes.utc(snapshot.computedAt()), snapshot.partialWindow()
         };
     }
 
@@ -48,6 +48,6 @@ public final class DailyMetricRow {
         return new DailySnapshot(SqlTimes.date(rs, "metric_day"), rs.getInt("new_visitors"), rs.getInt("new_explorers"),
             rs.getInt("dau"), rs.getInt("wau"), rs.getInt("mau"),
             new PageViews(rs.getInt("profile_views"), rs.getInt("card_views"), rs.getInt("bot_views")), kFactor, usage, errors,
-            SqlTimes.instant(rs, "computed_at"));
+            SqlTimes.instant(rs, "computed_at"), rs.getBoolean("partial_window"));
     }
 }

@@ -20,6 +20,7 @@ COPY progression/build.gradle progression/
 COPY wardrobe/build.gradle wardrobe/
 COPY social/build.gradle social/
 COPY sharing/build.gradle sharing/
+COPY notification/build.gradle notification/
 COPY analytics/build.gradle analytics/
 COPY app-api/build.gradle app-api/
 COPY frontend/package.json frontend/package-lock.json frontend/
@@ -38,6 +39,7 @@ COPY progression ./progression
 COPY wardrobe ./wardrobe
 COPY social ./social
 COPY sharing ./sharing
+COPY notification ./notification
 COPY analytics ./analytics
 COPY app-api ./app-api
 COPY frontend ./frontend

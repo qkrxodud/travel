@@ -19,10 +19,13 @@ import java.util.stream.Collectors;
  * @param cohorts     구간 안 코호트(오래된 날 먼저, 오늘 포함)
  * @param missingDays 구간 안인데 아직 배치가 계산하지 않은 지난 날 — 원본이 남아 있어 배치를 돌리면 채워진다
  * @param expiredDays 구간 안인데 계산한 적이 없고 원본 보관 기간도 지나 다시 셀 수 없는 날(빈 날로 세지 않는다)
+ * @param pendingCohortDays 구간 안인데 아직 배치가 코호트(퍼널·리텐션)를 계산하지 않은 지난 날 — 원본이 남아 있어 배치를 돌리면 채워진다
+ *                          (퍼널·리텐션 표의 "배치 전" 줄, 10단계 QA r2 P3-b)
  * @param lastBatchAt 마지막 일 배치 시각(없으면 null)
  */
 public record MetricsReport(DayRange range, DailySnapshot today, List<DailySnapshot> daily, List<CohortSnapshot> cohorts,
-                            List<LocalDate> missingDays, List<LocalDate> expiredDays, Instant lastBatchAt, Instant generatedAt) {
+                            List<LocalDate> missingDays, List<LocalDate> expiredDays, List<LocalDate> pendingCohortDays,
+                            Instant lastBatchAt, Instant generatedAt) {
 
     public MetricsReport {
         Objects.requireNonNull(range, "range");
@@ -31,6 +34,7 @@ public record MetricsReport(DayRange range, DailySnapshot today, List<DailySnaps
         cohorts = List.copyOf(cohorts);
         missingDays = List.copyOf(missingDays);
         expiredDays = List.copyOf(expiredDays);
+        pendingCohortDays = List.copyOf(pendingCohortDays);
     }
 
     /**
@@ -46,7 +50,10 @@ public record MetricsReport(DayRange range, DailySnapshot today, List<DailySnaps
         List<LocalDate> notComputed = range.from().datesUntil(today.day()).filter(day -> !computed.contains(day)).toList();
         List<LocalDate> missing = notComputed.stream().filter(day -> !day.isBefore(backfillFrom)).toList();
         List<LocalDate> expired = notComputed.stream().filter(day -> day.isBefore(backfillFrom)).toList();
-        return new MetricsReport(range, today, daily, cohorts, missing, expired, lastBatchAt, generatedAt);
+        Set<LocalDate> computedCohorts = cohorts.stream().map(CohortSnapshot::cohortDay).collect(Collectors.toSet());
+        List<LocalDate> pendingCohorts = range.from().datesUntil(today.day())
+            .filter(day -> !computedCohorts.contains(day) && !day.isBefore(backfillFrom)).toList();
+        return new MetricsReport(range, today, daily, cohorts, missing, expired, pendingCohorts, lastBatchAt, generatedAt);
     }
 
     private static <T> List<T> merge(List<T> stored, T live, Function<T, LocalDate> dayOf) {

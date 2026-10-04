@@ -185,14 +185,58 @@ export interface FunnelRow {
   status: string;
   settled: boolean;
   today: boolean;
+  /** 배치가 아직 계산하지 않은 코호트(숫자 대신 "배치 전" — 이어진 날은 한 줄로 묶고 cohortDay 는 그 마지막 날) */
+  pending: PendingSpan | null;
 }
 
-/** 퍼널 표 — 최근 코호트 먼저, 첫 화면이 있는 날과 오늘만. 아직 바뀔 수 있는 코호트는 "집계 중". */
-export function funnelRows(funnel: readonly FunnelView[], today: string): FunnelRow[] {
-  return funnel
+/** 이어진 날끼리 묶은 배치 전 코호트(표에 한 줄씩 — 30일이 모두 비어도 표가 길어지지 않게) */
+export interface PendingSpan {
+  /** 묶음의 마지막 날(표 정렬 기준) */
+  last: string;
+  days: number;
+  /** "배치 전 · 9/9 ~ 10/7 (29일)" */
+  text: string;
+}
+
+function nextDay(day: string): string {
+  const date = new Date(day + 'T00:00:00Z');
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+export function pendingSpans(days: readonly string[]): PendingSpan[] {
+  const sorted = [...new Set(days)].sort();
+  const spans: { first: string; last: string; days: number }[] = [];
+  for (const day of sorted) {
+    const current = spans.at(-1);
+    if (current && nextDay(current.last) === day) {
+      current.last = day;
+      current.days += 1;
+    } else {
+      spans.push({ first: day, last: day, days: 1 });
+    }
+  }
+  return spans.map(span => ({
+    last: span.last,
+    days: span.days,
+    text: span.days === 1
+      ? `${DAY_STATUS_TEXT.missing} — 배치를 실행하면 채워져요`
+      : `${DAY_STATUS_TEXT.missing} · ${shortDay(span.first)} ~ ${shortDay(span.last)} (${span.days}일) — 배치를 실행하면 채워져요`,
+  }));
+}
+
+/** 최근 날 먼저(같은 날은 없다 — 배치 전 코호트는 서버 funnel·retention 에 오지 않는다) */
+function latestFirst<T extends { cohortDay: string }>(rows: readonly T[]): T[] {
+  return rows.slice().sort((first, second) => second.cohortDay.localeCompare(first.cohortDay));
+}
+
+/**
+ * 퍼널 표 — 최근 코호트 먼저, 첫 화면이 있는 날과 오늘만. 아직 바뀔 수 있는 코호트는 "집계 중".
+ * 배치가 아직 계산하지 않은 코호트(pendingCohortDays)는 0 명이 아니라 "배치 전" 줄로 끼운다.
+ */
+export function funnelRows(funnel: readonly FunnelView[], today: string, pendingCohortDays: readonly string[] = []): FunnelRow[] {
+  const counted: FunnelRow[] = funnel
     .filter(row => row.firstScreen > 0 || row.cohortDay === today)
-    .slice()
-    .reverse()
     .map(row => ({
       cohortDay: row.cohortDay,
       firstScreen: countText(row.firstScreen),
@@ -204,7 +248,14 @@ export function funnelRows(funnel: readonly FunnelView[], today: string): Funnel
       status: row.settled ? '확정' : '집계 중',
       settled: row.settled,
       today: row.cohortDay === today,
+      pending: null,
     }));
+  const known = new Set(counted.map(row => row.cohortDay));
+  const pending: FunnelRow[] = pendingSpans(pendingCohortDays.filter(day => !known.has(day))).map(span => ({
+    cohortDay: span.last, firstScreen: '', firstCheckIn: '', revisited: '', checkInRate: '', revisitRate: '', overallRate: '',
+    status: DAY_STATUS_TEXT.missing, settled: false, today: false, pending: span,
+  }));
+  return latestFirst([...counted, ...pending]);
 }
 
 export interface RetentionCell {
@@ -218,6 +269,8 @@ export interface RetentionRow {
   cohortDay: string;
   newExplorers: string;
   cells: { d1: RetentionCell; d7: RetentionCell; d30: RetentionCell };
+  /** 배치가 아직 계산하지 않은 코호트(숫자 대신 "배치 전" — 이어진 날은 한 줄로) */
+  pending: PendingSpan | null;
 }
 
 function retentionCell(count: number | null, rate: number | null): RetentionCell {
@@ -225,12 +278,12 @@ function retentionCell(count: number | null, rate: number | null): RetentionCell
   return { count: countText(count), rate: percentText(rate), shade: rate === null ? 0 : Math.min(1, Math.max(0, rate)) };
 }
 
-/** 리텐션 표 — 가입한 탐험가가 있는 코호트만, 최근 먼저 */
-export function retentionRows(retention: readonly RetentionView[]): RetentionRow[] {
-  return retention
+const BLANK_CELL: RetentionCell = { count: '', rate: '', shade: null };
+
+/** 리텐션 표 — 가입한 탐험가가 있는 코호트와 배치 전 코호트("배치 전" 줄), 최근 먼저 */
+export function retentionRows(retention: readonly RetentionView[], pendingCohortDays: readonly string[] = []): RetentionRow[] {
+  const counted: RetentionRow[] = retention
     .filter(row => row.newExplorers > 0)
-    .slice()
-    .reverse()
     .map(row => ({
       cohortDay: row.cohortDay,
       newExplorers: countText(row.newExplorers),
@@ -239,7 +292,13 @@ export function retentionRows(retention: readonly RetentionView[]): RetentionRow
         d7: retentionCell(row.d7, row.d7Rate),
         d30: retentionCell(row.d30, row.d30Rate),
       },
+      pending: null,
     }));
+  const known = new Set(counted.map(row => row.cohortDay));
+  const pending: RetentionRow[] = pendingSpans(pendingCohortDays.filter(day => !known.has(day))).map(span => ({
+    cohortDay: span.last, newExplorers: '', cells: { d1: BLANK_CELL, d7: BLANK_CELL, d30: BLANK_CELL }, pending: span,
+  }));
+  return latestFirst([...counted, ...pending]);
 }
 
 /** 기능 이름(서버 이벤트 이름) → 화면 이름. 모르는 이름은 그대로. */
@@ -279,6 +338,16 @@ export function featureBars(features: readonly FeatureUse[]): FeatureBar[] {
     rate: percentText(feature.rate),
     width: feature.rate === null ? 0 : Math.round(Math.min(1, Math.max(0, feature.rate)) * 1000) / 10,
   }));
+}
+
+/** 30일 구간 앞부분 원본이 지워진 채 계산한 날의 MAU·K 계수 옆 표시 */
+export const LOW_CONFIDENCE_TEXT = '신뢰도 낮음';
+
+/** 그런 날이 있으면 안내(없으면 null) — 오늘(실시간)은 늘 온전하다 */
+export function partialWindowText(daily: readonly Pick<DailyView, 'day' | 'partialWindow'>[]): string | null {
+  const partial = daily.filter(row => row.partialWindow);
+  if (!partial.length) return null;
+  return `${partial.length}일은 30일 구간 앞부분 원본이 지워진 뒤 늦게 계산해 MAU·K 계수가 실제보다 작게 나올 수 있어요(${LOW_CONFIDENCE_TEXT})`;
 }
 
 /** 배치가 비워 둔 날 안내(없으면 null) */

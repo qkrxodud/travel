@@ -13,9 +13,11 @@ import java.util.Objects;
  * @param wau          day 로 끝나는 7일 동안 활동한 사람
  * @param mau          day 로 끝나는 30일 동안 활동한 사람
  * @param computedAt   계산한 시각
+ * @param partialWindow 계산할 때 30일 구간 앞부분 원본이 이미 지워졌다(MAU·K 계수가 작게 나옴 — 신뢰도 낮음, 10단계 QA r2 P3-c)
  */
 public record DailySnapshot(LocalDate day, int newVisitors, int newExplorers, int dau, int wau, int mau, PageViews pageViews,
-                            KFactor kFactor, FeatureUsage featureUsage, ErrorTally errors, Instant computedAt) {
+                            KFactor kFactor, FeatureUsage featureUsage, ErrorTally errors, Instant computedAt,
+                            boolean partialWindow) {
 
     public DailySnapshot {
         Objects.requireNonNull(day, "day");

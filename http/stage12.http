@@ -1,0 +1,169 @@
+### 12단계(웹 푸시) 왕복 확인 — VAPID 공개 키 → 구독(여러 기기)·검증 → 알림 설정 → 즉시 발송(local) → 가짜 푸시 서비스 수신 확인
+###   → 만료(410) 정리 → 멱등·하루 한 개 → 해지 → 분석(push_open·app_open entry=push) → 시계를 밀어 다음 월요일 스케줄 그대로
+### 서버: ./gradlew :app-api:bootRun --args='--server.port=18081'   (8080·18080·18090 은 쓰지 않는다)
+### 구독 주소는 이 서버의 개발용 가짜 푸시 서비스(/dev/push/inbox/{상자}) — 서버가 실제로 암호화(RFC 8291)·VAPID 서명(RFC 8292)해서 POST 한다.
+### 상자 이름이 gone… 이면 410(구독 없음), busy… 429, reject… 403. p256dh 는 P-256 곡선 위의 점이어야 한다(아래는 RFC 8291 예시 키).
+### curl 판: bash _workspace/12_stage12_curl.sh http://localhost:18081
+@host = http://localhost:18081
+@p256dh = BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4
+@auth = BTBZMqHH6r4Tts7J_aSIgg
+
+### 0. [local] 전체 초기화(알림 테이블·서버 시계 포함) → 204, 가짜 푸시 서비스 비우기 → 204
+DELETE {{host}}/dev/reset
+
+###
+DELETE {{host}}/dev/push/inbox
+
+### 1. 브라우저 구독에 쓸 서버 공개 키(인증 불필요) → 200 {publicKey}
+GET {{host}}/push/vapid-public-key
+
+### 2. 탐험가 발급 → 201
+POST {{host}}/explorers
+
+> {% client.global.set("token", response.body.accessToken); %}
+
+### 3. 아직 구독 전 — 모두 켜짐, 기기 0, 조용한 시간 22:00~08:00, 하루 1개 → 200
+GET {{host}}/push/preferences
+X-Explorer-Token: {{token}}
+
+### 4. 탐험가를 모르면 → 401 EXPLORER_TOKEN_REQUIRED
+POST {{host}}/push/subscriptions
+Content-Type: application/json
+
+{"endpoint": "{{host}}/dev/push/inbox/phone", "keys": {"p256dh": "{{p256dh}}", "auth": "{{auth}}"}}
+
+### 5. 알려진 브라우저 푸시 서비스가 아닌 주소 → 400 PUSH_ENDPOINT_NOT_ALLOWED
+POST {{host}}/push/subscriptions
+Content-Type: application/json
+X-Explorer-Token: {{token}}
+
+{"endpoint": "https://evil.example.com/hook", "keys": {"p256dh": "{{p256dh}}", "auth": "{{auth}}"}}
+
+### 6. 키가 빠짐 → 400 INVALID_PUSH_SUBSCRIPTION
+POST {{host}}/push/subscriptions
+Content-Type: application/json
+X-Explorer-Token: {{token}}
+
+{"endpoint": "https://fcm.googleapis.com/fcm/send/abc"}
+
+### 7. 이 브라우저 구독(PushSubscription.toJSON() 모양) → 200 {created:true, devices:1, evicted:0}
+POST {{host}}/push/subscriptions
+Content-Type: application/json
+X-Explorer-Token: {{token}}
+
+{"endpoint": "{{host}}/dev/push/inbox/phone", "expirationTime": null, "keys": {"p256dh": "{{p256dh}}", "auth": "{{auth}}"}}
+
+### 8. 같은 구독을 다시(앱을 열 때마다) → 200 {created:false, devices:1}
+POST {{host}}/push/subscriptions
+Content-Type: application/json
+X-Explorer-Token: {{token}}
+
+{"endpoint": "{{host}}/dev/push/inbox/phone", "keys": {"p256dh": "{{p256dh}}", "auth": "{{auth}}"}}
+
+### 9. 두 번째 기기(구독이 곧 없어질 브라우저) → 200 {created:true, devices:2}
+POST {{host}}/push/subscriptions
+Content-Type: application/json
+X-Explorer-Token: {{token}}
+
+{"endpoint": "{{host}}/dev/push/inbox/gone-laptop", "keys": {"p256dh": "{{p256dh}}", "auth": "{{auth}}"}}
+
+### 10. 설정은 세 가지 모두 → 400 INVALID_PUSH_PREFERENCES
+PUT {{host}}/push/preferences
+Content-Type: application/json
+X-Explorer-Token: {{token}}
+
+{"mystery": true}
+
+### 11. 스트릭 지키기만 끄기 → 200 {mystery:true, streak:false, season:true, devices:2, …}
+PUT {{host}}/push/preferences
+Content-Type: application/json
+X-Explorer-Token: {{token}}
+
+{"mystery": true, "streak": false, "season": true}
+
+### 12. [local] 스트릭 지키기 즉시 발송 — 끈 사람이라 대상 없음 → 200 {runs:[{kind:"STREAK_GUARD", period:"2026-10", decisions:{}}], dispatch:{…}}
+POST {{host}}/dev/push/send
+Content-Type: application/json
+
+{"kind": "streak"}
+
+### 13. [local] 이번 주 미스터리 즉시 발송(force 기본 true — 요일·조용한 시간 건너뜀) → 200 {runs:[{decisions:{PLANNED:1}}], dispatch:{outcomes:{SENT:1}, goneDevices:1}}
+POST {{host}}/dev/push/send
+Content-Type: application/json
+
+{"kind": "mystery"}
+
+### 14. 가짜 푸시 서비스가 받은 것 — 암호문(aes128gcm)·VAPID 서명·TTL 43200·Topic mystery → 200 [{…, vapid:true, status:201}]
+GET {{host}}/dev/push/inbox/phone
+
+### 15. 구독이 없어진 기기도 한 번 받았고 410 을 돌려줬다 → 200 [{status:410}]
+GET {{host}}/dev/push/inbox/gone-laptop
+
+### 16. 410 기기는 지워졌다 → 200 {devices:1}
+GET {{host}}/push/preferences
+X-Explorer-Token: {{token}}
+
+### 17. [local] 내 발송 기록 → 200 [{kind:"mystery", status:"SENT", deliveredDevices:1, title, body(지역 이름 없음), url:"/?from=push&push=mystery#map"}]
+GET {{host}}/dev/push/deliveries
+X-Explorer-Token: {{token}}
+
+### 18. 같은 주 미스터리를 다시 → 멱등 → 200 {runs:[{decisions:{ALREADY_PLANNED:1}}]}
+POST {{host}}/dev/push/send
+Content-Type: application/json
+
+{"kind": "mystery"}
+
+### 19. 같은 날 계절 알림 → 하루 한 개 → 200 {runs:[{decisions:{DAILY_LIMIT:1}}]}
+POST {{host}}/dev/push/send
+Content-Type: application/json
+
+{"kind": "season"}
+
+### 20. 모르는 종류 → 400 UNKNOWN_NOTIFICATION_KIND
+POST {{host}}/dev/push/send
+Content-Type: application/json
+
+{"kind": "promo"}
+
+### 21. 알림을 눌러 열었다(화면 이벤트 push_open, 첫 화면 entry=push) → 202 {accepted:2}
+POST {{host}}/events
+Content-Type: application/json
+User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148
+X-Explorer-Token: {{token}}
+
+{"visitorId": "push-visitor-0001", "events": [{"name": "app_open", "props": {"entry": "push"}}, {"name": "push_open", "props": {"kind": "mystery"}}]}
+
+### 22. [local] 서버 시계를 다음 월요일 09:00(서울)로 밀고 스케줄과 똑같이(force:false) → 새 주라 다시 PLANNED:1
+POST {{host}}/dev/clock
+Content-Type: application/json
+
+{"to": "2026-10-12T09:00:00+09:00"}
+
+###
+POST {{host}}/dev/push/send
+Content-Type: application/json
+
+{"kind": "mystery", "force": false}
+
+### 23. 화요일로 밀면 스케줄 그대로는 미스터리를 계획하지 않는다 → 200 {runs:[{period:null}]}
+POST {{host}}/dev/clock
+Content-Type: application/json
+
+{"days": 1}
+
+###
+POST {{host}}/dev/push/send
+Content-Type: application/json
+
+{"kind": "mystery", "force": false}
+
+### 24. 해지 → 204(다시 해지해도 204), 기기 0
+DELETE {{host}}/push/subscriptions
+Content-Type: application/json
+X-Explorer-Token: {{token}}
+
+{"endpoint": "{{host}}/dev/push/inbox/phone"}
+
+### 25. 운영 지표의 새 신뢰도 표시(10단계 QA r2) — pendingCohortDays, daily[].partialWindow → 200
+GET {{host}}/admin/metrics?days=7
+X-Admin-Token: local-admin-token

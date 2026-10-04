@@ -51,7 +51,7 @@ const smallInteger: FieldCheck = value => typeof value === 'number' && Number.is
 
 /** 화면 이벤트 허용 목록 — 이름과 필드(모두 필수) */
 const FIELD_RULES: FieldRules = {
-  app_open: { entry: oneOf('direct', 'invite', 'profile', 'card', 'other') },
+  app_open: { entry: oneOf('direct', 'invite', 'profile', 'card', 'other', 'push') },
   tab_view: { tab: oneOf('map', 'bag', 'sets', 'quests', 'rank', 'profile') },
   checkin_open: {},
   checkin_save: {},
@@ -60,6 +60,7 @@ const FIELD_RULES: FieldRules = {
   link_copy: { target: identifier },
   onboarding_step: { step: smallInteger, action: oneOf('view', 'done', 'skip') },
   push_prompt: { result: oneOf('shown', 'granted', 'denied', 'dismissed') },
+  push_open: { kind: oneOf('mystery', 'streak', 'season') },
   error_toast: { code: errorCode },
 };
 

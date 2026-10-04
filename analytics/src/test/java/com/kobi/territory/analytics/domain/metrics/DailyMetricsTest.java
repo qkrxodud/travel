@@ -72,7 +72,7 @@ class DailyMetricsTest {
         private DailySnapshot 하루(LocalDate day, int dau) {
             return new DailySnapshot(day, 0, 0, dau, dau, dau, PageViews.NONE, new KFactor(DayRange.ending(day, 30), 0, 0, 0, 0),
                 FeatureUsage.of(DayRange.ending(day, 7), 0, List.of(), Map.of()), ErrorTally.of(DayRange.ending(day, 7), Map.of()),
-                NOW);
+                NOW, false);
         }
 
         private CohortSnapshot 코호트(LocalDate day) {
@@ -109,6 +109,26 @@ class DailyMetricsTest {
 
             assertThat(report.missingDays()).containsExactly(TODAY.minusDays(2), TODAY.minusDays(1));
             assertThat(report.expiredDays()).containsExactly(TODAY.minusDays(4), TODAY.minusDays(3));
+        }
+    
+        @Test
+        @DisplayName("배치가 아직 퍼널·리텐션을 계산하지 않은 코호트 날도 따로 알려 준다 — 표에 배치 전 줄로 보이게")
+        void pendingCohorts() {
+            MetricsReport report = MetricsReport.assemble(DayRange.ending(TODAY, 4), List.of(하루(TODAY.minusDays(3), 1),
+                    하루(TODAY.minusDays(2), 1), 하루(TODAY.minusDays(1), 1)), 하루(TODAY, 9),
+                List.of(코호트(TODAY.minusDays(3))), 코호트(TODAY), TODAY.minusDays(90), null, NOW);
+
+            assertThat(report.missingDays()).isEmpty();
+            assertThat(report.pendingCohortDays()).containsExactly(TODAY.minusDays(2), TODAY.minusDays(1));
+        }
+
+        @Test
+        @DisplayName("원본 보관 기간이 지난 코호트 날은 배치 전으로 알리지 않는다 — 배치로도 채울 수 없다")
+        void expiredCohortsAreNotPending() {
+            MetricsReport report = MetricsReport.assemble(DayRange.ending(TODAY, 4), List.of(), 하루(TODAY, 9), List.of(), 코호트(TODAY),
+                TODAY.minusDays(1), null, NOW);
+
+            assertThat(report.pendingCohortDays()).containsExactly(TODAY.minusDays(1));
         }
     }
 }

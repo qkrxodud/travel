@@ -32,6 +32,25 @@ class MetricsPolicyTest {
     }
 
     @Nested
+    @DisplayName("오래된 빈 날을 늦게 채울 때")
+    class LateBackfill {
+
+        @Test
+        @DisplayName("그날로 끝나는 30일 구간 앞부분 원본이 이미 지워졌으면 월간 활동·K 계수를 믿기 어렵다고 표시한다")
+        void truncatedWindow() {
+            assertThat(METRICS.windowTruncated(TODAY.minusDays(70), TODAY)).isTrue();
+        }
+
+        @Test
+        @DisplayName("30일 구간이 모두 보관 기간 안이면 표시하지 않는다 — 61일째까지")
+        void fullWindow() {
+            assertThat(METRICS.windowTruncated(TODAY.minusDays(61), TODAY)).isFalse();
+            assertThat(METRICS.windowTruncated(TODAY.minusDays(62), TODAY)).isTrue();
+            assertThat(METRICS.windowTruncated(TODAY, TODAY)).isFalse();
+        }
+    }
+
+    @Nested
     @DisplayName("일 배치")
     class Batch {
 

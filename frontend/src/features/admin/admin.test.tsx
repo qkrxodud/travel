@@ -10,13 +10,13 @@ import type { DailyView, FunnelView, MetricsResponse, RetentionView } from '../.
 import { AdminApp } from './components/AdminApp';
 import {
   activityTrend, adminErrorText, dayEntries, daysBetween, expiredCohortNote, expiredDaysText, gapBands, lastValue, countText, featureBars, funnelRows, headlines, kFactorText, missingDaysText, newcomerTrend, niceMax,
-  percentText, retentionRows, shortDay, spreadLabels,
+  partialWindowText, pendingSpans, percentText, retentionRows, shortDay, spreadLabels,
 } from './model/metrics';
 
 vi.mock('../../api/admin', () => ({ adminApi: { metrics: vi.fn(), runBatch: vi.fn(async () => ({ from: '', to: '', dailyDays: 3, cohortDays: 35, purged: 0, elapsedMs: 5 })) } }));
 
 const day = (date: string, overrides: Partial<DailyView> = {}): DailyView => ({
-  day: date, newVisitors: 4, newExplorers: 2, dau: 10, wau: 30, mau: 60, profileViews: 1, cardViews: 2, botViews: 0, kFactor: 0.1, live: false, ...overrides,
+  day: date, newVisitors: 4, newExplorers: 2, dau: 10, wau: 30, mau: 60, profileViews: 1, cardViews: 2, botViews: 0, kFactor: 0.1, live: false, partialWindow: false, ...overrides,
 });
 const funnel = (cohortDay: string, overrides: Partial<FunnelView> = {}): FunnelView => ({
   cohortDay, firstScreen: 10, firstCheckIn: 4, revisitedWithin7Days: 1, checkInRate: 0.4, revisitRate: 0.25, overallRate: 0.1, settled: true, ...overrides,
@@ -26,7 +26,7 @@ const retention = (cohortDay: string, overrides: Partial<RetentionView> = {}): R
 });
 
 const METRICS: MetricsResponse = {
-  generatedAt: '2026-10-04T03:00:00Z', timeZone: 'Asia/Seoul', from: '2026-10-02', to: '2026-10-04', lastBatchAt: null, missingDays: [], expiredDays: [],
+  generatedAt: '2026-10-04T03:00:00Z', timeZone: 'Asia/Seoul', from: '2026-10-02', to: '2026-10-04', lastBatchAt: null, missingDays: [], expiredDays: [], pendingCohortDays: [],
   today: { day: '2026-10-04', newVisitors: 3, newExplorers: 1, dau: 12, wau: 40, mau: 90, computedAt: '2026-10-04T03:00:00Z' },
   daily: [day('2026-10-02'), day('2026-10-03'), day('2026-10-04', { live: true, dau: 12 })],
   funnel: [funnel('2026-10-02'), funnel('2026-10-03', { firstScreen: 0, firstCheckIn: 0, revisitedWithin7Days: 0, checkInRate: null }), funnel('2026-10-04', { firstScreen: 2, firstCheckIn: 1, settled: false })],
@@ -141,6 +141,43 @@ describe('퍼널', () => {
   });
 });
 
+describe('배치가 아직 코호트를 계산하지 않은 날', () => {
+  it('퍼널 표에 0 명이 아니라 "배치 전" 줄로 날짜 순서에 끼워 보인다', () => {
+    const rows = funnelRows(METRICS.funnel, METRICS.to, ['2026-10-03']);
+    expect(rows.map(row => [row.cohortDay, row.status, row.pending?.days ?? 0])).toEqual([
+      ['2026-10-04', '집계 중', 0], ['2026-10-03', '배치 전', 1], ['2026-10-02', '확정', 0],
+    ]);
+    expect(rows[1]).toMatchObject({ firstScreen: '', firstCheckIn: '', checkInRate: '' });
+  });
+
+  it('리텐션 표에도 같은 날을 "배치 전" 줄로 보이고 칸은 비워 둔다', () => {
+    const rows = retentionRows(METRICS.retention, ['2026-10-03']);
+    expect(rows.map(row => [row.cohortDay, !!row.pending])).toEqual([['2026-10-04', false], ['2026-10-03', true], ['2026-10-02', false]]);
+    expect(rows[1]?.cells.d1).toEqual({ count: '', rate: '', shade: null });
+  });
+});
+
+describe('배치 전 코호트가 여러 날 이어질 때', () => {
+  it('이어진 날은 한 줄로 묶어 기간과 날 수를 적는다(떨어진 날은 따로)', () => {
+    expect(pendingSpans(['2026-09-09', '2026-09-10', '2026-09-11', '2026-09-20']).map(span => [span.last, span.days, span.text])).toEqual([
+      ['2026-09-11', 3, '배치 전 · 9/9 ~ 9/11 (3일) — 배치를 실행하면 채워져요'],
+      ['2026-09-20', 1, '배치 전 — 배치를 실행하면 채워져요'],
+    ]);
+  });
+
+  it('달을 넘어 이어진 날도 한 묶음이다', () => {
+    expect(pendingSpans(['2026-09-30', '2026-10-01']).map(span => span.days)).toEqual([2]);
+  });
+});
+
+describe('30일 구간 앞부분 원본이 지워진 뒤 계산한 날', () => {
+  it('그런 날이 있으면 MAU·K 계수의 신뢰도가 낮다고 알리고, 없으면 아무 말도 하지 않는다', () => {
+    expect(partialWindowText([day('2026-07-01', { partialWindow: true }), day('2026-07-02')]))
+      .toBe('1일은 30일 구간 앞부분 원본이 지워진 뒤 늦게 계산해 MAU·K 계수가 실제보다 작게 나올 수 있어요(신뢰도 낮음)');
+    expect(partialWindowText([day('2026-07-02')])).toBeNull();
+  });
+});
+
 describe('리텐션', () => {
   it('가입한 탐험가가 있는 코호트만 최근부터 보이고, 아직 그날이 지나지 않은 칸은 빈칸이다', () => {
     const rows = retentionRows(METRICS.retention);
@@ -224,6 +261,22 @@ describe('토큰을 넣고 보기', () => {
     expect(document.querySelector('#admin-daily tr[data-day="2026-10-01"]')?.textContent).toContain('보관 기간 지남');
     expect(document.querySelector('#chart-active rect[data-gap="expired"]')).not.toBeNull();
     expect(document.querySelector('#admin-retention [data-gap="expired"]')).not.toBeNull();
+  });
+
+  it('배치 전 코호트는 퍼널·리텐션 표에 "배치 전"으로, 신뢰도 낮은 날은 일별 표의 MAU·K 계수 옆에 표시한다', async () => {
+    vi.mocked(adminApi.metrics).mockResolvedValueOnce({
+      ...METRICS, pendingCohortDays: ['2026-10-03'],
+      daily: [day('2026-10-02', { partialWindow: true }), day('2026-10-03'), day('2026-10-04', { live: true, dau: 12 })],
+    });
+    render(<AdminApp />);
+    open('local-admin-token');
+    await screen.findByText('코호트 리텐션');
+    expect(document.querySelector('#admin-funnel tr[data-cohort-day="2026-10-03"]')?.textContent).toContain('배치 전');
+    expect(document.querySelector('#admin-retention tr[data-cohort-day="2026-10-03"]')?.textContent).toContain('배치 전');
+    const partial = document.querySelector('#admin-daily tr[data-day="2026-10-02"]');
+    expect(partial?.querySelectorAll('[data-low-confidence]')).toHaveLength(2);
+    expect(document.querySelector('#admin-daily tr[data-day="2026-10-03"] [data-low-confidence]')).toBeNull();
+    expect(document.getElementById('admin-partial')?.textContent).toContain('신뢰도 낮음');
   });
 
   it('배치가 비워 둔 날이 있으면 배치를 실행하고 지표를 다시 읽는다', async () => {

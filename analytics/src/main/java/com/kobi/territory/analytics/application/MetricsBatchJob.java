@@ -62,7 +62,7 @@ public class MetricsBatchJob {
         DayRange backfill = policy.backfillRange(today);
         List<LocalDate> dailyDays = policy.dailyDaysToRecompute(today, store.computedDays(backfill));
         List<LocalDate> cohortDays = policy.cohortDaysToRecompute(today, store.computedCohortDays(backfill));
-        dailyDays.forEach(day -> dayTx.executeWithoutResult(status -> store.replaceDaily(computation.daily(day, now))));
+        dailyDays.forEach(day -> dayTx.executeWithoutResult(status -> store.replaceDaily(computation.daily(day, today, now))));
         cohortDays.forEach(day -> dayTx.executeWithoutResult(status -> store.replaceCohort(computation.cohort(day, today, now))));
         int purged = events.purgeBefore(policy.purgeBefore(today));
         int forgottenVisitors = visitors.purgeInactive(policy.purgeBefore(today));

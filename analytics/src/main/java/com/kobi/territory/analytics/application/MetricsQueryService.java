@@ -42,7 +42,7 @@ public class MetricsQueryService {
         LocalDate today = settings.ingestPolicy().dayOf(now);
         DayRange range = settings.metricsPolicy().reportRange(today, days);
         LiveToday current = live.updateAndGet(cached -> cached != null && cached.freshFor(today, now, settings) ? cached
-            : readTx.execute(status -> new LiveToday(today, computation.daily(today, now), computation.cohort(today, today, now), now)));
+            : readTx.execute(status -> new LiveToday(today, computation.daily(today, today, now), computation.cohort(today, today, now), now)));
         return readTx.execute(status -> MetricsReport.assemble(range, store.daily(range), current.daily(), store.cohorts(range),
             current.cohort(), settings.metricsPolicy().backfillRange(today).from(), store.lastComputedAt().orElse(null), now));
     }

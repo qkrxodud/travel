@@ -5,6 +5,8 @@ import { analytics } from './api/analytics';
 import { App } from './app/App';
 import { createQueryClient } from './app/queryClient';
 import { sprites } from './shared/lib/pixel';
+import { installPrompt } from './shared/lib/pwa/installPrompt';
+import { serviceWorkerClient } from './shared/lib/pwa/serviceWorkerClient';
 import './styles/global.css';
 
 /** 관리자 지표 화면(/#/admin) — 게임과 같은 페이지지만 따로 그린다(코드도 따로 받는다). 탐험가 발급·분석 수집을 하지 않는다. */
@@ -29,6 +31,12 @@ if (root && adminRoute) {
 } else if (root) {
   sprites.preload();
   analytics.start();
+  // PWA(12단계): 설치 창 이벤트는 그리기 전에 올 수 있어 먼저 듣는다. 서비스워커는 빌드 산출물에서만(개발 서버에는 sw.js 가 없다).
+  installPrompt.listen(window);
+  if (import.meta.env.PROD) {
+    void serviceWorkerClient.register();
+    serviceWorkerClient.keepChecking(document, (callback, ms) => setInterval(callback, ms));
+  }
   const queryClient = createQueryClient();
   createRoot(root).render(
     <QueryClientProvider client={queryClient}>
