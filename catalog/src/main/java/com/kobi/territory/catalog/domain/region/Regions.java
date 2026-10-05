@@ -42,6 +42,17 @@ public final class Regions {
         return out;
     }
 
+    /** 현행 지역인지(폐지됐거나 모르는 코드면 false). */
+    public boolean isActive(RegionCode code) {
+        Region region = byCode.get(code);
+        return region != null && region.active();
+    }
+
+    /** 그 시·도의 현행 지역, 원본 순서. */
+    public List<Region> activeIn(String provinceCode) {
+        return items.stream().filter(region -> region.active() && region.provinceCode().equals(provinceCode)).toList();
+    }
+
     public List<Region> all() {
         return items;
     }

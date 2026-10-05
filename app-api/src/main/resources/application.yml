@@ -148,6 +148,44 @@ territory:
         address-burst: 60
         address-per-minute: 120
         max-tracked-keys: 100000
+  tourapi:
+    # 13s단계 계절 명소 — 한국관광공사 TourAPI(공공데이터포털 "국문 관광정보 서비스" KorService2, 행사정보조회 searchFestival2).
+    # 서비스 키는 선택 값(환경변수 TOURAPI_SERVICE_KEY — 디코딩·인코딩 키 어느 쪽이든). 없으면 호출하지 않고 계절 회차는 seasons.json 기본 목록(AI 추정)을 쓴다.
+    # 키를 넣고 재기동하면 다음 회차 후보를 모으고, 관리자 POST /admin/seasons/{회차}/refresh 로 바로 확인·PUT …/confirm 으로 확정한다(doc/operations.md 13s단계).
+    service-key: ${TOURAPI_SERVICE_KEY:}
+    base-url: https://apis.data.go.kr/B551011/KorService2
+    # 요청 변수 MobileApp(서비스명)
+    mobile-app: Territory
+    timeout: 10s
+    # 연결 실패·5xx 때 더 시도하는 횟수(지수 백오프 retry-backoff × 2^n). 키 거절·한도 초과는 다시 하지 않는다
+    retries: 2
+    retry-backoff: 1s
+    # 한 쪽 행 수(크게 — 회차 하나를 보통 한 번에 읽어 호출 수를 줄인다) · 한 번 모을 때 읽는 최대 쪽 수(넘으면 앞쪽만 읽고 경고)
+    page-size: 1000
+    max-pages: 3
+    # 이 서비스의 하루 호출 상한(서울 날짜, DB tourapi_usage — 재기동해도 이어진다. 재시도도 한 번으로 센다). 기관 일일 한도(1,000건 미만)보다
+    # 넉넉히 낮게. 닿으면 그날은 호출하지 않고 관리자 화면에 경고. 같은 요청은 같은 날 응답 원문 캐시(tourapi_response)를 다시 쓴다
+    # (관리자 refresh?fresh=true 만 건너뛴다 — 그것도 이 상한 안에서)
+    daily-call-limit: 200   # 1 ~ 900(벗어나면 기동 실패)
+    lineup:
+      # 회차 지역 수 · 축제를 찾는 날짜 범위의 앞뒤 여유(회차 첫날 − 여유 ~ 마지막 날 + 여유) · 지역마다 남기는 근거 축제 수
+      size: 10
+      margin-days: 14
+      evidence-per-region: 5
+      # 축제 좌표가 단순화된 경계 밖이면 이 거리(km) 안의 가장 가까운 시·군·구로 본다(해안 축제 등). 그래도 없으면 주소로
+      boundary-tolerance-km: 3
+    collect:
+      # 자동 수집 cron(초 분 시 일 월 요일, territory.time-zone). "-" 면 끔. 회차 시작 lead-days 일 전부터 recollect-after 간격으로 다시 모은다
+      # (같은 회차는 하루 한 번 이하 — 실패한 시도도 하루 뒤에 다시)
+      cron: "0 40 4 * * *"
+      lead-days: 30
+      recollect-after: 7d
+      # 자동 수집 결과를 자동 확정 — TourAPI 근거 지역이 auto-confirm-min-regions 곳 이상일 때만(모자라면 후보로만 두고 지금 목록 유지,
+      # 관리자는 확정 가능). 관리자가 확정한 회차는 자동 수집이 덮지 않는다
+      auto-confirm: true
+      auto-confirm-min-regions: 10
+      # 기동 직후 한 번 수집(키를 넣고 재기동하면 바로 후보가 보이게 — 수집 기간 전이면 미리보기만, 확정 안 함)
+      on-startup: true
   push:
     # 12단계 웹 푸시(VAPID). 키는 프로파일별 — local 은 application-local.yml 시험용 키, 운영은 TERRITORY_VAPID_* 필수(application-prod.yml).
     # vapid: {public-key, private-key, subject}(프로파일별)

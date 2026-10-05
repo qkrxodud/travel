@@ -46,6 +46,7 @@ curl localhost:8080/actuator/health
 - **infra 하위 패키지**: JPA 엔티티는 `infra/entity/`, Spring Data 리포지토리·어댑터는 `infra/repository/`에 있어야 한다(위반 P3). infra 엔티티·Spring Data 타입을 infra 밖(application·api)에서 참조하면 P2.
 - **테스트 작성 규칙**(implement-context "테스트 작성 규칙", implement-frontend 테스트 절): DisplayName·describe/it·Playwright 제목에 QA 번호·코드 식별자·구현 용어가 있으면 P3(`grep -rnE "DisplayName\\(\".*(P[0-9]|Q[0-9]|R[0-9]-|outbox|upsert|refId|DTO|MockMvc|[0-9]{3}\\b)"`, 테스트 메서드 이름에 `_Q2`·`_P3_` 등), DisplayName 없는 테스트 P3, 애그리거트 불변식·커맨드에 대응 테스트가 없으면 P2(domain-model.md 대조).
 - **잠금·격리**(implement-context "잠금·격리 규칙"): 상한·유일성·순번 판단 쓰기 커맨드가 기본 격리(REPEATABLE READ)이거나 잠금 전에 일반 SELECT를 하면 P1 후보 — MySQL로 경계 동시 요청을 직접 재현한다. 대응 MySQL 동시성 테스트가 없으면 P2.
+- **데이터 출처**(implement-context "실제 세계 데이터의 출처"): 명소·축제 등 현실 사실 데이터에 출처·근거 필드가 없거나, AI 추정값이 `provenance: "ai-estimate"` 표시 없이 섞여 있으면 P2.
 - **생성자 주입**: main 코드에 `@Autowired` 필드·세터 주입이 있으면 P3(`grep -rn "@Autowired" */src/main`).
 - **리포지토리 어댑터 판단 금지**(implement-context "infra(JPA) 규칙"): 어댑터에 호출 의도 분기(`rebuilt()` 류 플래그), `Clock` 주입, 비즈니스 판단, 재계산용 diff 코드가 있으면 P3. 포트가 테이블 단위(`appendLedger` 등)로 쪼개져 서비스가 테이블 구조를 알게 되면 P3.
 - **명명 규칙**(implement-context "명명 규칙"): 한 글자 변수·파라미터·람다 파라미터(인덱스 루프 `i`/`j` 제외)와 JDK·Spring 타입과 같은 이름의 도메인 클래스는 P3 — 변경된 파일 전체를 grep으로 확인(예: `grep -rnE "\b[A-Z][A-Za-z]+ [a-z]\b[,)= ]"`, `-> ?[a-z] ?->`/`\b[a-z] ->`).

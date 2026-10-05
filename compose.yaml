@@ -61,6 +61,8 @@ services:
       TERRITORY_VAPID_SUBJECT: ${TERRITORY_VAPID_SUBJECT:?TERRITORY_VAPID_SUBJECT 을 .env 에 설정}
       # 분석 레이트 리밋이 믿는 프록시(CIDR, 쉼표) — 비우면 아무도 믿지 않음. Cloudflare Tunnel 을 붙이면 operations.md 10단계 참고
       TERRITORY_TRUSTED_PROXIES: ${TERRITORY_TRUSTED_PROXIES:-}
+      # 계절 명소 TourAPI 서비스 키(13s단계, 선택) — 비우면 AI 추정 목록 그대로. 넣고 `docker compose up -d` 로 재기동하면 다음 회차 후보를 모은다
+      TOURAPI_SERVICE_KEY: ${TOURAPI_SERVICE_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       TERRITORY_CARD_DIR: /data/share-cards

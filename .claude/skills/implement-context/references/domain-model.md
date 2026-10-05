@@ -189,6 +189,15 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 - 생성 시 예외: Explorer와 개인 ExpeditionMap(+territory 행)은 한 트랜잭션에서 함께 생성한다(모두 신규 행이라 잠금 경합이 없고, 개인 지도 없는 탐험가를 막기 위한 원자성이 필요). 공유 지도 생성(ExpeditionMap + 빈 territory 행)도 같은 이유로 함께. "커맨드 하나가 애그리거트 둘을 수정" 금지 규칙의 유일한 예외.
 - 3단계 구현: 탈퇴 유예 중인 멤버는 `Departure`(map_member.left_at, 일급 컬렉션 `Departures`). 지도 커맨드(join·leave·purge)는 Territory 를 같은 트랜잭션에서 고치지 않고 `MemberLeft`·`MemberJoined(rejoined)`·`MemberPurged` 를 내며, 탐험 자신의 구독자 `exploration.territory` 가 territory 를 잠그고 숨김(hidden_at)·선점 이전·복구·하드 삭제를 한다. 재가입은 원래 가입 시각으로 복귀(온보딩 예외 재사용 방지), 복구된 방문의 선점 순서(`claim_rank_at`)는 복구 시각이라 넘어간 선점은 돌아오지 않는다. 유예 종료 배치 `MapPurgeJob`(territory.map.purge-interval-ms). 지도장만: 설정·초대코드 재발급·지도장 넘기기·방문 이의. 개인 지도는 합류·탈퇴·양도 불가. mapId 지정 요청은 멤버 확인을 잠금보다 먼저(N2, READ_COMMITTED 라 안전).
 
+### 2-11. SeasonLineup (카탈로그 — 계절 회차 지역 목록, 13s단계)
+- **SeasonLineup(roundId)** — 계절 회차 하나({계절}-{연도})의 지역 목록. 루트 `catalog/domain/lineup/SeasonLineup`: 후보(`LineupSnapshot` — 마지막으로 모은 것, 미리보기)·확정본(회차에 쓰는 것)·확정한 쪽(`ConfirmedBy` AUTO|ADMIN)·마지막 수집 시도(`CollectionAttempt` — 결과·경고). 일급 `LineupRegions`(순위 순, 지역 중복 없음, 출처 요약 tourapi|ai-estimate|mixed), `LineupRegion{code, provenance, evidence[FestivalEvidence{contentId, title, startDate, endDate, fetchedAt}]}`.
+- 불변식: **회차가 열리면(시작 시각부터) 모으기·확정을 거절**(409 SEASON_ROUND_LOCKED) — 진행 중 지역이 바뀌면 진행도가 깨진다, 갱신은 다음 회차부터. 확정본이 없으면 계절 정의(seasons.json)의 기본 목록(AI 추정)을 쓴다 = 키가 없을 때의 동작. 후보 없이 확정 불가(409 SEASON_CANDIDATE_MISSING). 모으기 실패(키 거절·한도·응답 이상·연결)는 후보·확정본을 두고 까닭만 남긴다. 관리자 확정 회차는 자동 수집이 손대지 않는다. 자동 수집(`planAt`): 회차 시작 leadDays(30) 전부터 recollectAfter(7일) 간격, **같은 회차는 하루 한 번 이하**(실패 뒤도 하루), 수집 기간 전에는 한 번도 못 모았을 때만 미리보기(확정 안 함). 자동 확정은 TourAPI 근거 지역 ≥ autoConfirmMinRegions(10)일 때만.
+- 근거 두 종류(`LineupEvidence{kind FESTIVAL|ATTRACTION, …}`): 축제(`Festival`, 행사정보조회)와 계절 관광지(`Attraction`, 키워드 검색 `SeasonDefinition.attractionKeywords`, 기간 없음). 열린 회차 고정: 확정 없이 열린 회차는 `freezeOpened` 로 그때 기본 목록을 확정본(ConfirmedBy.OPENING)으로 저장(첫 조회·기동·하루 한 번, V11 이 2026 두 회차를 미리) — seasons.json 을 고쳐도 진행 중·지난 회차 불변.
+- 후보 고르기 `LineupSelector`(도메인 서비스): 같은 contentId 한 번 → 여유(marginDays 14)를 둔 회차 기간과 겹치고 이름이 계절 테마 키워드(`SeasonDefinition.keywords`, 공백·대소문자 무시)에 맞는 축제 + 관광지(중복 제외) → `RegionLocator`(region 폴더 도메인 서비스: 좌표 → `RegionBoundaries` 점-다각형(짝홀), 없으면 허용 거리(3km) 안 가장 가까운 경계, 그래도 없으면 주소 — 시·도 첫 낱말(정식·짧은·옛 이름) + 시·군·구 이름, 현행 지역만) → 순위: 축제 수 ↓ · 축제 일수 합(규모) ↓ · 관광지 수 ↓ · 지역 코드 ↑ → 상위 size(10), 모자라면 기본 목록에서 정의 순서로 채우고 AI 추정 표시. TourAPI 지역 코드표에 기대지 않는다.
+- 포트: `SeasonLineupRepository`(season_lineup + season_lineup_region, 버전 낙관적 잠금 → 충돌 409 SEASON_LINEUP_BUSY), `FestivalSource`(infra/client `TourApiFestivalClient` — KorService2 searchFestival2, 하루 호출 수 `tourapi_usage` 조건부 UPDATE·같은 날 응답 원문 캐시 `tourapi_response`·키 숨김).
+- 공개 Query `catalog.api.query.SeasonLineupQuery.lineupOf(roundId)` → `SeasonLineupView{roundId, provenance, source, confirmedAt, regions[{code, provenance, evidence[]}]}`(짧은 캐시 `SeasonLineupCache`, 확정 뒤 무효화). 진행 `ProgressionCatalog` 가 `RoundLineups` 포트로 이어 `SeasonCalendar` 의 회차 지역을 정한다(진행 중이던 autumn-2026 은 행이 없어 기본 목록 그대로). `GET /seasons/current` 의 `provenance`·`source`·`regions[].provenance/evidence` 도 이것.
+- API: `GET /admin/seasons`, `GET /admin/seasons/{roundId}`, `POST /admin/seasons/{roundId}/refresh?fresh=`, `PUT /admin/seasons/{roundId}/confirm` — `_workspace/13s_contracts.md`.
+
 ## 3. 체크인 이벤트 흐름
 
 ```
@@ -253,6 +262,10 @@ common에 두는 것: ExplorerId, RegionCode, Rarity, DomainEvent, Outbox(EventO
 | push_recipient | PushRecipient | explorer_id PK | mystery_enabled·streak_enabled·season_enabled(처음 모두 켜짐), created_at·updated_at — 12단계 V10. 구독·해지·설정·발송 계획을 탐험가 단위로 줄 세우는 잠금 대상(FOR UPDATE, READ_COMMITTED) |
 | push_device | PushRecipient(자식) | endpoint_hash PK(구독 주소 SHA-256) | explorer_id(IDX), endpoint(≤1024), p256dh·auth(base64url), registered_at — 한 브라우저 구독은 한 탐험가에게만, 탐험가당 ≤ territory.push.max-devices(5, 넘으면 오래된 기기부터 뺌) |
 | push_delivery | PushDelivery | id PK, UQ(explorer_id, kind, period) | delivery_day(서울 — 하루 최대 개수, IDX(explorer_id, delivery_day)), status(PENDING·SENDING·SENT·FAILED·EXPIRED·CANCELLED, IDX(status, next_attempt_at)), title·body·url·tag(계획 때 정한 문구), due_at·immediate(local 즉시 발송), next_attempt_at·attempts·claimed_at·sent_at·delivered_devices·last_error, version(발송기 잡기 낙관적 잠금) |
+| season_lineup | SeasonLineup | round_id PK | season_id·round_year·first_day·last_day·starts_at(이 순간부터 고정)·ends_at, 후보/확정본 수집 시각·경고(줄바꿈), confirmed_by(AUTO·ADMIN)·confirmed_at, 마지막 시도(attempt_at·outcome·warnings), version — 13s단계 V11 |
+| season_lineup_region | SeasonLineup(자식) | PK(round_id, stage, position_no) | stage CANDIDATE·CONFIRMED, region_code, provenance(tourapi·ai-estimate), evidence JSON(≤4000) — 저장은 회차 행 지우고 다시 넣기 |
+| tourapi_response | (외부 응답 캐시) | id PK, IDX(request_key, fetched_at) | request_key(키 제외 요청 변수), fetched_at, body MEDIUMTEXT — 같은 날 같은 요청은 캐시, 400일 보관 |
+| tourapi_usage | (외부 호출 예산) | usage_date PK | calls — 조건부 UPDATE(calls < 상한) 한 문장이라 동시에도 상한을 넘지 않는다. dev reset 이 지우지 않는다 |
 
 - 애그리거트 경계를 넘는 FK는 두지 않는다(예: scene.slots → owned_item 금지).
 - gender는 Scene이 바꾸는 값이므로 scene 테이블에 둔다(explorer 아님).
@@ -356,6 +369,8 @@ Flyway 번호 갱신(4단계): 4단계는 마이그레이션이 생겨 V4(파트
 - 병합된 탐험가(A)의 진행·인벤토리 행은 남겨 두되(복구용) 재계산 전체 대상(`TerritoryQuery.explorerIds` = 활성만)에서 빠진다.
 
 Kafka는 5단계까지 불필요.
+
+13s단계 계절 명소 TourAPI 연동(V11): §2-11. 키(`TOURAPI_SERVICE_KEY`)는 선택 — 없으면 아무 호출 없이 기본 목록 + "AI 추정" 표시. 기간 조정은 하지 않는다(회차 기간은 seasons.json 고정, 근거 축제 기간은 표시만 — 알림 캠페인·진행 달력이 같은 기간을 본다).
 
 ## 7. 리스크 대응으로 확정된 규칙
 

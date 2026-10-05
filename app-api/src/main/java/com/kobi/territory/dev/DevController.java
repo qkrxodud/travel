@@ -8,6 +8,7 @@ import com.kobi.territory.api.security.LoginResponse;
 import com.kobi.territory.api.security.SessionLogin;
 import com.kobi.territory.catalog.api.query.MysteryWeekView;
 import com.kobi.territory.catalog.application.ItemDefinitionCache;
+import com.kobi.territory.catalog.application.SeasonLineupCache;
 import com.kobi.territory.common.error.ErrorKind;
 import com.kobi.territory.common.error.TerritoryException;
 import com.kobi.territory.common.identity.CurrentExplorer;
@@ -101,7 +102,10 @@ public class DevController {
         "map_member", "expedition_map", "recalculation_request", "handle_reservation", "account", "share_card", "privacy_settings",
         "invite_reward", "streak_freeze", "season_progress", "revisit_stamp", "wish_pin", "wishlist", "inventory_revisit", "explorer",
         "analytics_event", "analytics_visitor", "analytics_explorer", "analytics_daily_breakdown", "analytics_daily", "analytics_cohort",
-        "push_delivery", "push_device", "push_recipient");
+        "push_delivery", "push_device", "push_recipient",
+        // 13s단계 계절 회차 지역 목록(후보·확정). TourAPI 응답 원문(tourapi_response)·하루 호출 수(tourapi_usage)는 지우지 않는다 — 실제 키의
+        // 일일 한도를 지키는 기록이라
+        "season_lineup_region", "season_lineup");
 
     private final JdbcTemplate jdbc;
     private final ExplorerDataReset dataReset;
@@ -120,6 +124,7 @@ public class DevController {
     private final FeedRebuildJob feedRebuild;
     private final RankBatchJob rankBatch;
     private final PinnableMysteryRegionQuery mysteries;
+    private final SeasonLineupCache seasonLineups;
 
     public DevController(JdbcTemplate jdbc, ExplorationDevService exploration, MapAccess mapAccess,
                          RecalculateService recalculate, OutboxRedelivery redelivery, ObjectMapper objectMapper,
@@ -127,8 +132,9 @@ public class DevController {
                          ItemDefinitionCache itemDefinitions, ObjectProvider<OutboxRelay> relay,
                          PlatformTransactionManager transactionManager, ExplorerAuthentication authentication,
                          SessionLogin sessionLogin, FeedRebuildJob feedRebuild, RankBatchJob rankBatch,
-                         PinnableMysteryRegionQuery mysteries) {
+                         PinnableMysteryRegionQuery mysteries, SeasonLineupCache seasonLineups) {
         this.mysteries = mysteries;
+        this.seasonLineups = seasonLineups;
         this.feedRebuild = feedRebuild;
         this.rankBatch = rankBatch;
         this.relay = relay;
@@ -167,6 +173,7 @@ public class DevController {
             relay.ifAvailable(OutboxRelay::resume);
         }
         itemDefinitions.invalidate();
+        seasonLineups.invalidate();
         // 8단계: 밀어 둔 서버 시계도 시스템 시계로(다음 이야기가 과거·미래에 남지 않게)
         if (clock instanceof AdjustableClock adjustable) adjustable.reset();
         // 8단계 보완: 고정해 둔 미스터리 지역도 풀어 원래 주차 선택으로

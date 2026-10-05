@@ -210,12 +210,36 @@ export interface QuestClaimResponse {
   claimedAt: string;
 }
 
+/** 계절 회차 지역 하나의 출처(13s단계): tourapi = 한국관광공사 TourAPI 근거, ai-estimate = AI 추정(검증 전) */
+export type RegionProvenance = 'tourapi' | 'ai-estimate';
+/** 회차 지역 목록 전체의 출처 요약(13s단계) */
+export type LineupProvenance = RegionProvenance | 'mixed';
+/** 근거 종류(13s단계): FESTIVAL = 축제(행사정보 — 기간 있음), ATTRACTION = 관광지(키워드 검색 — 기간 null) */
+export type EvidenceKind = 'FESTIVAL' | 'ATTRACTION';
+
+/** 지역을 고른 근거 하나 — SeasonEvidenceResponse(13s단계). 날짜는 서울 날짜 yyyy-MM-dd, fetchedAt 은 TourAPI 조회 시각(Instant) */
+export interface SeasonEvidenceResponse {
+  /** 한국관광공사 TourAPI 콘텐츠 id */
+  contentId: string;
+  title: string;
+  /** 축제 첫날(관광지는 null) */
+  startDate: string | null;
+  /** 축제 마지막 날(관광지는 null) */
+  endDate: string | null;
+  fetchedAt: string;
+  evidenceKind: EvidenceKind;
+}
+
 /** 계절 회차의 지역 — SeasonRegionResponse(코드 KR-xxxxx). collected = 이 회차 기간 안에 이 지도에서 칠해 센 지역 */
 export interface SeasonRegionResponse {
   code: string;
   name: string;
   provinceCode: string;
   collected: boolean;
+  /** 13s단계 */
+  provenance: RegionProvenance;
+  /** 근거(tourapi 지역만 — 축제 이른 순 → 관광지, 최대 5개). ai-estimate 는 [] */
+  evidence: SeasonEvidenceResponse[];
 }
 
 export type SeasonId = 'spring' | 'autumn';
@@ -246,7 +270,12 @@ export interface SeasonRoundResponse {
   titleName: string;
   /** season:{roundId} */
   backgroundItemId: string;
+  /** 확정 목록이면 순위 순, 기본 목록이면 정의 순서 */
   regions: SeasonRegionResponse[];
+  /** 회차 지역 목록 전체의 출처 요약(13s단계) */
+  provenance: LineupProvenance;
+  /** 근거 기관 — 근거 지역이 하나라도 있으면 "한국관광공사 TourAPI", 없으면 null(13s단계) */
+  source: string | null;
 }
 
 /** 다음에 열리는 회차 — NextSeasonResponse */
@@ -257,6 +286,8 @@ export interface NextSeasonResponse {
   emoji: string;
   startsAt: string;
   endsAt: string;
+  /** 그 회차 지역 목록의 출처 요약(13s단계) */
+  provenance: LineupProvenance;
 }
 
 /** GET /seasons/current — SeasonsResponse(9단계, mapId 생략 = 개인 지도) */

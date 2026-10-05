@@ -8,6 +8,8 @@ import com.kobi.territory.catalog.domain.item.ItemDefinition;
 import com.kobi.territory.catalog.domain.item.ItemDefinitions;
 import com.kobi.territory.catalog.domain.mystery.MysteryRules;
 import com.kobi.territory.catalog.domain.region.Provinces;
+import com.kobi.territory.catalog.domain.region.RegionBoundaries;
+import com.kobi.territory.catalog.domain.region.RegionLocator;
 import com.kobi.territory.catalog.domain.region.Regions;
 import com.kobi.territory.catalog.domain.reward.RewardRules;
 import java.util.List;
@@ -20,7 +22,7 @@ import java.util.Objects;
  * {@link #requireItemCoverage}로, 새 아이템의 참조는 {@link #requireReferences}로 검증한다).
  */
 public record Catalog(Regions regions, Provinces provinces, RewardRules rewardRules, String regionsGeoJson,
-                      ProgressionDefinitions progression, MysteryRules mystery) {
+                      ProgressionDefinitions progression, MysteryRules mystery, RegionBoundaries boundaries) {
     public Catalog {
         Objects.requireNonNull(regions, "regions");
         Objects.requireNonNull(provinces, "provinces");
@@ -28,8 +30,16 @@ public record Catalog(Regions regions, Provinces provinces, RewardRules rewardRu
         Objects.requireNonNull(regionsGeoJson, "regionsGeoJson");
         Objects.requireNonNull(progression, "progression");
         Objects.requireNonNull(mystery, "mystery");
+        Objects.requireNonNull(boundaries, "boundaries");
         provinces.requireConsistentWith(regions);
         progression.requireConsistentWith(regions, provinces);
+        boundaries.requireKnownIn(regions);
+    }
+
+    /** 경계 자료(점-다각형 판정) 없이 — 13s단계 이전 범위. */
+    public Catalog(Regions regions, Provinces provinces, RewardRules rewardRules, String regionsGeoJson,
+                   ProgressionDefinitions progression, MysteryRules mystery) {
+        this(regions, provinces, rewardRules, regionsGeoJson, progression, mystery, RegionBoundaries.none());
     }
 
     /** 미스터리 규칙 없이(8단계 이전 범위) 만든다. */
@@ -41,6 +51,11 @@ public record Catalog(Regions regions, Provinces provinces, RewardRules rewardRu
     /** 진행 정의 없이(1단계 범위) 만든다. */
     public Catalog(Regions regions, Provinces provinces, RewardRules rewardRules, String regionsGeoJson) {
         this(regions, provinces, rewardRules, regionsGeoJson, ProgressionDefinitions.empty());
+    }
+
+    /** 바깥 위치(좌표·주소) → 우리 지역(13s단계). @param toleranceKilometers 경계 밖 점을 가장 가까운 지역으로 볼 거리 */
+    public RegionLocator regionLocator(double toleranceKilometers) {
+        return new RegionLocator(regions, provinces, boundaries, toleranceKilometers);
     }
 
     /** 칭호 전체(진행 정의 + 시·도). */

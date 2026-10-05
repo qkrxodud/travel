@@ -160,6 +160,14 @@ class ProgressionDataTest {
         }
 
         @Test
+        @DisplayName("계절 기본 지역 목록은 AI 추정(검증 전)으로 표시돼 있고, 축제를 고를 테마 키워드가 있다")
+        void seasonProvenance() {
+            assertThat(카탈로그.seasons()).allMatch(season -> season.provenance().equals("ai-estimate"));
+            assertThat(데이터.progression().seasons())
+                .allMatch(season -> !season.keywords().isEmpty() && !season.attractionKeywords().isEmpty());
+        }
+
+        @Test
         @DisplayName("계절 지역은 모두 카탈로그에 있는 현행 지역이다")
         void seasonRegionsKnown() {
             카탈로그.seasons().forEach(season -> season.regionCodes().forEach(regionCode ->

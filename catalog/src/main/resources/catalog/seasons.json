@@ -18,7 +18,17 @@
    "KR-36330"
   ],
   "title": "벚꽃 순례자",
-  "emoji": "🌸"
+  "emoji": "🌸",
+  "keywords": [
+   "벚꽃",
+   "왕벚",
+   "벚나무"
+  ],
+  "attractionKeywords": [
+   "벚꽃"
+  ],
+  "provenance": "ai-estimate",
+  "provenanceNote": "지역 목록은 AI 가 일반 지식으로 추정한 값(검증 전). 회차별 확정 목록은 TourAPI 근거로 season_lineup 에 저장된다(13s단계)."
  },
  {
   "id": "autumn",
@@ -39,6 +49,15 @@
    "KR-35310"
   ],
   "title": "단풍 사냥꾼",
-  "emoji": "🍁"
+  "emoji": "🍁",
+  "keywords": [
+   "단풍",
+   "가을 산"
+  ],
+  "attractionKeywords": [
+   "단풍"
+  ],
+  "provenance": "ai-estimate",
+  "provenanceNote": "지역 목록은 AI 가 일반 지식으로 추정한 값(검증 전). 회차별 확정 목록은 TourAPI 근거로 season_lineup 에 저장된다(13s단계)."
  }
 ]

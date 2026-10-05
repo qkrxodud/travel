@@ -6,7 +6,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.time.Instant;
+import java.time.ZoneId;
 
 /**
  * 진행(2단계) 정의 데이터 묶음: 레벨 곡선·칭호, 도감 세트, 뱃지, 퀘스트. 칭호 목록은 이들로부터 파생한다.
@@ -59,6 +62,27 @@ public record ProgressionDefinitions(LevelRules levels, List<ThemeDefinition> th
     public boolean definesSeasonRound(String roundId) {
         String seasonId = SeasonDefinition.seasonIdOf(roundId);
         return seasonId != null && seasons.stream().anyMatch(season -> season.id().equals(seasonId));
+    }
+
+    /** 회차 id({계절}-{연도})의 계절 정의. 모르는 계절·형식이면 빈 값. */
+    public Optional<SeasonDefinition> seasonOfRound(String roundId) {
+        String seasonId = SeasonDefinition.seasonIdOf(roundId);
+        return seasons.stream().filter(season -> season.id().equals(seasonId)).findFirst();
+    }
+
+    /** 회차 id 의 기간. 모르는 계절·형식이면 빈 값. */
+    public Optional<SeasonRoundWindow> roundWindow(String roundId, ZoneId zone) {
+        return seasonOfRound(roundId).flatMap(season -> SeasonDefinition.yearOf(roundId).map(year -> season.windowOf(year, zone)));
+    }
+
+    /** 계절마다 이 시각 뒤에 처음 열리는 회차(정의 순서) — 자동 수집 대상. */
+    public List<SeasonRoundWindow> upcomingWindows(Instant at, ZoneId zone) {
+        return seasons.stream().map(season -> season.upcomingWindow(at, zone)).toList();
+    }
+
+    /** 이 시각에 열려 있는 회차(정의 순서). */
+    public List<SeasonRoundWindow> openWindows(Instant at, ZoneId zone) {
+        return seasons.stream().flatMap(season -> season.openWindow(at, zone).stream()).toList();
     }
 
     /**

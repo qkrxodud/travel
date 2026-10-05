@@ -72,7 +72,7 @@ public class CatalogService implements RegionCatalog, RewardCalculator, Progress
             .toList());
         this.seasons = definitions.seasons().stream().map(season -> new SeasonView(season.id(), season.name(), season.desc(),
             MONTH_DAY.format(season.start()), MONTH_DAY.format(season.end()), season.regions().stream().map(RegionCode::value).toList(),
-            season.titleId(), season.title(), season.emoji())).toList();
+            season.titleId(), season.title(), season.emoji(), season.provenance())).toList();
         this.titles = catalog.titles().stream()
             .map(title -> new TitleView(title.id(), title.name(), title.how(), title.source().name(), title.ref())).toList();
     }

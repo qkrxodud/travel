@@ -83,3 +83,4 @@ docker compose -p territory-e2e -f compose.yaml -f compose.e2e.yaml down -v
 | 2026-10-04 | 단계 수렴 기준에 운영 이미지 빌드(docker build) 추가, 운영 compose 반영 절차(백업 → prev 태그 → 재빌드) 명시 | verify-architecture, territory-orchestrator | 8단계 배포 시 Dockerfile buildSrc 누락으로 이미지 빌드 실패(QA 기준에 docker build 없음) |
 | 2026-10-04 | 잠금·격리 규칙 추가(상한·유일성 판단 쓰기는 READ_COMMITTED + 잠금이 첫 조회 + MySQL 동시성 테스트 필수), QA 점검 항목 추가 | implement-context, verify-architecture | 1단계·9단계에서 REPEATABLE READ 스냅숏 결함 재발(체크인 상한, 위시 30개) |
 | 2026-10-05 | infra 하위 패키지에 외부 클라이언트 자리(`infra/client`·대상 이름) 허용 | implement-context | 12단계 웹 푸시 HTTP 클라이언트가 entity/repository 어디에도 맞지 않음 |
+| 2026-10-05 | 실제 세계 데이터 출처 규칙 추가(명소·축제 등 사실 데이터는 출처·근거 기록, AI 추정은 provenance 표시), QA 점검 항목 추가 | implement-context, verify-architecture | 사용자 지적: seasons.json을 AI가 출처 없이 만듦 |

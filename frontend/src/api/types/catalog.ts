@@ -73,3 +73,117 @@ export interface RegionFeatureCollection {
   type: 'FeatureCollection';
   features: { type: 'Feature'; properties: RegionFeatureProperties; geometry: RegionGeometry }[];
 }
+
+// ---- 13s단계 관리자 계절 회차 지역 목록(catalog AdminSeasonDtos, X-Admin-Token) — 계약 _workspace/13s_contracts.md §2 ----
+
+/** 회차 지역 하나의 출처 — tourapi = 한국관광공사 TourAPI 근거, ai-estimate = AI 추정(검증 전) */
+export type LineupRegionProvenance = 'tourapi' | 'ai-estimate';
+/** 회차 지역 목록 전체의 출처 요약 */
+export type LineupSummaryProvenance = LineupRegionProvenance | 'mixed';
+/** 근거 종류 — FESTIVAL = 축제(기간 있음), ATTRACTION = 관광지(기간 null) */
+export type LineupEvidenceKind = 'FESTIVAL' | 'ATTRACTION';
+/** 지금 자동 수집이 돈다면 할 일 */
+export type LineupNextPlan = 'NONE' | 'PREVIEW' | 'COLLECT' | 'COLLECT_AND_CONFIRM';
+/** 확정한 쪽 — OPENING = 확정 없이 열려 그때 기본 목록으로 고정 */
+export type LineupConfirmedBy = 'AUTO' | 'ADMIN' | 'OPENING';
+/** 마지막 수집 시도 결과 */
+export type LineupAttemptOutcome = 'COLLECTED' | 'PARTIAL' | 'NOT_CONFIGURED' | 'KEY_REJECTED' | 'QUOTA_EXCEEDED' | 'BAD_RESPONSE' | 'UNREACHABLE';
+
+/** EvidenceResponse — 날짜는 서울 날짜 yyyy-MM-dd, fetchedAt 은 TourAPI 조회 시각(Instant) */
+export interface LineupEvidenceResponse {
+  /** TourAPI 콘텐츠 id */
+  contentId: string;
+  title: string;
+  /** 축제 첫날(관광지는 null) */
+  startDate: string | null;
+  /** 축제 마지막 날(관광지는 null) */
+  endDate: string | null;
+  fetchedAt: string;
+  evidenceKind: LineupEvidenceKind;
+}
+
+/** LineupRegionResponse — code 는 KR-xxxxx, 카탈로그에서 못 찾으면 name·provinceCode null */
+export interface LineupRegionResponse {
+  code: string;
+  name: string | null;
+  provinceCode: string | null;
+  provenance: LineupRegionProvenance;
+  evidence: LineupEvidenceResponse[];
+}
+
+/** LineupResponse — 이 회차에 쓰는(쓸) 목록. confirmedBy null = 아직 열리지 않은 회차의 기본 목록(AI 추정) */
+export interface LineupResponse {
+  provenance: LineupSummaryProvenance;
+  source: string | null;
+  confirmedBy: LineupConfirmedBy | null;
+  confirmedAt: string | null;
+  /** 근거 자료를 읽은 시각(기본 목록이면 null) */
+  collectedAt: string | null;
+  regions: LineupRegionResponse[];
+}
+
+/** CandidateResponse — 확정 전 후보 */
+export interface LineupCandidateResponse {
+  provenance: LineupSummaryProvenance;
+  source: string | null;
+  collectedAt: string;
+  /** TourAPI 근거 지역 수 */
+  evidencedRegions: number;
+  regions: LineupRegionResponse[];
+  warnings: string[];
+}
+
+/** AttemptResponse — 마지막 수집 시도 */
+export interface LineupAttemptResponse {
+  at: string;
+  outcome: LineupAttemptOutcome;
+  failed: boolean;
+  warnings: string[];
+}
+
+/** RoundLineupResponse — GET /admin/seasons/{roundId} · POST …/refresh · PUT …/confirm */
+export interface RoundLineupResponse {
+  roundId: string;
+  seasonId: string;
+  name: string;
+  emoji: string;
+  year: number;
+  startsAt: string;
+  /** 닫히는 순간 — 회차 기간 [startsAt, endsAt) */
+  endsAt: string;
+  /** 열렸거나 지나 목록이 고정됨 — 갱신·확정 불가 */
+  locked: boolean;
+  /** 자동 수집·확정을 시작하는 시각(시작 leadDays 일 전) */
+  collectionOpensAt: string;
+  nextPlan: LineupNextPlan;
+  inEffect: LineupResponse;
+  candidate: LineupCandidateResponse | null;
+  lastAttempt: LineupAttemptResponse | null;
+  warnings: string[];
+}
+
+/** TourApiStatusResponse — 키 값은 응답에 없다(configured 만) */
+export interface TourApiStatusResponse {
+  configured: boolean;
+  /** 오늘(서울 날짜) 이 서비스의 호출 수 */
+  callsToday: number;
+  dailyLimit: number;
+  exhausted: boolean;
+  source: string;
+  warnings: string[];
+}
+
+/** ScheduleResponse — 자동 수집 정책 */
+export interface LineupScheduleResponse {
+  leadDays: number;
+  recollectAfterHours: number;
+  autoConfirm: boolean;
+  autoConfirmMinRegions: number;
+}
+
+/** GET /admin/seasons — SeasonLineupsResponse. rounds = 지금 열린 회차(있으면) → 계절마다 다음 회차 */
+export interface SeasonLineupsResponse {
+  tourApi: TourApiStatusResponse;
+  schedule: LineupScheduleResponse;
+  rounds: RoundLineupResponse[];
+}

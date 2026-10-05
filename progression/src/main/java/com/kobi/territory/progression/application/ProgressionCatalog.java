@@ -8,6 +8,7 @@ import com.kobi.territory.catalog.api.query.ProgressionRules.QuestView;
 import com.kobi.territory.catalog.api.query.ProgressionRules.StreakRulesView;
 import com.kobi.territory.catalog.api.query.RegionCatalog;
 import com.kobi.territory.catalog.api.query.RewardCalculator;
+import com.kobi.territory.catalog.api.query.SeasonLineupQuery;
 import com.kobi.territory.common.model.Rarity;
 import com.kobi.territory.common.model.RegionCode;
 import com.kobi.territory.progression.domain.policy.Badge;
@@ -61,7 +62,7 @@ public class ProgressionCatalog implements XpRewards {
     private final SeasonCalendar seasonCalendar;
 
     public ProgressionCatalog(ProgressionRules rules, RewardCalculator rewards, RegionCatalog regions,
-                              MysteryRegionQuery mysteries, Clock clock) {
+                              MysteryRegionQuery mysteries, SeasonLineupQuery lineups, Clock clock) {
         this.rewards = rewards;
         this.mysteries = mysteries;
         this.clock = clock;
@@ -85,7 +86,8 @@ public class ProgressionCatalog implements XpRewards {
         this.seasonCalendar = SeasonCalendar.of(rules.seasons().stream()
             .map(season -> new Season(season.id(), MonthDay.parse("--" + season.start()), MonthDay.parse("--" + season.end()),
                 season.regionCodes().stream().map(RegionCode::of).collect(Collectors.toSet())))
-            .toList(), clock.getZone());
+            .toList(), clock.getZone(), roundId -> lineups.lineupOf(roundId)
+            .map(lineup -> lineup.regionCodes().stream().map(RegionCode::of).collect(Collectors.toSet())));
         this.questRules = new QuestRules(rules.quests().stream()
             .map(quest -> new QuestRule(quest.id(), QuestRule.Scope.valueOf(quest.scope()),
                 QuestRule.Metric.valueOf(quest.metric()), quest.param(), quest.target(), quest.xp()))
@@ -147,7 +149,7 @@ public class ProgressionCatalog implements XpRewards {
         return rewards.wishFulfilled().amount();
     }
 
-    /** 계절 한정 테마 달력(9단계). */
+    /** 계절 한정 테마 달력(9단계). 회차 지역은 카탈로그의 회차별 확정 목록(13s단계), 없으면 기본 목록. */
     public SeasonCalendar seasonCalendar() {
         return seasonCalendar;
     }

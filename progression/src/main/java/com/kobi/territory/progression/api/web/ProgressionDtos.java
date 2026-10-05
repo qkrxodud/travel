@@ -2,6 +2,7 @@ package com.kobi.territory.progression.api.web;
 
 import com.kobi.territory.common.model.Rarity;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 /** 진행 API 응답·요청 DTO. */
@@ -87,8 +88,26 @@ public final class ProgressionDtos {
                                    List<ProvinceProgressResponse> provinces, int mysteryFoundCount, int revisitStampCount,
                                    int wishFulfilledCount) {}
 
-    /** 계절 회차의 지역 하나 — collected = 이 회차 기간 안에 이 지도에서 칠해 센 지역. */
-    public record SeasonRegionResponse(String code, String name, String provinceCode, boolean collected) {}
+    /**
+     * 계절 회차의 지역 하나 — collected = 이 회차 기간 안에 이 지도에서 칠해 센 지역.
+     *
+     * @param provenance 이 지역을 고른 근거의 출처(13s단계): "tourapi"(한국관광공사 TourAPI 축제) | "ai-estimate"(AI 추정, 검증 전)
+     * @param evidence   근거(tourapi 지역만 — 축제 이른 순 → 관광지, 최대 5개), ai-estimate 는 빈 목록
+     */
+    public record SeasonRegionResponse(String code, String name, String provinceCode, boolean collected, String provenance,
+                                       List<SeasonEvidenceResponse> evidence) {}
+
+    /**
+     * 근거 하나(13s단계).
+     *
+     * @param contentId    한국관광공사 TourAPI 콘텐츠 id
+     * @param startDate    축제 첫날(관광지는 null)
+     * @param endDate      축제 마지막 날(관광지는 null)
+     * @param fetchedAt    TourAPI 조회 시각
+     * @param evidenceKind "FESTIVAL"(축제) | "ATTRACTION"(관광지) — 화면은 "축제"/"관광지"로 표시
+     */
+    public record SeasonEvidenceResponse(String contentId, String title, LocalDate startDate, LocalDate endDate,
+                                         Instant fetchedAt, String evidenceKind) {}
 
     /**
      * 계절 한정 테마 회차 하나(9단계).
@@ -100,14 +119,18 @@ public final class ProgressionDtos {
      * @param open             지금 열려 있는지
      * @param rewarded         내가 완성 보상(XP·칭호·배경)을 받은 수령자인지(완성 시점 멤버)
      * @param backgroundItemId 회차 배경 아이템 id(season:{roundId})
+     * @param provenance       회차 지역 목록 전체의 출처 요약(13s단계): "tourapi" | "ai-estimate" | "mixed"
+     * @param source           근거 기관 표기 — 근거 지역이 있으면 "한국관광공사 TourAPI", 없으면 null
      */
     public record SeasonRoundResponse(String roundId, String seasonId, String name, String emoji, int year, Instant startsAt,
                                       Instant endsAt, long remainingSeconds, boolean open, int have, int total,
                                       boolean completed, Instant completedAt, boolean rewarded, int xp, String titleId,
-                                      String titleName, String backgroundItemId, List<SeasonRegionResponse> regions) {}
+                                      String titleName, String backgroundItemId, List<SeasonRegionResponse> regions,
+                                      String provenance, String source) {}
 
-    /** 다음에 열리는 회차(지금 열린 회차가 없을 때 안내용). */
-    public record NextSeasonResponse(String roundId, String seasonId, String name, String emoji, Instant startsAt, Instant endsAt) {}
+    /** 다음에 열리는 회차(지금 열린 회차가 없을 때 안내용). @param provenance 그 회차 지역 목록의 출처 요약(13s단계) */
+    public record NextSeasonResponse(String roundId, String seasonId, String name, String emoji, Instant startsAt, Instant endsAt,
+                                     String provenance) {}
 
     /**
      * GET /seasons/current(9단계) — mapId 생략 시 개인 지도.

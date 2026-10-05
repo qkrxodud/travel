@@ -41,7 +41,7 @@ const week = (received: boolean): MysteryWeekResponse => ({
 
 const round = (overrides: Partial<SeasonRoundResponse> = {}): SeasonRoundResponse => ({
   roundId: 'autumn-2026', seasonId: 'autumn', name: '2026 단풍 명소', emoji: '🍁', year: 2026, startsAt: '', endsAt: '', remainingSeconds: 100, open: true,
-  have: 9, total: 10, completed: false, completedAt: null, rewarded: false, xp: 150, titleId: 'season-autumn', titleName: '단풍 사냥꾼', backgroundItemId: 'season:autumn-2026', regions: [], ...overrides,
+  have: 9, total: 10, completed: false, completedAt: null, rewarded: false, xp: 150, titleId: 'season-autumn', titleName: '단풍 사냥꾼', backgroundItemId: 'season:autumn-2026', regions: [], provenance: 'ai-estimate', source: null, ...overrides,
 });
 const seasons = (current: SeasonRoundResponse): SeasonsResponse => ({ mapId: 'personal', now: '', current: [current], next: null, history: [] });
 const wishlist = (status: 'WANTED' | 'VISITED'): WishlistResponse => ({

@@ -390,7 +390,8 @@ describe('계절 한정 배지', () => {
     roundId: 'autumn-2026', seasonId: 'autumn', name: '2026 단풍 명소', emoji: '🍁', year: 2026, startsAt: '2026-09-30T15:00:00Z', endsAt: '2026-11-30T15:00:00Z',
     remainingSeconds: 58 * 86400, open: true, have: 1, total: 2, completed: false, completedAt: null, rewarded: false, xp: 150, titleId: 'season-autumn', titleName: '단풍 사냥꾼',
     backgroundItemId: 'season:autumn-2026',
-    regions: [{ code: 'KR-31370', name: '가평군', provinceCode: 'KR-31', collected: true }, { code: 'KR-11010', name: '종로구', provinceCode: 'KR-11', collected: false }],
+    regions: [{ code: 'KR-31370', name: '가평군', provinceCode: 'KR-31', collected: true, provenance: 'ai-estimate', evidence: [] }, { code: 'KR-11010', name: '종로구', provinceCode: 'KR-11', collected: false, provenance: 'ai-estimate', evidence: [] }],
+    provenance: 'ai-estimate', source: null,
   };
   const seasons = (current: SeasonRoundResponse[]): SeasonsResponse => ({ mapId: 'personal', now: '', current, next: null, history: [] });
 

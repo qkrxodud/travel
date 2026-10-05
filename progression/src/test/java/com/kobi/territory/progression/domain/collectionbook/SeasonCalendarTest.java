@@ -5,10 +5,15 @@ import static com.kobi.territory.progression.domain.Fixtures.계절;
 import static com.kobi.territory.progression.domain.Fixtures.서울시각;
 import static com.kobi.territory.progression.domain.Fixtures.서울정오;
 import static com.kobi.territory.progression.domain.Fixtures.종로구;
+import static com.kobi.territory.progression.domain.Fixtures.중구;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.MonthDay;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -52,6 +57,39 @@ class SeasonCalendarTest {
         void covering() {
             assertThat(계절.roundsCovering(가평군, 서울정오(2026, 10, 4))).isEmpty();
             assertThat(계절.roundsCovering(종로구, 서울정오(2026, 10, 4))).hasSize(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("회차 지역은")
+    class RoundRegions {
+
+        /** spring-2027 만 확정 목록(중구 하나)이 있다. */
+        private final SeasonCalendar 확정된_봄 = SeasonCalendar.of(List.of(
+            new Season("autumn", MonthDay.of(10, 1), MonthDay.of(11, 30), Set.of(종로구, 중구)),
+            new Season("spring", MonthDay.of(3, 20), MonthDay.of(4, 30), Set.of(가평군, 종로구))), 서울시각,
+            roundId -> roundId.equals("spring-2027") ? Optional.of(Set.of(중구)) : Optional.empty());
+
+        @Test
+        @DisplayName("확정 목록이 있는 회차는 그 목록을 쓴다")
+        void confirmedLineup() {
+            assertThat(확정된_봄.roundsOpenAt(서울정오(2027, 4, 1))).extracting(SeasonRound::regions).containsExactly(Set.of(중구));
+            assertThat(확정된_봄.roundsCovering(중구, 서울정오(2027, 4, 1))).hasSize(1);
+            assertThat(확정된_봄.roundsCovering(가평군, 서울정오(2027, 4, 1))).isEmpty();
+        }
+
+        @Test
+        @DisplayName("확정 목록이 없는 회차(진행 중이던 회차 포함)는 계절 정의의 기본 목록 그대로다")
+        void defaultLineup() {
+            assertThat(확정된_봄.roundsOpenAt(서울정오(2026, 10, 4))).extracting(SeasonRound::regions).containsExactly(Set.of(종로구, 중구));
+            assertThat(확정된_봄.round("spring-2028")).map(SeasonRound::regions).hasValue(Set.of(가평군, 종로구));
+        }
+
+        @Test
+        @DisplayName("재계산용 사본도 같은 확정 목록을 쓴다")
+        void replayCopy() {
+            assertThat(확정된_봄.excludingEndedBy(서울정오(2027, 4, 2)).roundsOpenAt(서울정오(2027, 4, 1)))
+                .extracting(SeasonRound::regions).containsExactly(Set.of(중구));
         }
     }
 

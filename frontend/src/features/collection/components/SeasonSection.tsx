@@ -3,8 +3,9 @@ import { nextRoundText, openRound, pastRoundText, seasonRoundView } from '../../
 import { useSeasons } from '../../../shared/queries/seasons';
 import { Bar } from '../../../shared/ui/Bar';
 import { useUiStore } from '../../../store/uiStore';
+import { SeasonSources } from './SeasonSources';
 
-/** 도감 탭 "계절 한정"(#season) — 지금 회차의 남은 기간·진행·완성 보상·지도에서 보기, 다음 회차·지난 기록. 값은 전부 서버 값 */
+/** 도감 탭 "계절 한정"(#season) — 지금 회차의 남은 기간·진행·완성 보상·지도에서 보기·추천 근거와 출처(13s), 다음 회차·지난 기록. 값은 전부 서버 값 */
 export function SeasonSection() {
   const { data: seasons } = useSeasons();
   const showOnMap = useUiStore(state => state.showOnMap);
@@ -34,6 +35,7 @@ export function SeasonSection() {
           <div className="row">
             <button className="btn sm" id="season-show" onClick={() => showRegionsOnMap(round.regions.map(region => toClientCode(region.code)))}>지도에서 보기</button>
           </div>
+          <SeasonSources round={round} />
         </div>
       ) : (
         <p className="sub" style={{ margin: 0 }}>지금은 계절 한정 기간이 아니에요.</p>

@@ -1,19 +1,30 @@
 /**
- * 운영 지표 화면 — 운영자는 관리자 토큰을 넣고 서버가 센 숫자(오늘 활동·추이·퍼널·리텐션·K 계수·기능 사용률·오류)를 그대로 본다.
- * 이야기 순서: 숫자 읽는 법 → 머리 숫자·추이 → 퍼널 → 리텐션 → 기능·오류 → 토큰을 넣고 보기 → 배치가 비워 둔 날.
+ * 관리자 화면 — 운영자는 관리자 토큰을 넣고 서버가 센 숫자(오늘 활동·추이·퍼널·리텐션·K 계수·기능 사용률·오류)를 그대로 보고,
+ * 계절 회차마다 한국관광공사 TourAPI 근거로 모은 후보 지역을 살펴 확정한다(13s단계).
+ * 이야기 순서: 숫자 읽는 법 → 머리 숫자·추이 → 퍼널 → 리텐션 → 기능·오류 → 토큰을 넣고 보기 → 배치가 비워 둔 날
+ *   → 계절 회차(근거 읽는 법 → 회차 목록과 TourAPI 사용량 → 새로 모으기 → 확정 → 바꿀 수 없을 때).
  */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { adminApi } from '../../api/admin';
 import { ApiError } from '../../api/client';
 import type { DailyView, FunnelView, MetricsResponse, RetentionView } from '../../api/types/analytics';
+import type { LineupRegionResponse, RoundLineupResponse, SeasonLineupsResponse } from '../../api/types/catalog';
 import { AdminApp } from './components/AdminApp';
 import {
   activityTrend, adminErrorText, dayEntries, daysBetween, expiredCohortNote, expiredDaysText, gapBands, lastValue, countText, featureBars, funnelRows, headlines, kFactorText, missingDaysText, newcomerTrend, niceMax,
   partialWindowText, pendingSpans, percentText, retentionRows, shortDay, spreadLabels,
 } from './model/metrics';
+import {
+  adminViewOf, attemptOutcomeText, canConfirm, canRefresh, confirmedByText, lineupErrorText, regionRows, scheduleText, shortageText, usageText,
+} from './model/seasonLineups';
 
-vi.mock('../../api/admin', () => ({ adminApi: { metrics: vi.fn(), runBatch: vi.fn(async () => ({ from: '', to: '', dailyDays: 3, cohortDays: 35, purged: 0, elapsedMs: 5 })) } }));
+vi.mock('../../api/admin', () => ({
+  adminApi: {
+    metrics: vi.fn(), runBatch: vi.fn(async () => ({ from: '', to: '', dailyDays: 3, cohortDays: 35, purged: 0, elapsedMs: 5 })),
+    seasonLineups: vi.fn(), seasonLineup: vi.fn(), refreshSeasonLineup: vi.fn(), confirmSeasonLineup: vi.fn(),
+  },
+}));
 
 const day = (date: string, overrides: Partial<DailyView> = {}): DailyView => ({
   day: date, newVisitors: 4, newExplorers: 2, dau: 10, wau: 30, mau: 60, profileViews: 1, cardViews: 2, botViews: 0, kFactor: 0.1, live: false, partialWindow: false, ...overrides,
@@ -289,5 +300,207 @@ describe('토큰을 넣고 보기', () => {
     });
     expect(adminApi.runBatch).toHaveBeenCalledWith('local-admin-token');
     await waitFor(() => expect(vi.mocked(adminApi.metrics).mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+});
+
+// ---- 계절 회차(13s단계) ----
+
+const FETCHED = '2026-10-05T04:00:00Z';
+const festivalRegion = (code: string, name: string, title: string): LineupRegionResponse => ({
+  code, name, provinceCode: code.slice(0, 5), provenance: 'tourapi',
+  evidence: [{ contentId: 'c-' + code, title, startDate: '2027-03-25', endDate: '2027-04-05', fetchedAt: FETCHED, evidenceKind: 'FESTIVAL' }],
+});
+const attractionRegion = (code: string, name: string, title: string): LineupRegionResponse => ({
+  code, name, provinceCode: code.slice(0, 5), provenance: 'tourapi',
+  evidence: [{ contentId: 'a-' + code, title, startDate: null, endDate: null, fetchedAt: FETCHED, evidenceKind: 'ATTRACTION' }],
+});
+const estimatedRegion = (code: string, name: string): LineupRegionResponse => ({ code, name, provinceCode: code.slice(0, 5), provenance: 'ai-estimate', evidence: [] });
+
+const SCHEDULE = { leadDays: 30, recollectAfterHours: 168, autoConfirm: true, autoConfirmMinRegions: 10 };
+const lineupRound = (overrides: Partial<RoundLineupResponse> = {}): RoundLineupResponse => ({
+  roundId: 'spring-2027', seasonId: 'spring', name: '2027 벚꽃 명소', emoji: '🌸', year: 2027,
+  startsAt: '2027-03-19T15:00:00Z', endsAt: '2027-04-30T15:00:00Z', locked: false, collectionOpensAt: '2027-02-17T15:00:00Z', nextPlan: 'PREVIEW',
+  inEffect: { provenance: 'ai-estimate', source: null, confirmedBy: null, confirmedAt: null, collectedAt: null, regions: [estimatedRegion('KR-38110', '창원시')] },
+  candidate: null, lastAttempt: null, warnings: [], ...overrides,
+});
+const CANDIDATE = {
+  provenance: 'mixed' as const, source: '한국관광공사 TourAPI', collectedAt: FETCHED, evidencedRegions: 2,
+  regions: [festivalRegion('KR-11650', '서초구', '[개발용] 양재천 벚꽃 축제'), attractionRegion('KR-43150', '제천시', '청풍호 벚꽃길'), estimatedRegion('KR-38110', '창원시')],
+  warnings: ['맞는 축제가 모자라 AI 추정으로 채웠어요'],
+};
+const LINEUPS: SeasonLineupsResponse = {
+  tourApi: { configured: true, callsToday: 4, dailyLimit: 200, exhausted: false, source: '한국관광공사 TourAPI', warnings: [] },
+  schedule: SCHEDULE,
+  rounds: [
+    lineupRound({
+      roundId: 'autumn-2026', seasonId: 'autumn', name: '2026 단풍 명소', emoji: '🍁', year: 2026, locked: true, nextPlan: 'NONE',
+      inEffect: { provenance: 'ai-estimate', source: null, confirmedBy: 'OPENING', confirmedAt: '2026-09-30T15:00:00Z', collectedAt: null, regions: [estimatedRegion('KR-31370', '가평군')] },
+    }),
+    lineupRound(),
+  ],
+};
+
+describe('계절 회차 근거 읽는 법', () => {
+  it('관리자 주소 #/admin/seasons 는 계절 회차를, 그 밖의 관리자 주소는 운영 지표를 연다', () => {
+    expect(adminViewOf('#/admin/seasons')).toBe('seasons');
+    expect(adminViewOf('#/admin')).toBe('metrics');
+  });
+
+  it('오늘 TourAPI 호출 수와 하루 예산, 자동 수집 정책을 서버 값 그대로 한 줄로 보인다', () => {
+    expect(usageText(LINEUPS.tourApi)).toBe('오늘 TourAPI 호출 4 / 200회');
+    expect(scheduleText(SCHEDULE)).toBe('회차 시작 30일 전부터 7일마다 모아요 · 근거 10곳이 모이면 자동 확정');
+  });
+
+  it('지역 표는 서버 순서가 곧 순위이고, 축제는 기간을 붙이고 관광지는 이름만, AI 추정은 근거가 없다', () => {
+    expect(regionRows(CANDIDATE.regions)).toEqual([
+      { rank: 1, code: '11650', name: '서초구', provenance: 'tourapi', sourceText: '한국관광공사 TourAPI', evidence: ['축제 「[개발용] 양재천 벚꽃 축제」 3/25~4/5'] },
+      { rank: 2, code: '43150', name: '제천시', provenance: 'tourapi', sourceText: '한국관광공사 TourAPI', evidence: ['관광지 「청풍호 벚꽃길」'] },
+      { rank: 3, code: '38110', name: '창원시', provenance: 'ai-estimate', sourceText: 'AI 추정(검증 전)', evidence: [] },
+    ]);
+  });
+
+  it('카탈로그에서 못 찾은 지역은 이름 대신 코드를 보인다', () => {
+    expect(regionRows([{ ...estimatedRegion('KR-99999', '없음'), name: null, provinceCode: null }])[0]?.name).toBe('KR-99999');
+  });
+
+  it('후보의 근거 지역이 자동 확정 기준보다 적으면 몇 곳뿐인지 경고하고, 기준을 채우면 경고하지 않는다', () => {
+    expect(shortageText(CANDIDATE, SCHEDULE)).toBe('근거 지역 2곳 — 10곳 미만이라 자동 확정하지 않아요(나머지는 AI 추정으로 채움)');
+    expect(shortageText({ ...CANDIDATE, evidencedRegions: 10 }, SCHEDULE)).toBeNull();
+    expect(shortageText(null, SCHEDULE)).toBeNull();
+  });
+
+  it('쓰는 목록이 누가 정한 것인지와 마지막 수집 결과를 우리말로 보인다', () => {
+    expect(confirmedByText(null)).toBe('기본 목록(확정 전)');
+    expect(confirmedByText('OPENING')).toBe('열릴 때 고정');
+    expect(confirmedByText('ADMIN')).toBe('관리자 확정');
+    expect(attemptOutcomeText('QUOTA_EXCEEDED')).toBe('호출 한도 초과');
+    expect(attemptOutcomeText('NOT_CONFIGURED')).toBe('키 없음 — 부르지 않음');
+  });
+
+  it('열렸거나 지난 회차는 새로 모을 수도 확정할 수도 없고, 후보가 없으면 확정할 수 없다', () => {
+    expect(canRefresh(lineupRound({ locked: true }))).toBe(false);
+    expect(canConfirm(lineupRound({ locked: true, candidate: CANDIDATE }))).toBe(false);
+    expect(canRefresh(lineupRound())).toBe(true);
+    expect(canConfirm(lineupRound())).toBe(false);
+    expect(canConfirm(lineupRound({ candidate: CANDIDATE }))).toBe(true);
+  });
+
+  it('서버가 거절한 이유를 종류마다 알려 준다', () => {
+    expect(lineupErrorText(new ApiError(409, 'SEASON_ROUND_LOCKED', ''))).toContain('바꿀 수 없어요');
+    expect(lineupErrorText(new ApiError(409, 'SEASON_CANDIDATE_MISSING', ''))).toBe('확정할 후보가 없어요. 먼저 새로 모아 주세요.');
+    expect(lineupErrorText(new ApiError(409, 'SEASON_LINEUP_BUSY', ''))).toContain('고치는 중');
+    expect(lineupErrorText(new ApiError(404, 'SEASON_ROUND_NOT_FOUND', ''))).toContain('그런 회차가 없어요');
+    expect(lineupErrorText(new ApiError(403, 'ADMIN_TOKEN_INVALID', ''))).toContain('맞지 않아요');
+    expect(lineupErrorText(new TypeError('offline'))).toContain('처리하지 못했어요');
+  });
+});
+
+describe('계절 회차 화면', () => {
+  const openSeasons = async (token = 'local-admin-token') => {
+    window.location.hash = '#/admin/seasons';
+    render(<AdminApp />);
+    fireEvent.change(screen.getByLabelText('관리자 토큰'), { target: { value: token } });
+    fireEvent.click(screen.getByText('회차 보기'));
+  };
+  afterEach(() => {
+    window.location.hash = '';
+  });
+
+  it('토큰을 넣으면 TourAPI 사용량과 회차 목록을 보이고, 열린 회차는 버튼이 잠겨 있으며 토큰은 어디에도 저장하지 않는다', async () => {
+    vi.mocked(adminApi.seasonLineups).mockResolvedValueOnce(LINEUPS);
+    await openSeasons();
+    await screen.findByText('오늘 TourAPI 호출 4 / 200회');
+    expect(adminApi.seasonLineups).toHaveBeenCalledWith('local-admin-token');
+    expect(adminApi.metrics).not.toHaveBeenCalled();
+    const autumn = document.querySelector('.lineup-round[data-round="autumn-2026"]');
+    expect(autumn?.getAttribute('data-locked')).toBe('true');
+    expect((autumn?.querySelector('[data-action="refresh"]') as HTMLButtonElement).disabled).toBe(true);
+    expect((autumn?.querySelector('[data-action="confirm"]') as HTMLButtonElement).disabled).toBe(true);
+    const spring = document.querySelector('.lineup-round[data-round="spring-2027"]');
+    expect((spring?.querySelector('[data-action="refresh"]') as HTMLButtonElement).disabled).toBe(false);
+    expect((spring?.querySelector('[data-action="confirm"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(document.getElementById('admin-login')?.hidden).toBe(true);
+    expect(JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage })).not.toContain('local-admin-token');
+  });
+
+  it('키가 없으면 그렇다고 알리고 서버가 준 경고를 그대로 보인다', async () => {
+    vi.mocked(adminApi.seasonLineups).mockResolvedValueOnce({
+      ...LINEUPS, tourApi: { ...LINEUPS.tourApi, configured: false, callsToday: 0, warnings: ['TourAPI 키가 없어요 — 계절 회차는 AI 추정 목록을 그대로 씁니다'] },
+    });
+    await openSeasons();
+    expect((await screen.findByText('키 없음')).id).toBe('tourapi-key-state');
+    expect(document.querySelector('#tourapi-warnings li')?.textContent).toContain('AI 추정 목록을 그대로');
+  });
+
+  it('새로 모으면 후보의 지역·순위·근거·출처를 상세로 보이고, 근거가 모자라면 경고한다', async () => {
+    vi.mocked(adminApi.seasonLineups).mockResolvedValue(LINEUPS);
+    const refreshed = lineupRound({ candidate: CANDIDATE, lastAttempt: { at: FETCHED, outcome: 'PARTIAL', failed: false, warnings: [] } });
+    vi.mocked(adminApi.refreshSeasonLineup).mockResolvedValueOnce(refreshed);
+    vi.mocked(adminApi.seasonLineup).mockResolvedValue(refreshed);
+    await openSeasons();
+    await screen.findByText('오늘 TourAPI 호출 4 / 200회');
+    await act(async () => {
+      fireEvent.click(document.querySelector('.lineup-round[data-round="spring-2027"] [data-action="refresh"]') as HTMLButtonElement);
+    });
+    expect(adminApi.refreshSeasonLineup).toHaveBeenCalledWith('local-admin-token', 'spring-2027', false);
+    await waitFor(() => expect(document.querySelectorAll('#lineup-candidate tbody tr')).toHaveLength(3));
+    const first = document.querySelector('#lineup-candidate tr[data-region="11650"]');
+    expect(first?.textContent).toContain('축제 「[개발용] 양재천 벚꽃 축제」 3/25~4/5');
+    expect(first?.textContent).toContain('한국관광공사 TourAPI');
+    expect(document.querySelector('#lineup-candidate tr[data-region="38110"]')?.getAttribute('data-provenance')).toBe('ai-estimate');
+    expect(document.getElementById('lineup-detail-shortage')?.textContent).toContain('10곳 미만');
+    await waitFor(() => expect(vi.mocked(adminApi.seasonLineups).mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it('캐시 없이 새로 모으기는 같은 날 받아 둔 응답을 건너뛰라고 요청한다', async () => {
+    vi.mocked(adminApi.seasonLineups).mockResolvedValue(LINEUPS);
+    vi.mocked(adminApi.refreshSeasonLineup).mockResolvedValueOnce(lineupRound({ candidate: CANDIDATE }));
+    vi.mocked(adminApi.seasonLineup).mockResolvedValue(lineupRound({ candidate: CANDIDATE }));
+    await openSeasons();
+    await screen.findByText('오늘 TourAPI 호출 4 / 200회');
+    await act(async () => {
+      fireEvent.click(document.querySelector('.lineup-round[data-round="spring-2027"] [data-action="refresh-fresh"]') as HTMLButtonElement);
+    });
+    expect(adminApi.refreshSeasonLineup).toHaveBeenCalledWith('local-admin-token', 'spring-2027', true);
+  });
+
+  it('후보를 확정하면 쓰는 목록이 관리자 확정으로 바뀐다', async () => {
+    const withCandidate = { ...LINEUPS, rounds: [LINEUPS.rounds[0] as RoundLineupResponse, lineupRound({ candidate: CANDIDATE })] };
+    const confirmed = lineupRound({ inEffect: { ...CANDIDATE, confirmedBy: 'ADMIN', confirmedAt: FETCHED } });
+    vi.mocked(adminApi.seasonLineups).mockResolvedValueOnce(withCandidate).mockResolvedValue({ ...LINEUPS, rounds: [LINEUPS.rounds[0] as RoundLineupResponse, confirmed] });
+    vi.mocked(adminApi.confirmSeasonLineup).mockResolvedValueOnce(confirmed);
+    vi.mocked(adminApi.seasonLineup).mockResolvedValue(confirmed);
+    await openSeasons();
+    await screen.findByText('오늘 TourAPI 호출 4 / 200회');
+    await act(async () => {
+      fireEvent.click(document.querySelector('.lineup-round[data-round="spring-2027"] [data-action="confirm"]') as HTMLButtonElement);
+    });
+    expect(adminApi.confirmSeasonLineup).toHaveBeenCalledWith('local-admin-token', 'spring-2027');
+    await waitFor(() => expect(document.querySelector('.lineup-round[data-round="spring-2027"]')?.getAttribute('data-confirmed-by')).toBe('ADMIN'));
+    expect(document.querySelectorAll('#lineup-in-effect tbody tr')).toHaveLength(3);
+  });
+
+  it('보는 사이 회차가 열려 서버가 바꿀 수 없다고 거절하면 그 이유를 회차 카드에 알려 준다', async () => {
+    vi.mocked(adminApi.seasonLineups).mockResolvedValue(LINEUPS);
+    vi.mocked(adminApi.refreshSeasonLineup).mockRejectedValueOnce(new ApiError(409, 'SEASON_ROUND_LOCKED', 'locked'));
+    await openSeasons();
+    await screen.findByText('오늘 TourAPI 호출 4 / 200회');
+    await act(async () => {
+      fireEvent.click(document.querySelector('.lineup-round[data-round="spring-2027"] [data-action="refresh"]') as HTMLButtonElement);
+    });
+    const error = await screen.findByRole('alert');
+    expect(error.textContent).toContain('이미 열렸거나 지난 회차라');
+    expect(error.getAttribute('data-code')).toBe('SEASON_ROUND_LOCKED');
+  });
+
+  it('지난 회차는 id 로 찾아 그때 쓴 목록을 보고, 없는 회차면 없다고 알려 준다', async () => {
+    vi.mocked(adminApi.seasonLineups).mockResolvedValue(LINEUPS);
+    vi.mocked(adminApi.seasonLineup).mockRejectedValueOnce(new ApiError(404, 'SEASON_ROUND_NOT_FOUND', 'missing'));
+    await openSeasons();
+    await screen.findByText('오늘 TourAPI 호출 4 / 200회');
+    fireEvent.change(screen.getByLabelText('다른 회차 보기'), { target: { value: 'winter-2027' } });
+    fireEvent.click(screen.getByText('보기'));
+    expect((await screen.findByRole('alert')).textContent).toContain('그런 회차가 없어요');
+    expect(adminApi.seasonLineup).toHaveBeenCalledWith('local-admin-token', 'winter-2027');
   });
 });

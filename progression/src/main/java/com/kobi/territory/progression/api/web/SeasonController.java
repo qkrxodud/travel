@@ -5,10 +5,14 @@ import com.kobi.territory.catalog.api.query.ProgressionRules.SeasonView;
 import com.kobi.territory.catalog.api.query.RegionCatalog;
 import com.kobi.territory.catalog.api.query.RegionView;
 import com.kobi.territory.catalog.api.query.RewardCalculator;
+import com.kobi.territory.catalog.api.query.SeasonLineupQuery;
+import com.kobi.territory.catalog.api.query.SeasonLineupQuery.LineupRegionView;
+import com.kobi.territory.catalog.api.query.SeasonLineupQuery.SeasonLineupView;
 import com.kobi.territory.common.identity.CurrentExplorer;
 import com.kobi.territory.common.model.ExplorerId;
 import com.kobi.territory.common.model.RegionCode;
 import com.kobi.territory.progression.api.web.ProgressionDtos.NextSeasonResponse;
+import com.kobi.territory.progression.api.web.ProgressionDtos.SeasonEvidenceResponse;
 import com.kobi.territory.progression.api.web.ProgressionDtos.SeasonRegionResponse;
 import com.kobi.territory.progression.api.web.ProgressionDtos.SeasonRoundResponse;
 import com.kobi.territory.progression.api.web.ProgressionDtos.SeasonsResponse;
@@ -39,13 +43,15 @@ public class SeasonController {
     private final ProgressionRules rules;
     private final RegionCatalog regions;
     private final RewardCalculator rewards;
+    private final SeasonLineupQuery lineups;
 
     public SeasonController(CollectionBookService collectionBooks, ProgressionRules rules, RegionCatalog regions,
-                            RewardCalculator rewards) {
+                            RewardCalculator rewards, SeasonLineupQuery lineups) {
         this.collectionBooks = collectionBooks;
         this.rules = rules;
         this.regions = regions;
         this.rewards = rewards;
+        this.lineups = lineups;
     }
 
     @GetMapping("/seasons/current")
@@ -60,7 +66,7 @@ public class SeasonController {
         SeasonRound next = overview.next();
         return new SeasonsResponse(overview.mapId(), overview.now(), current,
             next == null ? null : new NextSeasonResponse(next.roundId(), next.seasonId(), nameOf(next, seasons),
-                seasons.get(next.seasonId()).emoji(), next.startsAt(), next.endsAt()),
+                seasons.get(next.seasonId()).emoji(), next.startsAt(), next.endsAt(), lineupOf(next, seasons).provenance()),
             history);
     }
 
@@ -69,16 +75,28 @@ public class SeasonController {
         SeasonView season = seasons.get(round.seasonId());
         SeasonProgress progress = overview.book().seasonProgressOf(round.roundId());
         Set<RegionCode> collected = progress.collected();
-        List<SeasonRegionResponse> members = season.regionCodes().stream().map(code -> {
-            RegionView region = regions.findRegion(RegionCode.of(code)).orElse(null);
-            return new SeasonRegionResponse(code, region == null ? code : region.name(), region == null ? null : region.provinceCode(),
-                collected.contains(RegionCode.of(code)));
+        SeasonLineupView lineup = lineupOf(round, seasons);
+        List<SeasonRegionResponse> members = lineup.regions().stream().map(member -> {
+            RegionView region = regions.findRegion(RegionCode.of(member.code())).orElse(null);
+            return new SeasonRegionResponse(member.code(), region == null ? member.code() : region.name(),
+                region == null ? null : region.provinceCode(), collected.contains(RegionCode.of(member.code())), member.provenance(),
+                member.evidence().stream().map(item -> new SeasonEvidenceResponse(item.contentId(), item.title(), item.startDate(),
+                    item.endDate(), item.fetchedAt(), item.evidenceKind())).toList());
         }).toList();
         long remaining = open ? Math.max(0, Duration.between(overview.now(), round.endsAt()).getSeconds()) : 0;
         return new SeasonRoundResponse(round.roundId(), round.seasonId(), nameOf(round, seasons), season.emoji(), round.year(),
             round.startsAt(), round.endsAt(), remaining, open, progress.have(), round.regions().size(), progress.completed(),
             progress.completedAt(), progress.rewardedTo(explorerId), rewards.seasonComplete().amount(), season.titleId(),
-            season.titleName(), BACKGROUND_PREFIX + round.roundId(), members);
+            season.titleName(), BACKGROUND_PREFIX + round.roundId(), members, lineup.provenance(), lineup.source());
+    }
+
+    /** 회차 지역 목록과 근거(13s단계 — 확정본, 없으면 기본 목록). 카탈로그가 모르는 회차면 계절 정의의 기본 목록. */
+    private SeasonLineupView lineupOf(SeasonRound round, Map<String, SeasonView> seasons) {
+        return lineups.lineupOf(round.roundId()).orElseGet(() -> {
+            SeasonView season = seasons.get(round.seasonId());
+            return new SeasonLineupView(round.roundId(), season.provenance(), null, null, season.regionCodes().stream()
+                .map(code -> new LineupRegionView(code, season.provenance(), List.of())).toList());
+        });
     }
 
     private static String nameOf(SeasonRound round, Map<String, SeasonView> seasons) {

@@ -35,6 +35,9 @@ services:
       GOOGLE_CLIENT_ID: ""
       GOOGLE_CLIENT_SECRET: ""
       LOGGING_LEVEL_COM_KOBI_TERRITORY: INFO
+      # 계절 명소 TourAPI(13s단계) — 운영 .env 의 실제 키가 섞이지 않게 가짜 키 + 앱 자신의 가짜 TourAPI(/dev/tourapi, local 전용)로 명시
+      TOURAPI_SERVICE_KEY: dev-fixture-key
+      TERRITORY_TOURAPI_BASE_URL: http://localhost:8080/dev/tourapi
     ports: !override
       - "127.0.0.1:18090:8080"
     restart: "no"

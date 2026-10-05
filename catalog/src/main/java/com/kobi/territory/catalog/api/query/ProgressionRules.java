@@ -49,9 +49,11 @@ public interface ProgressionRules {
      * @param end         매년 닫히는 날 "MM-dd"(이 날까지 포함)
      * @param regionCodes KR-xxxxx
      * @param titleId     season-{id}(회차 무관 하나)
+     * @param regionCodes 기본 지역 목록 — 회차별 확정 목록은 {@link SeasonLineupQuery}(13s단계)
+     * @param provenance  기본 지역 목록의 출처 표시("ai-estimate" — AI 추정, 검증 전)
      */
     record SeasonView(String id, String name, String desc, String start, String end, List<String> regionCodes, String titleId,
-                      String titleName, String emoji) {
+                      String titleName, String emoji, String provenance) {
         public SeasonView {
             regionCodes = List.copyOf(regionCodes);
         }

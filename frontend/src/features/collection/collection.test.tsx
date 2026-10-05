@@ -1,7 +1,8 @@
 /**
  * 도감 탭 — 같은 테마의 지역을 모아 세트를 완성한다. 모은 수·완성 여부·보상은 지금 보는 지도 기준 서버 값이다.
  * (9단계) 계절 한정 — 봄·가을 회차 기간 안에 칠한 곳만 세어 완성하면 보상을 받는다. 회차·남은 기간·진행·보상은 서버 값이다.
- * 이야기 순서: 불러오는 중 → 세트 진행 → 세트 완성 → 지역을 지도에서 보기 → 계절 한정(기간 중 → 완성 → 기간 밖·지난 기록).
+ * (13s단계) 계절 회차 지역마다 왜 골랐는지(한국관광공사 TourAPI 축제·관광지 또는 AI 추정)와 출처를 함께 보여 준다.
+ * 이야기 순서: 불러오는 중 → 세트 진행 → 세트 완성 → 지역을 지도에서 보기 → 계절 한정(기간 중 → 추천 근거 → 완성 → 기간 밖·지난 기록).
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -79,7 +80,8 @@ describe('계절 한정', () => {
     startsAt: '2026-09-30T15:00:00Z', endsAt: '2026-11-30T15:00:00Z', remainingSeconds: 57 * 86400 + 3600, open: true,
     have: 1, total: 2, completed: false, completedAt: null, rewarded: false, xp: 150, titleId: 'season-autumn', titleName: '단풍 사냥꾼',
     backgroundItemId: 'season:autumn-2026',
-    regions: [{ code: 'KR-31370', name: '가평군', provinceCode: 'KR-31', collected: true }, { code: 'KR-11010', name: '종로구', provinceCode: 'KR-11', collected: false }],
+    regions: [{ code: 'KR-31370', name: '가평군', provinceCode: 'KR-31', collected: true, provenance: 'ai-estimate', evidence: [] }, { code: 'KR-11010', name: '종로구', provinceCode: 'KR-11', collected: false, provenance: 'ai-estimate', evidence: [] }],
+    provenance: 'ai-estimate', source: null,
     ...overrides,
   });
   const seasons = (overrides: Partial<SeasonsResponse> = {}): SeasonsResponse =>
@@ -123,6 +125,72 @@ describe('계절 한정', () => {
     });
   });
 
+  describe('추천 근거', () => {
+    const fetchedAt = '2026-10-05T04:00:00Z';
+    const festival = { contentId: '2786391', title: '가평 단풍 축제', startDate: '2026-10-20', endDate: '2026-10-26', fetchedAt, evidenceKind: 'FESTIVAL' as const };
+    const attraction = { contentId: '126508', title: '내장산 단풍생태공원', startDate: null, endDate: null, fetchedAt, evidenceKind: 'ATTRACTION' as const };
+    const evidenced = (overrides: Partial<SeasonRoundResponse> = {}) => round({
+      provenance: 'tourapi', source: '한국관광공사 TourAPI',
+      regions: [
+        { code: 'KR-31370', name: '가평군', provinceCode: 'KR-31', collected: true, provenance: 'tourapi', evidence: [festival] },
+        { code: 'KR-45180', name: '정읍시', provinceCode: 'KR-45', collected: false, provenance: 'tourapi', evidence: [attraction] },
+      ],
+      ...overrides,
+    });
+
+    it('검증 전 AI 추정 목록이면 추천 근거가 AI 추정이라고 알리고 지역마다 AI 추정으로 표시한다', () => {
+      served.seasons = seasons();
+      render(<CollectionTab />);
+      expect(document.querySelector('#season-sources-summary')?.textContent).toBe('추천 근거: AI 추정(검증 전)');
+      const lines = document.querySelectorAll('#season-sources li');
+      expect(lines).toHaveLength(2);
+      expect([...lines].map(line => line.getAttribute('data-provenance'))).toEqual(['ai-estimate', 'ai-estimate']);
+      expect(lines[0]?.textContent).toBe('가평군AI 추정');
+      expect(document.querySelector('#season-footnote')?.textContent).toBe('출처: AI 추정은 공개 자료로 확인하기 전의 추천이에요.');
+    });
+
+    it('TourAPI 근거 지역은 출처와 근거 종류·이름을 보이고, 축제에는 기간을 붙인다', () => {
+      served.seasons = seasons({ current: [evidenced()] });
+      render(<CollectionTab />);
+      expect(document.querySelector('#season-sources-summary')?.textContent).toBe('추천 근거: 한국관광공사 TourAPI');
+      const festivalLine = document.querySelector('#season-sources li[data-source-region="31370"]');
+      expect(festivalLine?.textContent).toContain('한국관광공사 TourAPI');
+      expect(festivalLine?.textContent).toContain('축제 「가평 단풍 축제」 10/20~10/26');
+      expect(document.querySelector('#season-sources li[data-source-region="45180"]')?.textContent).toContain('관광지 「내장산 단풍생태공원」');
+    });
+
+    it('이름·기간이 같은 근거가 둘이어도(다른 축제) 둘 다 보인다', () => {
+      const twin = { ...festival, contentId: '2786392' };
+      served.seasons = seasons({ current: [evidenced({
+        regions: [{ code: 'KR-31370', name: '가평군', provinceCode: 'KR-31', collected: true, provenance: 'tourapi', evidence: [festival, twin] }],
+      })] });
+      render(<CollectionTab />);
+      expect(document.querySelectorAll('#season-sources li[data-source-region="31370"] .season-evidence')).toHaveLength(2);
+    });
+
+    it('근거를 읽은 날을 출처 안내에 적는다', () => {
+      served.seasons = seasons({ current: [evidenced()] });
+      render(<CollectionTab />);
+      expect(document.querySelector('#season-footnote')?.textContent).toBe(`출처: 한국관광공사 TourAPI 축제·관광지 정보(${new Date(fetchedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })} 조회)`);
+    });
+
+    it('근거와 AI 추정이 섞이면 각각 몇 곳인지 알리고 지역마다 다르게 표시한다', () => {
+      served.seasons = seasons({
+        current: [evidenced({
+          provenance: 'mixed',
+          regions: [
+            { code: 'KR-31370', name: '가평군', provinceCode: 'KR-31', collected: true, provenance: 'tourapi', evidence: [festival] },
+            { code: 'KR-11010', name: '종로구', provinceCode: 'KR-11', collected: false, provenance: 'ai-estimate', evidence: [] },
+          ],
+        })],
+      });
+      render(<CollectionTab />);
+      expect(document.querySelector('#season-sources-summary')?.textContent).toBe('추천 근거: TourAPI 1곳 · AI 추정 1곳');
+      expect(document.querySelector('#season-sources li[data-source-region="11010"]')?.textContent).toBe('종로구AI 추정');
+      expect(document.querySelector('#season-footnote')?.textContent).toContain('AI 추정은 공개 자료로 확인하기 전의 추천이에요.');
+    });
+  });
+
   describe('회차를 완성하면', () => {
     it('완성 시점 멤버였으면 받은 칭호·XP·계절 배경을 보여 준다', () => {
       served.seasons = seasons({ current: [round({ have: 2, completed: true, rewarded: true, completedAt: '2026-10-04T03:00:00Z' })] });
@@ -141,7 +209,7 @@ describe('계절 한정', () => {
     it('기간이 아니라고 알리고, 다음 회차가 언제 열리는지와 지난 회차 기록을 보여 준다', () => {
       served.seasons = seasons({
         current: [],
-        next: { roundId: 'spring-2027', seasonId: 'spring', name: '2027 벚꽃 명소', emoji: '🌸', startsAt: '2027-03-19T15:00:00Z', endsAt: '2027-04-30T15:00:00Z' },
+        next: { roundId: 'spring-2027', seasonId: 'spring', name: '2027 벚꽃 명소', emoji: '🌸', startsAt: '2027-03-19T15:00:00Z', endsAt: '2027-04-30T15:00:00Z', provenance: 'ai-estimate' },
         history: [round({ open: false, remainingSeconds: 0, have: 2, completed: true, rewarded: true })],
       });
       render(<CollectionTab />);

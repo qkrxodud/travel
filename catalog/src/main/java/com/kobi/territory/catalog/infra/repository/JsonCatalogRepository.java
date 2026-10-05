@@ -1,6 +1,10 @@
 package com.kobi.territory.catalog.infra.repository;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.kobi.territory.catalog.domain.region.RegionBoundaries;
+import com.kobi.territory.catalog.domain.region.RegionBoundary;
+import java.util.ArrayList;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kobi.territory.catalog.domain.definition.BadgeCondition;
@@ -61,11 +65,41 @@ public class JsonCatalogRepository implements CatalogRepository {
         Map<Rarity, Integer> xp = new HashMap<>();
         rj.xpByRarity.forEach((rarityName, amount) -> xp.put(Rarity.valueOf(rarityName), amount));
         // 정합성 검증은 도메인(Catalog·일급 컬렉션)이 생성 시 한다
+        String geoJson = readString("regions.geojson");
         this.catalog = new Catalog(Regions.of(regions), Provinces.of(provinces),
             new RewardRules(xp, rj.provinceFirstBonus, rj.setCompleteBonus, rj.claimBonus, rj.mysteryBonus,
                 rj.provinceConquestBonus, rj.seasonCompleteBonus, rj.revisitStampBonus, rj.wishFulfilledBonus),
-            readString("regions.geojson"),
-            progression(om), mystery(om));
+            geoJson, progression(om), mystery(om), boundaries(om, geoJson));
+    }
+
+    /** 13s단계: regions.geojson 경계 → 점-다각형 판정용 경계(Polygon·MultiPolygon). */
+    static RegionBoundaries boundaries(ObjectMapper om, String geoJson) {
+        try {
+            List<RegionBoundary> boundaries = new ArrayList<>();
+            for (JsonNode feature : om.readTree(geoJson).path("features")) {
+                JsonNode geometry = feature.path("geometry");
+                List<List<List<double[]>>> polygons = new ArrayList<>();
+                switch (geometry.path("type").asText()) {
+                    case "Polygon" -> polygons.add(rings(geometry.path("coordinates")));
+                    case "MultiPolygon" -> geometry.path("coordinates").forEach(polygon -> polygons.add(rings(polygon)));
+                    default -> throw new IllegalStateException("모르는 경계 형식: " + geometry.path("type").asText());
+                }
+                boundaries.add(RegionBoundary.of(RegionCode.of(feature.path("properties").path("code").asText()), polygons));
+            }
+            return RegionBoundaries.of(boundaries);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("카탈로그 로딩 실패: regions.geojson", exception);
+        }
+    }
+
+    private static List<List<double[]>> rings(JsonNode polygon) {
+        List<List<double[]>> rings = new ArrayList<>();
+        polygon.forEach(ring -> {
+            List<double[]> vertices = new ArrayList<>();
+            ring.forEach(vertex -> vertices.add(new double[] {vertex.get(0).asDouble(), vertex.get(1).asDouble()}));
+            rings.add(vertices);
+        });
+        return rings;
     }
 
     /** 8단계 이번 주 미스터리 지역 규칙: mystery.json */
@@ -102,7 +136,7 @@ public class JsonCatalogRepository implements CatalogRepository {
         return read(om, "seasons.json", new TypeReference<List<SeasonJson>>() {}).stream()
             .map(seasonJson -> new SeasonDefinition(seasonJson.id, seasonJson.name, seasonJson.desc, MonthDay.parse("--" + seasonJson.start),
                 MonthDay.parse("--" + seasonJson.end), seasonJson.regionCodes.stream().map(RegionCode::of).toList(), seasonJson.title,
-                seasonJson.emoji))
+                seasonJson.emoji, seasonJson.keywords, seasonJson.provenance, seasonJson.attractionKeywords))
             .toList();
     }
 
@@ -164,9 +198,14 @@ public class JsonCatalogRepository implements CatalogRepository {
                       int mysteryBonus, int provinceConquestBonus, int seasonCompleteBonus, int revisitStampBonus,
                       int wishFulfilledBonus) {}
 
-    /** @param start·end "MM-dd"(양 끝 포함) */
+    /**
+     * @param start·end   "MM-dd"(양 끝 포함)
+     * @param keywords   계절 테마 키워드(13s단계 — TourAPI 축제 이름 대조)
+     * @param provenance 기본 지역 목록의 출처 표시("ai-estimate")
+     * @param attractionKeywords 계절 관광지 키워드 검색어(TourAPI 키워드 검색)
+     */
     record SeasonJson(String id, String name, String desc, String start, String end, List<String> regionCodes, String title,
-                      String emoji) {}
+                      String emoji, List<String> keywords, String provenance, List<String> attractionKeywords) {}
 
     record FreezeJson(int maxHeld, int monthlyQuestsReward) {}
 

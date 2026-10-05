@@ -76,6 +76,21 @@
 - **분석**: 서버가 보낸 알림은 `push_sent`(kind·기기 수), 화면은 알림을 눌러 열면 `push_open`(kind)·`app_open(entry=push)` 를 보낸다(클릭 경로에 `?from=push&push=종류`). 동의율은 `push_prompt`.
 - **local 확인**: `POST /dev/push/send {"kind":"mystery"|"streak"|"season","force":true}`(기본 force — 날짜 조건·조용한 시간 건너뜀, `force:false` 면 `/dev/clock` 으로 그날로 밀어서 스케줄과 같게), `GET /dev/push/deliveries`(내 발송 기록), 가짜 푸시 서비스 `POST·GET /dev/push/inbox/{상자}`(구독 주소 `http://localhost:포트/dev/push/inbox/상자`, `gone…` 410·`busy…` 429·`reject…` 403). 실제 브라우저 수신은 화면 쪽 E2E.
 
+## 13s단계 계절 명소 근거(한국관광공사 TourAPI)
+
+- **키(선택)**: 공공데이터포털 "한국관광공사_국문 관광정보 서비스_GW"(https://www.data.go.kr/data/15101578/openapi.do) 활용 신청 → 일반 인증키를 `.env` 의 `TOURAPI_SERVICE_KEY=` 에 붙인다(디코딩 키 권장 — 서버가 한 번만 URL 인코딩한다. `%` 가 든 인코딩 키도 그대로 쓴다). `docker compose up -d` 로 재기동하면 기동 직후 다음 회차(계절마다) 후보를 미리 모은다(수집 기간 전이면 확정 안 함). 키가 없으면 아무것도 부르지 않고 계절 회차는 seasons.json 기본 목록(화면에 "AI 추정")을 그대로 쓴다. 키는 로그·응답·오류 메시지·캐시 키에 남지 않는다.
+- **실제 키는 운영 compose(.env → MySQL)에만 둔다**: 하루 호출 수·응답 캐시·회차 기록은 DB 에 남아 재기동해도 이어지지만, local(`bootRun`·`java -jar` 기본 local 프로파일, H2 메모리)은 재기동마다 사라진다 — 실제 키를 local 에 넣으면 띄울 때마다 미리보기 호출(회차당 2건)이 새로 나가고 하루 상한도 그 서버만 따로 0부터 센다(운영과 별도로 쓰여 기관 한도를 함께 깎는다). local·E2E 는 가짜 키 + 가짜 TourAPI(`/dev/tourapi`)로 확인한다.
+- **키·주소 형식 검사**: 기동할 때 키(공백·제어 문자·한글·끝이 잘린 `%` 인코딩)와 `base-url`(공백 없는 http/https 주소) 형식을 본다. 틀리면 연동을 끄고 기본 목록(AI 추정)을 쓰며 경고만 남긴다(값은 남기지 않음) — 관리자 화면 경고 "서비스 키 형식 오류"·"base-url 형식 오류". 공공데이터포털 키를 다시 복사해 붙이고 재기동한다. `daily-call-limit` 은 1~900 이어야 한다(벗어나면 기동 실패).
+- **사용량 보기**: 관리자 화면 `/#/admin/seasons`(관리자 토큰 입력) 위쪽 "TourAPI" 줄 — 오늘(서울 날짜) 호출 수/하루 상한·상한 도달 경고·키 상태. API 로는 `GET /admin/seasons` 의 `tourApi.{configured, callsToday, dailyLimit, exhausted, warnings}`. 기관 쪽 총 사용량은 공공데이터포털 마이페이지(활용 신청 상세)에서 본다.
+- **바로 확인**: `curl -X POST -H "X-Admin-Token: $TERRITORY_ADMIN_TOKEN" localhost:18080/admin/seasons/spring-2027/refresh` → 후보(지역·근거 축제·조회 시각)·`lastAttempt.outcome`(COLLECTED·PARTIAL·KEY_REJECTED·QUOTA_EXCEEDED·BAD_RESPONSE·UNREACHABLE)·`warnings`. 괜찮으면 `PUT …/confirm`. 전체 현황 `GET /admin/seasons`(오늘 호출 수·상한·경고, 지금 열린 회차와 다음 회차).
+- **회차가 열리면 고정**: 시작 시각부터 그 회차는 갱신·확정이 409 `SEASON_ROUND_LOCKED`. 진행 중인 회차(지금 autumn-2026)는 기본 목록 그대로 끝난다 — 바뀌는 것은 다음 회차부터.
+- **자동 수집**: 하루 한 번(`territory.tourapi.collect.cron`, 기본 04:40) + 기동 직후. 회차 시작 30일 전부터 7일 간격으로 다시 모으고, TourAPI 근거 지역이 10곳이면 자동 확정(`auto-confirm`, `auto-confirm-min-regions`). 모자라면 후보로만 두고 지금 목록 유지 — 관리자가 보고 확정할 수 있다. 관리자가 확정한 회차는 자동 수집이 덮지 않는다. 같은 회차는 하루(서울 달력 날짜)에 한 번 넘게 모으지 않는다. TourAPI 가 다른 주소로 보내는 응답(리디렉션)은 따라가지 않는다(키가 다른 곳으로 가지 않게).
+- **근거 두 종류**: (a) 행사·축제(`searchFestival2`, 회차 기간 ± 14일, 이름에 계절 키워드), (b) 계절 관광지(`searchKeyword2`, 관광지 contentTypeId 12, 검색어 = seasons.json `attractionKeywords` — 봄 "벚꽃", 가을 "단풍"). 순위는 축제 근거 우선 → 관광지 근거 수 → 지역 코드. 응답의 `evidenceKind`(FESTIVAL·ATTRACTION)로 구분. 키워드 검색은 이름 부분 일치라 "단풍길"·"단풍명소"처럼 이미 있는 검색어를 담은 말은 더해도 새로 나오지 않는다(2026-10-05 실제: "단풍길" 0건) — 다른 낱말일 때만 더한다(검색어 하나 = 호출 하나).
+- **열린 회차 고정**: 확정 없이 열린 회차는 처음 조회·기동·하루 한 번 때 그때의 기본 목록을 확정본(OPENING)으로 저장한다. spring-2026·autumn-2026 은 V11 이 고정해 두었다 — 이제 seasons.json 의 기본 목록을 고쳐도 진행 중·지난 회차는 바뀌지 않는다.
+- **호출 예산**: 기관 일일 한도(1,000건 미만)보다 낮은 `territory.tourapi.daily-call-limit`(기본 200, DB `tourapi_usage` — 재기동해도 이어짐, 재시도도 한 번으로 셈). 한 쪽 1,000행이라 회차 하나는 보통 호출 2번(축제 1 + 관광지 검색어 1), 같은 날 같은 요청은 응답 원문 캐시(`tourapi_response`). `fresh=true` 갱신만 캐시를 건너뛴다(그것도 같은 예산 안). 상한에 닿으면 그날은 호출하지 않고 관리자 화면에 경고.
+- **알아 둘 것(2026-10-05 실제 응답으로 확인)**: 2026 봄(3/6~5/14) 행사 198건 중 벚꽃 축제 22건 → 근거 지역 10곳이 찬다. 2026 가을(9/17~12/14) 행사 341건 중 이름에 "단풍"이 든 축제는 0건이고, 관광지 키워드 검색 "단풍"도 3건(정읍 내장산 단풍생태공원·정선(좌표 — 주소는 영월) 단풍산·태백 철암단풍군락지)뿐 — 가을 회차는 근거 3곳 + AI 추정 7곳이 되어 자동 확정되지 않고(관리자 경고), 관리자가 보고 확정하거나 AI 추정을 유지한다. 2027 회차 행사는 아직 등록 전이라 지금 미리보기는 "맞는 축제가 없음"이 정상 — 회차 30일 전 자동 수집 때 다시 본다. 주소의 시·도 이름이 바뀐 경우(예: "전남광주통합특별시")가 있어 지역은 좌표(경계 판정)를 먼저 쓴다.
+- local 확인: `http/stage13s.http`(가짜 TourAPI `/dev/tourapi/searchFestival2`, 모드 `PUT /dev/tourapi/mode`, 자동 수집 `POST /dev/tourapi/collect`).
+
 ## 배포 체크리스트(12단계 정리)
 
 배포·업데이트 전에 확인한다(위 단계별 절의 요약).

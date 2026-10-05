@@ -8,10 +8,12 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const PORT = process.env.E2E_PORT ?? '8080';
 const BASE_URL = `http://localhost:${PORT}`;
-const BOOT_RUN =
-  PORT === '8080'
-    ? './gradlew :app-api:bootRun'
-    : `./gradlew :app-api:bootRun --args='--server.port=${PORT}'`;
+/**
+ * 13s단계: 계절 명소 TourAPI 는 실제 키 대신 서버 자신의 가짜 TourAPI(/dev/tourapi, local 전용)를 부르게 띄운다 —
+ * 실제 키·실제 호출 없이 "키 있는 흐름"(후보 → 확정 → 근거 표시)을 확인한다. 키 값은 아무 문자열(dev-fixture-key).
+ */
+const FAKE_TOURAPI = `--territory.tourapi.service-key=dev-fixture-key --territory.tourapi.base-url=${BASE_URL}/dev/tourapi`;
+const BOOT_RUN = `./gradlew :app-api:bootRun --args='--server.port=${PORT} ${FAKE_TOURAPI}'`;
 
 export default defineConfig({
   testDir: './tests',

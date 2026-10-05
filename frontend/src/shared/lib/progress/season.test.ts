@@ -11,7 +11,7 @@ const round = (overrides: Partial<SeasonRoundResponse> = {}): SeasonRoundRespons
   roundId: 'autumn-2026', seasonId: 'autumn', name: '2026 단풍 명소', emoji: '🍁', year: 2026,
   startsAt: '2026-09-30T15:00:00Z', endsAt: '2026-11-30T15:00:00Z', remainingSeconds: 58 * DAY, open: true,
   have: 3, total: 10, completed: false, completedAt: null, rewarded: false, xp: 150, titleId: 'season-autumn', titleName: '단풍 사냥꾼',
-  backgroundItemId: 'season:autumn-2026', regions: [], ...overrides,
+  backgroundItemId: 'season:autumn-2026', regions: [], provenance: 'ai-estimate', source: null, ...overrides,
 });
 const seasons = (overrides: Partial<SeasonsResponse> = {}): SeasonsResponse =>
   ({ mapId: 'personal', now: '2026-10-04T03:00:00Z', current: [round()], next: null, history: [], ...overrides });
@@ -60,7 +60,7 @@ describe('지도 탭 배지', () => {
 
 describe('다음 회차와 지난 회차', () => {
   it('다음 회차는 첫날을 서울 날짜로 알려 준다', () => {
-    expect(nextRoundText({ roundId: 'spring-2027', seasonId: 'spring', name: '2027 벚꽃 명소', emoji: '🌸', startsAt: '2027-03-19T15:00:00Z', endsAt: '2027-04-30T15:00:00Z' }))
+    expect(nextRoundText({ roundId: 'spring-2027', seasonId: 'spring', name: '2027 벚꽃 명소', emoji: '🌸', startsAt: '2027-03-19T15:00:00Z', endsAt: '2027-04-30T15:00:00Z', provenance: 'ai-estimate' }))
       .toBe('다음 회차 🌸 2027 벚꽃 명소 · 3월 20일부터');
   });
 

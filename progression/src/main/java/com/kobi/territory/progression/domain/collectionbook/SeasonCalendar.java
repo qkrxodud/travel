@@ -20,31 +20,39 @@ public final class SeasonCalendar {
     private final List<Season> seasons;
     private final ZoneId zone;
     private final Instant frozenBefore;
+    private final RoundLineups lineups;
 
-    private SeasonCalendar(List<Season> seasons, ZoneId zone, Instant frozenBefore) {
+    private SeasonCalendar(List<Season> seasons, ZoneId zone, Instant frozenBefore, RoundLineups lineups) {
         this.seasons = List.copyOf(seasons);
         this.zone = Objects.requireNonNull(zone, "zone");
         this.frozenBefore = frozenBefore;
+        this.lineups = Objects.requireNonNull(lineups, "lineups");
     }
 
+    /** 회차 지역은 모두 계절 정의의 기본 목록. */
     public static SeasonCalendar of(List<Season> seasons, ZoneId zone) {
-        return new SeasonCalendar(seasons, zone, null);
+        return of(seasons, zone, RoundLineups.defaults());
+    }
+
+    /** 회차 지역은 회차별 확정 목록(13s단계), 없으면 기본 목록. */
+    public static SeasonCalendar of(List<Season> seasons, ZoneId zone, RoundLineups lineups) {
+        return new SeasonCalendar(seasons, zone, null, lineups);
     }
 
     /** 계절이 없는 달력(9단계 이전 범위). */
     public static SeasonCalendar none(ZoneId zone) {
-        return new SeasonCalendar(List.of(), zone, null);
+        return of(List.of(), zone);
     }
 
     /** 재계산용: at 에 이미 닫힌 회차는 내지 않는 사본. */
     public SeasonCalendar excludingEndedBy(Instant at) {
-        return new SeasonCalendar(seasons, zone, at);
+        return new SeasonCalendar(seasons, zone, at, lineups);
     }
 
     /** 이 시각에 열려 있는 회차들. */
     public List<SeasonRound> roundsOpenAt(Instant at) {
         int year = at.atZone(zone).getYear();
-        return seasons.stream().map(season -> season.roundOf(year, zone))
+        return seasons.stream().map(season -> season.roundOf(year, zone, lineups))
             .filter(round -> round.openAt(at) && (frozenBefore == null || !round.endedBy(frozenBefore))).toList();
     }
 
@@ -61,7 +69,7 @@ public final class SeasonCalendar {
         try {
             int year = Integer.parseInt(roundId.substring(dash + 1));
             return seasons.stream().filter(season -> season.id().equals(seasonId)).findFirst()
-                .map(season -> season.roundOf(year, zone));
+                .map(season -> season.roundOf(year, zone, lineups));
         } catch (NumberFormatException notRound) {
             return Optional.empty();
         }
@@ -70,7 +78,7 @@ public final class SeasonCalendar {
     /** 이 시각 뒤에 가장 먼저 열리는 회차(지금 열린 회차는 제외). 계절이 없으면 빈 값. */
     public Optional<SeasonRound> nextRoundAfter(Instant at) {
         int year = at.atZone(zone).getYear();
-        return seasons.stream().flatMap(season -> List.of(season.roundOf(year, zone), season.roundOf(year + 1, zone)).stream())
+        return seasons.stream().flatMap(season -> List.of(season.roundOf(year, zone, lineups), season.roundOf(year + 1, zone, lineups)).stream())
             .filter(round -> round.startsAt().isAfter(at)).min(Comparator.comparing(SeasonRound::startsAt));
     }
 
